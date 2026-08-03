@@ -1,0 +1,40 @@
+name: release
+
+# Chạy khi push tag v* : build artifact + Docker image API + (tương lai) publish config bundle.
+# BOOTSTRAP SKELETON — bước publish/registry là TODO (cần secrets & registry).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write   # tạo GitHub Release
+
+jobs:
+  server-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build & test
+        run: |
+          dotnet restore server/GameTeam.sln
+          dotnet build server/GameTeam.sln -c Release --no-restore
+          dotnet test server/GameTeam.sln -c Release --no-build
+      - name: Build Docker image (API)
+        run: docker build -f server/Dockerfile -t game-team-api:${{ github.ref_name }} .
+      # TODO: đăng nhập & push lên container registry bằng secrets (docs/deployment/release-operations.md).
+
+  create-release:
+    needs: server-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tạo GitHub Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+      # TODO: đính kèm client export (Android), publish config bundle versioned (ADR-005).

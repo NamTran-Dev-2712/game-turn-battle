@@ -1,0 +1,19 @@
+<Project>
+  <!-- Thiết lập chung cho MỌI project trong server/ (docs/backend/solution-structure.md §5). -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Warning-as-error "mức hợp lý": lỗi compiler chặn build, còn cảnh báo analyzer
+         không chặn build ở bootstrap (siết dần) — docs/conventions/code-style.md §7. -->
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <!-- CA1014 (CLSCompliant): không cần cho service nội bộ (không phải thư viện public đa ngôn ngữ). -->
+    <NoWarn>$(NoWarn);CA1014</NoWarn>
+  </PropertyGroup>
+</Project>

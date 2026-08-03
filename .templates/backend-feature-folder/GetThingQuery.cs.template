@@ -1,0 +1,19 @@
+// TEMPLATE — rename <Thing>, remove this header, drop the .template extension.
+// A query reads state and never mutates it.
+using MediatR;
+
+namespace GameTeam.Application.Features.__FeatureName__.Queries;
+
+public sealed record GetThingQuery(long ExampleId) : IRequest<GetThingResult>;
+
+public sealed record GetThingResult(/* projection fields */ long Id);
+
+public sealed class GetThingQueryHandler : IRequestHandler<GetThingQuery, GetThingResult>
+{
+    // Inject a read port only.
+    public async Task<GetThingResult> Handle(GetThingQuery request, CancellationToken cancellationToken)
+    {
+        await Task.CompletedTask;
+        return new GetThingResult(request.ExampleId);
+    }
+}

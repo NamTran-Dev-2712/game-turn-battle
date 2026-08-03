@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Câu hỏi kiến trúc / điểm chưa chốt
+    url: https://github.com/
+    about: Với điểm mơ hồ nghiệp vụ, ghi vào docs/mvp/10-open-questions.md thay vì tự quyết.
+  - name: Thảo luận
+    url: https://github.com/
+    about: Dùng Discussions cho ý tưởng/thảo luận mở.

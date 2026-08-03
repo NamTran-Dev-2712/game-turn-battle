@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Contracts: DTO/request/response versioned; nguồn codegen client (shared/). -->
+  <ItemGroup>
+    <ProjectReference Include="..\GameTeam.Domain\GameTeam.Domain.csproj" />
+  </ItemGroup>
+</Project>

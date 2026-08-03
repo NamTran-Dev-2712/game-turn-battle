@@ -1,0 +1,33 @@
+name: validate-config
+
+# Gate merge: validate config data-driven theo JSON Schema + referential integrity (ADR-005).
+on:
+  push:
+    branches: [main, dev]
+    paths: ["config/**", "shared/config-schema/**", ".github/workflows/validate-config.yml"]
+  pull_request:
+    paths: ["config/**", "shared/config-schema/**", ".github/workflows/validate-config.yml"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JSON parse check (bootstrap — cú pháp)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          fail=0
+          for f in config/**/*.json shared/config-schema/**/*.json; do
+            if ! python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf-8'))" "$f"; then
+              echo "::error file=$f::JSON không hợp lệ"; fail=1
+            fi
+          done
+          exit $fail
+
+      # TODO (phase Core Framework): thay bằng tools/config-validator (JSON Schema draft 2020-12
+      # + referential integrity + version/migration). Đây là GATE thật — xem tools/config-validator/README.md.
+      - name: Schema + referential validation (TODO)
+        run: echo "config-validator chưa hiện thực — sẽ thay bước JSON parse ở phase Core Framework."

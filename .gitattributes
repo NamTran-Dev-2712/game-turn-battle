@@ -1,2 +1,35 @@
-# Normalize EOL for all files that Git considers text files.
+# Chuẩn hoá EOL: mặc định text tự nhận diện, EOL = LF.
 * text=auto eol=lf
+
+# Script Windows giữ CRLF.
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+# Shell script LF.
+*.sh   text eol=lf
+
+# ── Binary (không diff/merge text) ──
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.ttf  binary
+*.otf  binary
+*.wav  binary
+*.ogg  binary
+*.mp3  binary
+*.res  binary
+*.ctex binary
+
+# ── Git LFS candidates (bật khi cài Git LFS — asset nặng) ──
+# *.psd  filter=lfs diff=lfs merge=lfs -text
+# *.wav  filter=lfs diff=lfs merge=lfs -text
+# *.mp4  filter=lfs diff=lfs merge=lfs -text
+
+# ── Linguist: bỏ qua docs/generated khi tính ngôn ngữ repo ──
+docs/**            linguist-documentation
+shared/codegen/**  linguist-generated

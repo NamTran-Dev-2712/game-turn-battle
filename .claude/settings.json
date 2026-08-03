@@ -1,0 +1,30 @@
+{
+  "$comment": "Team-shared Claude Code config for this repo. NO secrets/tokens here (use .env, git-ignored). Personal overrides go in .claude/settings.local.json. Permissions: allow read-only inspection + routine dev commands; deny anything that reads secret files. Canonical AI rules live in docs/ai/ — this file only governs tool execution.",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet format:*)",
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(godot --headless:*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.keystore)",
+      "Read(**/*.p12)",
+      "Read(**/*.mobileprovision)"
+    ]
+  }
+}

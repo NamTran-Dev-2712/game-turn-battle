@@ -1,0 +1,28 @@
+# CODEOWNERS — review bắt buộc theo khu vực.
+# Thay các nhóm @game-team/* bằng team/username GitHub thật khi tổ chức repo.
+# Cú pháp: https://docs.github.com/articles/about-code-owners
+
+# Mặc định
+*                       @game-team/maintainers
+
+# Kiến trúc & quyết định (đổi = cần review kỹ)
+/docs/adr/              @game-team/architects
+/docs/architecture/     @game-team/architects
+/docs/conventions/      @game-team/architects
+
+# Backend
+/server/                @game-team/backend
+
+# Client
+/client/                @game-team/client
+
+# Hợp đồng & config (đồng bộ 2 phía)
+/shared/                @game-team/architects @game-team/backend @game-team/client
+/config/                @game-team/design @game-team/backend
+/shared/config-schema/  @game-team/architects @game-team/backend
+
+# Hạ tầng / CI
+/.github/               @game-team/platform
+/deploy/                @game-team/platform
+/scripts/               @game-team/platform
+/tools/                 @game-team/platform

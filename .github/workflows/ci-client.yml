@@ -1,0 +1,32 @@
+name: ci-client
+
+# Build + test client Godot khi có thay đổi ở client/ (docs/deployment/ci-cd-pipeline.md).
+# BOOTSTRAP SKELETON: các bước Godot headless (import/test/export) là TODO — cần ghim
+# Godot 4.x + export templates trong CI runner. Job hiện chỉ kiểm tra cấu trúc project.
+on:
+  push:
+    branches: [main, dev]
+    paths: ["client/**", ".github/workflows/ci-client.yml"]
+  pull_request:
+    paths: ["client/**", ".github/workflows/ci-client.yml"]
+
+env:
+  GODOT_VERSION: "4.7"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kiểm tra project.godot tồn tại
+        run: test -f client/project.godot
+
+      # TODO (phase Core Framework+):
+      #   - Cài Godot ${{ env.GODOT_VERSION }} headless + export templates (vd chickensoft/setup-godot).
+      #   - Import project: godot --headless --import --path client
+      #   - Chạy test gdUnit4 headless (docs/testing/godot-testing.md).
+      #   - Golden vector combat (client) — so khớp server (ADR-011).
+      #   - Export Android (release) — docs/deployment/ci-cd-pipeline.md.
+      - name: Placeholder (chưa có Godot CI)
+        run: echo "ci-client skeleton — bước Godot headless sẽ thêm ở phase Core Framework."

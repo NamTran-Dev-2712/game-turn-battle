@@ -1,0 +1,27 @@
+// TEMPLATE — rename, remove this header, drop the .template extension.
+// The handler orchestrates domain logic through PORTS. It must not reference Infrastructure types
+// (EF, HttpClient, etc.) or read wall-clock time / config files directly.
+using MediatR;
+
+namespace GameTeam.Application.Features.__FeatureName__.Commands;
+
+public sealed class DoThingCommandHandler : IRequestHandler<DoThingCommand, DoThingResult>
+{
+    // Inject ports/interfaces only (repository port, IClock, IConfigProvider, ...).
+    // private readonly IExampleRepository _repository;
+    // private readonly IClock _clock;
+
+    public DoThingCommandHandler(/* ports */)
+    {
+        // assign injected ports
+    }
+
+    public async Task<DoThingResult> Handle(DoThingCommand request, CancellationToken cancellationToken)
+    {
+        // 1. Load aggregate via port.
+        // 2. Invoke domain behavior (business rules live in Domain, not here).
+        // 3. Persist via port. Return a Result — do not swallow errors.
+        await Task.CompletedTask;
+        return new DoThingResult(Success: true);
+    }
+}

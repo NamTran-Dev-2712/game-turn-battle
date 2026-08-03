@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/config-bundle.schema.json",
+  "title": "ConfigBundle (PLACEHOLDER — bootstrap)",
+  "description": "Khung tối thiểu cho metadata một config bundle versioned (ADR-005). Schema đầy đủ cho từng loại config thêm ở phase Core Framework (S2). KHÔNG dùng cho gameplay values ở bootstrap.",
+  "type": "object",
+  "required": ["schema_version", "config_version"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Phiên bản cấu trúc schema; tăng khi đổi cấu trúc (có migration)."
+    },
+    "config_version": {
+      "type": "string",
+      "pattern": "^config@v[0-9]+$",
+      "description": "Nhãn bundle bất biến, ví dụ 'config@v1'."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": true
+}

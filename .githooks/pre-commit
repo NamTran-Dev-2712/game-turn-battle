@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# pre-commit (bootstrap stub) — cảnh báo secret rõ ràng. Kích hoạt:
+#   git config core.hooksPath .githooks
+set -euo pipefail
+
+# Chặn file secret bị stage nhầm.
+blocked=$(git diff --cached --name-only | grep -E '\.(env|pem|key|keystore|p12|mobileprovision)$' | grep -v '\.env\.example$' || true)
+if [ -n "$blocked" ]; then
+  echo "✖ pre-commit: từ chối commit file có vẻ là secret:"
+  echo "$blocked"
+  echo "  Bỏ stage: git restore --staged <file>. Secret không được commit (xem .env.example)."
+  exit 1
+fi
+
+# TODO: thêm gdformat/dotnet format --verify-no-changes khi tooling sẵn sàng.
+exit 0

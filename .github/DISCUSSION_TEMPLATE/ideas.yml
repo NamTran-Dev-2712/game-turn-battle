@@ -1,0 +1,18 @@
+title: "[idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Dùng cho ý tưởng/thảo luận mở. Lưu ý: **không** đổi MVP scope hay thiết kế trong
+        docs/mvp/ tại đây — nếu là điểm chưa chốt, ghi vào docs/mvp/10-open-questions.md.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Ý tưởng
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Bối cảnh / liên kết

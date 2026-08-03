@@ -1,0 +1,37 @@
+name: "🐛 Bug report"
+description: Báo lỗi trong client, server, hoặc tooling.
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Mô tả lỗi
+      description: Hành vi mong đợi vs thực tế.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Các bước tái hiện
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Khu vực
+      options: [client, server, config, tooling, ci, khác]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Phiên bản / commit
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log/ảnh (không đính secret)
+      render: shell
