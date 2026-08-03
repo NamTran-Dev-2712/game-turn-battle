@@ -1,0 +1,25 @@
+name: "⚙️ Config / balance change"
+description: Thay đổi dữ liệu data-driven trong config/ (không đổi code).
+title: "[config]: "
+labels: ["config", "triage"]
+body:
+  - type: textarea
+    id: change
+    attributes:
+      label: Thay đổi gì
+      description: Loại config (heroes/skills/stages/gacha/shop/rewards/economy/quests/liveops) + nội dung.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Cơ sở (mvp/design)
+      description: "docs/mvp/* hoặc quyết định balance liên quan."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Kiểm tra
+      options:
+        - label: Hợp JSON Schema (shared/config-schema)
+        - label: Referential integrity (ref hero↔skill↔stage…) đúng
+        - label: Có xem xét version/migration bundle nếu cần (ADR-005)

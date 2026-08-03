@@ -1,3 +1,54 @@
-# Godot 4+ specific ignores
+# ─────────────────────────── Godot (client) ───────────────────────────
 .godot/
+client/.godot/
 /android/
+client/android/
+export_presets.cfg.local
+*.translation
+
+# ─────────────────────────── .NET (server) ────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+TestResults/
+*.trx
+*.coverage
+*.nupkg
+artifacts/
+
+# ─────────────────────────── Generated / build ────────────────────────
+/build/*
+!/build/README.md
+/tmp/*
+!/tmp/README.md
+/shared/codegen/output/
+
+# ─────────────────────────── Secrets / env ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.p12
+*.mobileprovision
+appsettings.*.local.json
+secrets.json
+
+# ─────────────────────────── IDE / OS ─────────────────────────────────
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# VSCode: giữ cấu hình chia sẻ, bỏ cấu hình cá nhân
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json

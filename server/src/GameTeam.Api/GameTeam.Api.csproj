@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Api: Presentation + composition root (DI). Chỉ Api biết Infrastructure cụ thể
+       để wiring (docs/backend/solution-structure.md §1). -->
+  <ItemGroup>
+    <ProjectReference Include="..\GameTeam.Application\GameTeam.Application.csproj" />
+    <ProjectReference Include="..\GameTeam.Infrastructure\GameTeam.Infrastructure.csproj" />
+    <ProjectReference Include="..\GameTeam.Contracts\GameTeam.Contracts.csproj" />
+  </ItemGroup>
+</Project>

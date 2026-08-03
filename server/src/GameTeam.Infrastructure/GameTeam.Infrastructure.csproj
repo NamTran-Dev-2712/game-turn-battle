@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Infrastructure: EF Core/PostgreSQL, Redis, JWT, Configuration Service, jobs.
+       Hiện thực các port của Application (DIP). Phụ thuộc: Application, Domain. -->
+  <ItemGroup>
+    <ProjectReference Include="..\GameTeam.Application\GameTeam.Application.csproj" />
+    <ProjectReference Include="..\GameTeam.Domain\GameTeam.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,31 @@
+name: "✨ Feature / task"
+description: Đề xuất tính năng hoặc task hiện thực (tuân SSOT — không đổi MVP scope).
+title: "[feat]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Mục tiêu (WHY)
+      description: Kết quả mong muốn & giá trị.
+    validations:
+      required: true
+  - type: input
+    id: ssot
+    attributes:
+      label: Liên kết SSOT/ADR
+      description: "docs/mvp/* hoặc docs/adr/ADR-0xx liên quan (bắt buộc để truy vết)."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Phạm vi & ranh giới
+      description: Module được sửa / không được sửa (docs/architecture/dependency-graph.md).
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Điều kiện coi là hoàn thành (gồm test cần có).
+    validations:
+      required: true

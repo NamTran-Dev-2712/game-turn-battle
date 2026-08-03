@@ -1,0 +1,19 @@
+# TEMPLATE — rename <Feature>/<feature>, remove this header, drop the .template extension.
+# Controller wires the feature scene to core services. It communicates with other features ONLY
+# through the EventBus (ADR-002) and makes no server-authoritative decisions locally (ADR-011).
+class_name FeatureController
+extends Node
+
+## Emitted when the user requests an action this feature handles.
+signal action_requested(payload: Dictionary)
+
+# Access core services via the project's EventBus / service locator — do NOT import sibling features.
+# var _events: EventBus
+
+func _ready() -> void:
+	# subscribe to relevant EventBus signals here
+	pass
+
+func _on_action(payload: Dictionary) -> void:
+	# Validate input locally for UX, but the authoritative result comes from the server.
+	action_requested.emit(payload)

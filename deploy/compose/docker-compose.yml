@@ -1,0 +1,52 @@
+# Local dev stack — Postgres + Redis + API (bootstrap skeleton).
+# KHÔNG dùng cho production. Secret/biến lấy từ ../../.env (copy .env.example).
+# API service để 'profiles: [api]' để mặc định chỉ dựng hạ tầng (db+redis)
+# trong khi server skeleton chưa có image; bật bằng: docker compose --profile api up -d
+name: game-team-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gameteam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-gameteam}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gameteam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    profiles: ["api"]
+    build:
+      context: ../..
+      dockerfile: server/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-gameteam};Username=${POSTGRES_USER:-gameteam};Password=${POSTGRES_PASSWORD:-devpassword}"
+      ConnectionStrings__Redis: "redis:6379"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

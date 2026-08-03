@@ -1,0 +1,14 @@
+// TEMPLATE — rename, remove this header, drop the .template extension.
+// All input validation for the command lives here (not in the handler).
+using FluentValidation;
+
+namespace GameTeam.Application.Features.__FeatureName__.Commands;
+
+public sealed class DoThingCommandValidator : AbstractValidator<DoThingCommand>
+{
+    public DoThingCommandValidator()
+    {
+        RuleFor(x => x.ExampleId).GreaterThan(0);
+        // TODO: real rules. Keep messages clear; no gameplay balance numbers hardcoded here.
+    }
+}

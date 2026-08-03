@@ -1,0 +1,13 @@
+// TEMPLATE — rename <FeatureName>/<DoThing>, remove this header, drop the .template extension.
+// A command is an intent to change state. Keep it a plain record of inputs only.
+using MediatR;
+
+namespace GameTeam.Application.Features.__FeatureName__.Commands;
+
+public sealed record DoThingCommand(
+    // TODO: input fields only (ids, values). No entities, no services.
+    long ExampleId
+) : IRequest<DoThingResult>;
+
+// TODO: replace with the real result contract (or a shared Result<T>).
+public sealed record DoThingResult(bool Success);

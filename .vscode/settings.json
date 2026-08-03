@@ -1,0 +1,21 @@
+{
+  "files.eol": "\n",
+  "editor.formatOnSave": true,
+  "editor.insertSpaces": true,
+  "[csharp]": {
+    "editor.defaultFormatter": "ms-dotnettools.csharp"
+  },
+  "[gdscript]": {
+    "editor.insertSpaces": false
+  },
+  "dotnet.defaultSolution": "server/GameTeam.sln",
+  "godotTools.editorPath.godot4": "",
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "**/.godot": true
+  },
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml"
+  }
+}
