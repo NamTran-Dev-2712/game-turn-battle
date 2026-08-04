@@ -1,6 +1,6 @@
 # Roadmap
 
-> Tóm tắt. **Nguồn đầy đủ:** [`docs/roadmap/README.md`](docs/roadmap/README.md) (phase P0–P7: prerequisites · outputs · acceptance · playable) và thứ tự kỹ thuật [`docs/architecture/implementation-order.md`](docs/architecture/implementation-order.md) (S0–S13).
+> Tóm tắt. **Nguồn đầy đủ:** [`docs/roadmap/`](docs/roadmap/README.md) — sổ tay vận hành ([`README.md`](docs/roadmap/README.md)) + **55 file phase chi tiết đánh số** (`01-*.md` … `55-*.md`), mỗi phase một mục tiêu, có checklist · tiêu chí hoàn thành · cách kiểm tra · rủi ro · technical-debt review. Mỗi coding session làm **đúng 1 phase**. Góc nhìn thô: phase giao hàng P0–P7 (README §12) và thứ tự kỹ thuật [`docs/architecture/implementation-order.md`](docs/architecture/implementation-order.md) (S0–S13).
 
 ## Trình tự tổng
 **Bootstrap → Core Framework → Gameplay Systems → Backend Integration → LiveOps → Polish → Release**
