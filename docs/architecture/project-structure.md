@@ -242,7 +242,22 @@ docs/
 
 ---
 
-## 9. Thư mục generated & gitignore (nguyên tắc)
+## 9. Thư mục bổ sung ngoài §2 (đã giải thích)
+
+Các thư mục sau **có trên đĩa nhưng không nằm trong cây sản phẩm §2** — chúng là **bổ sung có chủ đích** (tầng thực thi AI + công cụ dev), đã ghi nhận trong [`../audit/bootstrap-audit.md`](../audit/bootstrap-audit.md) §2. Liệt kê ở đây để layout doc **tự chứa 100%** (không lệch chưa giải thích) — theo [roadmap phase 01](../roadmap/01-repo-structure-conventions.md).
+
+| Thư mục / nhóm | WHY | Nguồn |
+|---|---|---|
+| `.claude/ .prompts/ .templates/ .context/ .rules/ .instructions/ .memory/ .tasks/ .agents/` | **AI execution layer**: workflow, checklist, prompt, template, context, agent charter — bổ sung cho `../ai/`, **không** thay SSOT | `../../CLAUDE.md` §4 |
+| `.githooks/` | Git hook cục bộ (chặn secret; kích hoạt `git config core.hooksPath .githooks`) | [`../conventions/enforcement-map.md`](../conventions/enforcement-map.md) §8 |
+| `.vscode/` | Cấu hình editor chia sẻ (extensions/settings) — commit có chọn lọc | `.gitignore` (VSCode section) |
+| `design/` | Nơi làm việc tài sản thiết kế thô (mockup/nháp), **KHÔNG** thay SSOT `../mvp/` | [`../../design/README.md`](../../design/README.md) |
+
+> Kết luận đối chiếu: mọi thư mục cấp 1 của §2 đều hiện diện; các thư mục ngoài §2 đều thuộc bảng trên (đã giải thích). Cây repo **khớp 100%** `project-structure.md`.
+
+---
+
+## 10. Thư mục generated & gitignore (nguyên tắc)
 
 | Loại | Ví dụ | Chính sách |
 |---|---|---|
@@ -253,7 +268,7 @@ docs/
 
 ---
 
-## 10. Liên kết
+## 11. Liên kết
 - Đồ thị phụ thuộc: `dependency-graph.md`
 - Đặt tên chi tiết: `../conventions/naming.md`
 - Backend layout: `../backend/solution-structure.md`

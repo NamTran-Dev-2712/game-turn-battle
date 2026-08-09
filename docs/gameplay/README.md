@@ -36,3 +36,7 @@
 | Gacha RNG | — | ✅ |
 | AFK/energy tính | Hiển thị ước lượng | ✅ Quyết định (khi claim) |
 | Giao dịch tài nguyên | — | ✅ Atomic |
+
+## Liên kết
+- Yêu cầu (SSOT): [`../mvp/03-core-gameplay.md`](../mvp/03-core-gameplay.md), [`../mvp/05-player-progression.md`](../mvp/05-player-progression.md), [`../mvp/06-game-economy.md`](../mvp/06-game-economy.md)
+- Quyết định: [`../adr/ADR-004-data-driven-design.md`](../adr/ADR-004-data-driven-design.md), [`../adr/ADR-011-combat-authority-and-determinism.md`](../adr/ADR-011-combat-authority-and-determinism.md) · Backend: [`../backend/`](../backend/) · Client: [`../godot/`](../godot/)

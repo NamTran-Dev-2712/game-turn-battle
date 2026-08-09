@@ -21,5 +21,6 @@
 | Resource data-driven | `.tres`/custom Resource làm dữ liệu (ADR-004) |
 | Tách UI khỏi logic | View-model; UI không gọi network |
 
-## Nguồn
-- Hàm ý kỹ thuật client: `../mvp/08`. Hiệu năng: `../mvp/09` PF.
+## Liên kết
+- Hàm ý kỹ thuật client: [`../mvp/08-technical-impact.md`](../mvp/08-technical-impact.md) · Hiệu năng: [`../mvp/09-risk-analysis.md`](../mvp/09-risk-analysis.md).
+- Quyết định: [`../adr/ADR-002-godot-architecture.md`](../adr/ADR-002-godot-architecture.md) · Conventions: [`../conventions/`](../conventions/) · Testing: [`../testing/`](../testing/)

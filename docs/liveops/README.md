@@ -17,5 +17,6 @@
 - Scheduling dựa **server time** (`../mvp/08`).
 - Telemetry là điều kiện để LiveOps ra quyết định (`../mvp/09` LO2).
 
-## Nguồn
-- `../mvp/07-liveops-planning.md` (SSOT).
+## Liên kết
+- Yêu cầu (SSOT): [`../mvp/07-liveops-planning.md`](../mvp/07-liveops-planning.md).
+- Quyết định: [`../adr/ADR-005-configuration-strategy.md`](../adr/ADR-005-configuration-strategy.md), [`../adr/ADR-006-liveops.md`](../adr/ADR-006-liveops.md) · Backend: [`../backend/`](../backend/)
