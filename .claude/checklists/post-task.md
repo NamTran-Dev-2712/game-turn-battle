@@ -10,6 +10,9 @@ is enforced — a task is not Done until this passes.
 - [ ] **New decision?** → captured as an ADR, not left in prose or in your head.
 - [ ] **New ambiguity?** → in `docs/mvp/10-open-questions.md`.
 - [ ] **Status moved?** → reflected in `docs/audit/bootstrap-audit.md` / `docs/roadmap/`.
+- [ ] **Roadmap phase? Strict Phase Gate** (`docs/roadmap/README.md` §5, `CLAUDE.md` §4.5): every
+      `# Công việc cần thực hiện` item is `[x]` **with run evidence**, negative/failure tests done and
+      **reverted**, no future-phase scope leaked in, no open `TODO`. An unchecked item ⇒ not Done.
 - [ ] **Hand-off:** if work is unfinished, leave a note in `.tasks/` for the next session.
 - [ ] **Workspace improved?** If you hit friction a future session would also hit, improve the
       relevant `.claude/` / `.prompts/` / `.instructions/` file now (the self-maintaining goal).

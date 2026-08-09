@@ -1,16 +1,82 @@
 name: ci-server
 
-# Build + test backend .NET khi có thay đổi ở server/ (docs/deployment/ci-cd-pipeline.md).
+# Cổng chất lượng CI cho backend .NET 9 (docs/deployment/ci-cd-pipeline.md §7).
+# Job: build-test (build Release + test + coverage) và architecture-test (NetArchTest gate) chạy
+# song song; hai job placeholder (config-validate, golden-vector) chừa hook cho phase 07/26.
 on:
   push:
     branches: [main, dev]
-    paths: ["server/**", ".github/workflows/ci-server.yml"]
+    paths:
+      - "server/**"
+      - "shared/**"
+      - "server/Directory.Build.props"
+      - "server/Directory.Packages.props"
+      - ".github/workflows/ci-server.yml"
   pull_request:
-    paths: ["server/**", ".github/workflows/ci-server.yml"]
+    paths:
+      - "server/**"
+      - "shared/**"
+      - "server/Directory.Build.props"
+      - "server/Directory.Packages.props"
+      - ".github/workflows/ci-server.yml"
+
+# Huỷ run cũ khi có commit mới trên cùng ref (tiết kiệm runner).
+concurrency:
+  group: ci-server-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: chỉ cần đọc source (không push/registry ở phase này).
+permissions:
+  contents: read
 
 jobs:
+  # Build Release (warnings-as-error do server/Directory.Build.props bật) + test + coverage artifact.
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # SDK cố định theo global.json (9.0.306) — nguồn sự thật duy nhất về version.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Cache NuGet; key theo hash Directory.Packages.props (CPM, ADR-010) — chưa dùng lockfile.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('server/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore server/GameTeam.sln
+
+      - name: Build (warnings-as-error)
+        run: dotnet build server/GameTeam.sln --no-restore --configuration Release
+
+      - name: Test (+ coverage)
+        run: >-
+          dotnet test server/GameTeam.sln --no-build --configuration Release
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+          --verbosity normal
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-server
+          path: ./coverage/**/*.cobertura.xml
+          if-no-files-found: error
+
+  # Cổng architecture tách riêng: NetArchTest (GameTeam.Application.Tests) — báo đỏ rõ ràng khi
+  # vi phạm dependency rule Clean Architecture, ví dụ leak Domain→Infrastructure (ADR-003).
+  architecture-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -19,14 +85,48 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('server/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore server/GameTeam.sln
 
-      - name: Build (warnings-as-error)
-        run: dotnet build server/GameTeam.sln --no-restore --configuration Release
+      - name: Architecture tests (NetArchTest)
+        run: >-
+          dotnet test server/tests/GameTeam.Application.Tests/GameTeam.Application.Tests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName~ArchitectureTests"
+          --verbosity normal
 
-      - name: Test
-        run: dotnet test server/GameTeam.sln --no-build --configuration Release --verbosity normal
+  # PLACEHOLDER — chỉ là hook, KHÔNG thực thi validator thật ở phase này.
+  # Owner: Phase 07 (docs/roadmap/07-*.md). TODO: chạy tools/config-validator
+  # (JSON Schema + referential integrity) trên config/** & shared/config-schema/**.
+  config-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Placeholder notice
+        run: |
+          echo "STATUS : PLACEHOLDER (chưa thực thi)"
+          echo "GATE   : config-validate"
+          echo "TODO   : JSON Schema + referential-integrity validation cho config bundle"
+          echo "OWNER  : Phase 07 — docs/roadmap (validate-config.yml sẽ đảm nhiệm bản thật)"
 
-      # TODO (phase Core Framework+): architecture test (NetArchTest) là job gate riêng,
-      # golden vector combat (server) — so khớp với client (ADR-011). Xem ci-cd-pipeline.md §4.
+  # PLACEHOLDER — chỉ là hook, KHÔNG chạy so khớp golden vector ở phase này.
+  # Owner: Phase 26 (docs/roadmap/26-*.md). TODO: chạy sim server + client trên cùng test vector,
+  # so khớp output để bảo vệ determinism (ADR-011).
+  golden-vector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Placeholder notice
+        run: |
+          echo "STATUS : PLACEHOLDER (chưa thực thi)"
+          echo "GATE   : golden-vector (deterministic combat)"
+          echo "TODO   : so khớp output sim server vs client trên cùng test vector (ADR-011)"
+          echo "OWNER  : Phase 26 — docs/roadmap"
