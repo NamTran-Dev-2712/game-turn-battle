@@ -55,6 +55,6 @@ Hệ quả tích cực/tiêu cực, việc phải làm tiếp.
 | [ADR-010](ADR-010-dependency-management.md) | Dependency Management | Accepted | Quản lý package/addon 2 phía |
 | [ADR-011](ADR-011-combat-authority-and-determinism.md) | Combat Authority & Determinism | Accepted | Server-authoritative + deterministic re-sim |
 
-## 5. Nguồn ràng buộc
-- Yêu cầu nghiệp vụ: `../mvp/` (SSOT).
-- 3 quyết định chặn (R1–R3): `../mvp/14-readiness-checklist.md` → chốt ở ADR-007/008/011.
+## 5. Liên kết
+- Yêu cầu nghiệp vụ (SSOT): [`../mvp/`](../mvp/) · 3 quyết định chặn R1–R3: [`../mvp/14-readiness-checklist.md`](../mvp/14-readiness-checklist.md) → chốt ở ADR-007/008/011.
+- Kiến trúc: [`../architecture/`](../architecture/) · Conventions: [`../conventions/`](../conventions/) · Master index: [`../README.md`](../README.md)

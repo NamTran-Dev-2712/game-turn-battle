@@ -18,5 +18,6 @@
 - Server-authoritative + deterministic re-sim (ADR-011).
 - Modular monolith, feature-folder → dễ tách service về sau.
 
-## Nguồn
-- Yêu cầu: `../mvp/03`, `06`, `08`. Hàm ý kỹ thuật: `../mvp/08-technical-impact.md`.
+## Liên kết
+- Yêu cầu (SSOT): [`../mvp/03-core-gameplay.md`](../mvp/03-core-gameplay.md), [`../mvp/06-game-economy.md`](../mvp/06-game-economy.md) · Hàm ý kỹ thuật: [`../mvp/08-technical-impact.md`](../mvp/08-technical-impact.md).
+- Quyết định: [`../adr/ADR-003-backend-architecture.md`](../adr/ADR-003-backend-architecture.md) · Conventions: [`../conventions/`](../conventions/) · Testing: [`../testing/`](../testing/)
