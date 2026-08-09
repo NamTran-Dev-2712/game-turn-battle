@@ -6,6 +6,12 @@
 ## 0. Precondition
 Run `.claude/checklists/startup.md` once per session. One task = one goal with clear acceptance.
 
+## 0.5 Pick the phase (roadmap work)
+If this is roadmap work, apply the **Phase-Execution Protocol** (`CLAUDE.md` §4.5,
+`docs/roadmap/README.md` §4–§5): pick the lowest un-closed phase whose prerequisites are Closed,
+execute **only** that phase, and treat its `# Công việc cần thực hiện` list as the contract —
+one item at a time, no future-phase scope.
+
 ## 1. Load context (in this order — `docs/ai/context-strategy.md` §2)
 1. Task goal + acceptance criteria.
 2. Business SSOT: the **specific** `docs/mvp/` file(s), not the whole folder.
@@ -42,3 +48,5 @@ If a required decision is missing or ambiguous → add to `docs/mvp/10-open-ques
 
 ## 6. Done
 Meet `docs/ai/review-and-dod.md` §4 before declaring done. Then `.claude/checklists/commit.md`.
+For roadmap work, also pass the **Strict Phase Gate** (`docs/roadmap/README.md` §5): every checklist
+item `[x]` with run evidence, negative tests done + reverted, no future-phase creep, no open `TODO`.

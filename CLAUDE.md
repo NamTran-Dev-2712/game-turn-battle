@@ -52,6 +52,28 @@ Follow the order in **`docs/ai/context-strategy.md`** §2:
 | Cross-session task hand-off | `.tasks/` |
 | Repo-tuned specialist agents | `.claude/agents/` (charters in `.agents/`) |
 
+## 4.5 Phase-Execution Protocol (roadmap work is a contract)
+
+When the task is a **roadmap phase** (`docs/roadmap/NN-*.md`), the Strict Phase Gate in
+**`docs/roadmap/README.md` §4–§5** is binding. Do not restate it — apply it:
+
+1. **One phase per session.** Execute the lowest un-closed phase whose prerequisites are Closed.
+   Do not skip, reorder, or bundle phases.
+2. **Read the whole phase file first**, plus every doc it links (ADR / testing / deployment /
+   architecture). Inspect the existing implementation before changing it.
+3. **The phase's `# Công việc cần thực hiện` list is the execution contract.** Implement it item by
+   item; never invent requirements outside the documented scope.
+4. **`- [ ]` → `- [x]` only after the item is implemented AND verified** — with evidence from a run
+   (build/test/CI output, a negative test, an artifact). Never check an item on intent, or because
+   code merely exists.
+5. **Run the phase's negative / failure-path tests** where specified (e.g. inject a dependency-rule
+   leak, confirm the gate fails), then **fully revert** the temporary change and re-verify green.
+6. **Never implement future-phase scope.** Future gates stay explicit placeholders pointing at their
+   owning phase.
+7. **Before declaring the phase done:** re-read the phase file, run the completeness audit, confirm
+   every checklist item is `[x]` with evidence and no `TODO`/blocker remains (Gate condition set).
+   An unchecked item means the phase is **not** complete.
+
 ## 5. Definition of Done & the update policy
 
 - A change is **Done** only per `docs/ai/review-and-dod.md` §4 (acceptance met, review checklist

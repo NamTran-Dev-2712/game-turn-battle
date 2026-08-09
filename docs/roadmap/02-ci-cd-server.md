@@ -41,14 +41,14 @@ Bootstrap đã có ci-server chạy build+test, nhưng cần chuẩn hoá cache,
 
 # Công việc cần thực hiện
 
-- [ ] Cố định `actions/setup-dotnet` đọc version từ `global.json` (SDK 9.0.306).
-- [ ] Thêm cache NuGet theo `packages.lock`/`Directory.Packages.props`.
-- [ ] Step `dotnet restore` → `dotnet build -c Release` (đảm bảo `TreatWarningsAsErrors` compiler bật).
-- [ ] Step `dotnet test -c Release --collect` (coverlet) → upload artifact coverage.
-- [ ] Tách/đảm bảo test architecture (NetArchTest trong `GameTeam.Application.Tests`) chạy và fail-fast khi vi phạm dependency rule (ADR-003).
-- [ ] Path filter cho `server/**`, `shared/**`, `Directory.Build.props`, `Directory.Packages.props`.
-- [ ] Khai báo placeholder job `config-validate` và `golden-vector` (skip có ghi chú TODO trỏ phase 07/26).
-- [ ] Cập nhật `../deployment/ci-cd-pipeline.md` mô tả pipeline.
+- [x] Cố định `actions/setup-dotnet` đọc version từ `global.json` (SDK 9.0.306).
+- [x] Thêm cache NuGet theo `packages.lock`/`Directory.Packages.props`.
+- [x] Step `dotnet restore` → `dotnet build -c Release` (đảm bảo `TreatWarningsAsErrors` compiler bật).
+- [x] Step `dotnet test -c Release --collect` (coverlet) → upload artifact coverage.
+- [x] Tách/đảm bảo test architecture (NetArchTest trong `GameTeam.Application.Tests`) chạy và fail-fast khi vi phạm dependency rule (ADR-003).
+- [x] Path filter cho `server/**`, `shared/**`, `Directory.Build.props`, `Directory.Packages.props`.
+- [x] Khai báo placeholder job `config-validate` và `golden-vector` (skip có ghi chú TODO trỏ phase 07/26).
+- [x] Cập nhật `../deployment/ci-cd-pipeline.md` mô tả pipeline.
 
 # Tiêu chí hoàn thành
 
@@ -84,6 +84,15 @@ Bám [`../deployment/ci-cd-pipeline.md`](../deployment/ci-cd-pipeline.md) và AD
 # Phase Review
 
 Đóng khi CI server xanh với build/test/architecture, có coverage, negative test architecture xác nhận cổng hoạt động.
+
+**Bằng chứng xác minh (local, Phase 02):**
+- SDK: `dotnet --version` → `9.0.306` (khớp `global.json`).
+- Build Release: `0 Warning(s), 0 Error(s)`.
+- Test: **6/6 pass** (Domain 1, Application 3, Infrastructure 1, Api 1); coverage `coverage.cobertura.xml` sinh ra (4 file, coverlet).
+- Architecture (positive): 2 test `ArchitectureTests` pass qua filter riêng.
+- Architecture (**negative**): tạo type Domain phụ thuộc namespace `GameTeam.Infrastructure` ⇒ `Domain_should_not_depend_on_outer_layers` **FAIL** (exit 1) ⇒ đã **revert** ⇒ 6/6 pass lại. Cổng hoạt động.
+- Còn lại (chưa chứng minh local): "PR mẫu chạy CI xanh" + cache nhanh hơn lần 2 — cần push/PR trên GitHub Actions (chờ phê duyệt push).
+- Placeholder `config-validate` (→ phase 07) & `golden-vector` (→ phase 26) chỉ là hook, chưa thực thi.
 
 ---
 
