@@ -1,35 +1,51 @@
 name: release
 
-# Chạy khi push tag v* : build artifact + Docker image API + (tương lai) publish config bundle.
-# BOOTSTRAP SKELETON — bước publish/registry là TODO (cần secrets & registry).
+# Chạy khi push tag v* : build+test server → Docker image API → tạo draft GitHub Release.
+# Phase 03 (nền): CHỈ tạo draft; KHÔNG push registry / KHÔNG ký / KHÔNG export client.
+# Release hoàn chỉnh (push image, publish config bundle, Android export) để Phase 55.
 on:
   push:
     tags: ["v*"]
 
 permissions:
-  contents: write   # tạo GitHub Release
+  contents: write   # cần để tạo GitHub Release
 
 jobs:
   server-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+
+      # Cache NuGet (đồng bộ convention ci-server.yml — key theo hash Directory.Packages.props).
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('server/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Build & test
         run: |
           dotnet restore server/GameTeam.sln
           dotnet build server/GameTeam.sln -c Release --no-restore
           dotnet test server/GameTeam.sln -c Release --no-build
+
       - name: Build Docker image (API)
         run: docker build -f server/Dockerfile -t game-team-api:${{ github.ref_name }} .
-      # TODO: đăng nhập & push lên container registry bằng secrets (docs/deployment/release-operations.md).
+      # TODO (Phase 55): đăng nhập & push image lên container registry bằng secrets
+      # (docs/deployment/release-operations.md). KHÔNG thêm registry credential ở phase này.
 
   create-release:
     needs: server-image
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Tạo GitHub Release (draft)
@@ -37,4 +53,4 @@ jobs:
         with:
           draft: true
           generate_release_notes: true
-      # TODO: đính kèm client export (Android), publish config bundle versioned (ADR-005).
+      # TODO (Phase 55): đính kèm client export (Android), publish config bundle versioned (ADR-005).

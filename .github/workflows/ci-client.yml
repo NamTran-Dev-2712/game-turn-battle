@@ -1,8 +1,8 @@
 name: ci-client
 
-# Build + test client Godot khi có thay đổi ở client/ (docs/deployment/ci-cd-pipeline.md).
-# BOOTSTRAP SKELETON: các bước Godot headless (import/test/export) là TODO — cần ghim
-# Godot 4.x + export templates trong CI runner. Job hiện chỉ kiểm tra cấu trúc project.
+# Cổng CI client Godot headless (docs/deployment/ci-cd-pipeline.md §4c).
+# Phase 03: cài Godot 4.7 (pin + verify + cache) → `--headless --import` → gdUnit4 smoke test
+# headless (xuất JUnit). Feature test client mở rộng ở nhóm phase 3+ (đây chỉ dựng cổng nền).
 on:
   push:
     branches: [main, dev]
@@ -10,23 +10,97 @@ on:
   pull_request:
     paths: ["client/**", ".github/workflows/ci-client.yml"]
 
+# Huỷ run cũ khi có commit mới trên cùng ref (đồng bộ convention ci-server.yml).
+concurrency:
+  group: ci-client-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: chỉ đọc source (không release/registry ở workflow này).
+permissions:
+  contents: read
+
 env:
+  # Pin Godot — PHẢI khớp client/project.godot feature "4.7" (ADR-001, ADR-010).
   GODOT_VERSION: "4.7"
+  GODOT_RELEASE: "4.7-stable"
+  # gdUnit4 addon được commit (vendored) tại client/addons/gdUnit4 — xem plugin.cfg (ADR-010).
+  GDUNIT4_VERSION: "6.2.0"
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
       - name: Kiểm tra project.godot tồn tại
         run: test -f client/project.godot
 
-      # TODO (phase Core Framework+):
-      #   - Cài Godot ${{ env.GODOT_VERSION }} headless + export templates (vd chickensoft/setup-godot).
-      #   - Import project: godot --headless --import --path client
-      #   - Chạy test gdUnit4 headless (docs/testing/godot-testing.md).
-      #   - Golden vector combat (client) — so khớp server (ADR-011).
-      #   - Export Android (release) — docs/deployment/ci-cd-pipeline.md.
-      - name: Placeholder (chưa có Godot CI)
-        run: echo "ci-client skeleton — bước Godot headless sẽ thêm ở phase Core Framework."
+      # Cache binary Godot theo release — tránh tải lại mỗi run (ADR-010).
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ runner.os }}-${{ env.GODOT_RELEASE }}
+
+      # Tải binary chính thức + xác minh SHA512 theo file sums chính thức của cùng release
+      # (ghim version + deterministic URL + verify integrity). Fail cứng nếu hash sai.
+      - name: Download + verify Godot ${{ env.GODOT_RELEASE }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/godot-bin"
+          cd "$HOME/godot-bin"
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_RELEASE}"
+          zip="Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          echo "Downloading ${zip} + SHA512-SUMS.txt from ${base}"
+          curl -fL --retry 4 --retry-delay 2 -o "$zip" "${base}/${zip}"
+          curl -fL --retry 4 --retry-delay 2 -o SHA512-SUMS.txt "${base}/SHA512-SUMS.txt"
+          # Chỉ verify đúng dòng của binary Linux x86_64 (official checksum).
+          grep "  ${zip}\$" SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "$zip"
+          mv "Godot_v${GODOT_RELEASE}_linux.x86_64" godot
+          chmod +x godot
+          rm -f "$zip"
+
+      - name: Expose Godot + kiểm tra version khớp
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$HOME/godot-bin" >> "$GITHUB_PATH"
+          ver="$("$HOME/godot-bin/godot" --headless --version || true)"
+          echo "Godot reports: ${ver}"
+          case "$ver" in
+            ${GODOT_VERSION}.*|${GODOT_VERSION}) echo "OK: khớp GODOT_VERSION=${GODOT_VERSION}";;
+            *) echo "::error::Godot version '${ver}' không khớp pin '${GODOT_VERSION}'"; exit 1;;
+          esac
+
+      # Import gate: build import cache; KHÔNG che exit code — fail nếu import lỗi.
+      - name: Godot import (--headless --import)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --import --path client
+
+      # gdUnit4 smoke test headless → JUnit. runtest.sh lần chạy đầu cần display ảo (xvfb).
+      - name: Run gdUnit4 smoke test (headless → JUnit)
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x client/addons/gdUnit4/runtest.sh
+          cd client
+          xvfb-run --auto-servernum ./addons/gdUnit4/runtest.sh \
+            --godot_binary "$HOME/godot-bin/godot" \
+            -a res://tests -rd reports
+          # gdUnit4 ghi JUnit tại reports/report_<n>/results.xml — xác nhận tồn tại.
+          test -n "$(find reports -name results.xml -print -quit)"
+
+      - name: Upload JUnit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdunit4-results
+          path: client/reports/**/results.xml
+          if-no-files-found: error
