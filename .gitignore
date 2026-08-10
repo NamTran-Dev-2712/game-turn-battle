@@ -5,6 +5,8 @@ client/.godot/
 client/android/
 export_presets.cfg.local
 *.translation
+# gdUnit4 JUnit/HTML reports sinh trong CI (ci-client.yml -rd reports) — không commit.
+client/reports/
 
 # ─────────────────────────── .NET (server) ────────────────────────────
 [Bb]in/
@@ -52,3 +54,10 @@ desktop.ini
 !.vscode/settings.json
 !.vscode/launch.json
 !.vscode/tasks.json
+
+# ─────────────────── gdUnit4 addon (vendored, pin v6.2.0) ───────────────────
+# Addon commit theo ADR-010. Nó có thư mục bin/ chứa CLI runner (GdUnitCmdTool.gd mà
+# runtest.sh gọi) → rule .NET [Bb]in//[Oo]bj/[Rr]elease/... ở trên vô tình loại. Re-include
+# TOÀN BỘ addon (last-match-wins). Phải un-exclude thư mục con trước, rồi tới nội dung.
+!client/addons/gdUnit4/bin/
+!client/addons/gdUnit4/**

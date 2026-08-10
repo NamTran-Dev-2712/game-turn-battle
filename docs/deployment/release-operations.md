@@ -24,6 +24,22 @@ flowchart LR
 | 3 version độc lập | App / API / Config (ADR-005/008) |
 | Client tương thích API | Server hỗ trợ ≥1 major cũ trong chuyển đổi (ADR-008) |
 
+### 1a. Hiện trạng thực tế `release.yml` (Phase 03 — cổng nền)
+
+> Sơ đồ trên là quy trình **đích**. Hôm nay sau Phase 03, `release.yml` mới làm phần đầu:
+
+| Bước (job) | Đang làm | Ghi chú |
+|---|---|---|
+| Trigger | push tag `v*` | `permissions: contents: write`. |
+| Build + test server | `restore → build -c Release → test` (`server-image`) | `setup-dotnet` theo `global.json`; cache NuGet. |
+| Docker image | `docker build -f server/Dockerfile -t game-team-api:<tag> .` | Build context = repo root. **Không** push registry. |
+| GitHub Release | `softprops/action-gh-release@v2` `draft: true` + `generate_release_notes: true` (`create-release`) | Chỉ tạo **draft**; người vận hành review rồi mới publish tay. |
+
+**Phase 03 cố ý CHƯA làm (để Phase 55):** push image lên container registry (cần secrets),
+ký/xuất client (Android/iOS keystore), publish config bundle versioned, deploy staging/prod,
+migration DB, post-deploy smoke. Chưa cấu hình signing key → không lộ secret. Chi tiết pipeline:
+`ci-cd-pipeline.md` §4e.
+
 ## 2. Rollback
 
 | Thành phần | Cách rollback |

@@ -31,8 +31,9 @@
 - Mock network để test feature độc lập server.
 
 ## 5. CI
-- Godot headless chạy unit + golden + smoke (`../deployment/ci-cd-pipeline.md`).
-- Ghim version Godot (ADR-010).
+- Godot headless chạy unit + golden + smoke (`../deployment/ci-cd-pipeline.md` §4c).
+- Ghim version Godot (ADR-010) — Godot **4.7**, gdUnit4 **v6.2.0** (vendored).
+- **Hiện trạng Phase 03 (nền):** mới 1 smoke test tất định `client/tests/smoke/example_smoke_test.gd` (`extends GdUnitTestSuite`), chạy qua `runtest.sh` dưới `xvfb-run`, xuất **JUnit** `client/reports/report_<n>/results.xml`. Golden vector để **Phase 26**; unit/integration feature thêm dần ở các phase nhóm 3+.
 
 ## 6. Liên kết
 - Strategy: `README.md` · Tooling: `../godot/tooling-and-testing.md`

@@ -65,7 +65,9 @@ When the task is a **roadmap phase** (`docs/roadmap/NN-*.md`), the Strict Phase 
    item; never invent requirements outside the documented scope.
 4. **`- [ ]` → `- [x]` only after the item is implemented AND verified** — with evidence from a run
    (build/test/CI output, a negative test, an artifact). Never check an item on intent, or because
-   code merely exists.
+   code merely exists. For a gate that **only runs on CI** (Godot headless, Docker build with no local
+   daemon, a `v*`-tag release), the evidence is the **Actions result** — until you have it, keep the
+   item `[ ]` ("CI-verification pending") and don't self-certify.
 5. **Run the phase's negative / failure-path tests** where specified (e.g. inject a dependency-rule
    leak, confirm the gate fails), then **fully revert** the temporary change and re-verify green.
 6. **Never implement future-phase scope.** Future gates stay explicit placeholders pointing at their

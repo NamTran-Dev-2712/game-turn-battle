@@ -1,6 +1,8 @@
 name: validate-config
 
 # Gate merge: validate config data-driven theo JSON Schema + referential integrity (ADR-005).
+# Phase 03: giữ JSON parse-check (cú pháp) + thêm hook gọi tools/config-validator theo ngữ nghĩa
+# `--if-present` (no-op tới khi Phase 07 hiện thực validator thật → khi đó thành GATE bắt buộc).
 on:
   push:
     branches: [main, dev]
@@ -8,9 +10,17 @@ on:
   pull_request:
     paths: ["config/**", "shared/config-schema/**", ".github/workflows/validate-config.yml"]
 
+concurrency:
+  group: validate-config-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +37,18 @@ jobs:
           done
           exit $fail
 
-      # TODO (phase Core Framework): thay bằng tools/config-validator (JSON Schema draft 2020-12
-      # + referential integrity + version/migration). Đây là GATE thật — xem tools/config-validator/README.md.
-      - name: Schema + referential validation (TODO)
-        run: echo "config-validator chưa hiện thực — sẽ thay bước JSON parse ở phase Core Framework."
+      # Hook validator (`--if-present`): gọi tools/config-validator nếu đã có entrypoint chạy được;
+      # nếu chưa (trước Phase 07) → no-op giữ workflow xanh. Phase 07 chỉ cần thêm run.sh để bật GATE.
+      - name: config-validator hook (--if-present, no-op tới Phase 07)
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="tools/config-validator/run.sh"
+          if [ -x "$runner" ]; then
+            echo "config-validator hiện diện — chạy GATE thật."
+            "$runner" config shared/config-schema
+          else
+            echo "STATUS : SKIP (--if-present)"
+            echo "REASON : tools/config-validator/run.sh chưa hiện thực"
+            echo "OWNER  : Phase 07 — khi có run.sh, bước này tự động thành GATE bắt buộc"
+          fi

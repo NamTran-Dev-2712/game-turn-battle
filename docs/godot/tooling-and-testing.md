@@ -9,6 +9,13 @@
 - Addon để trong `client/addons/`, **commit** + ghi version/license.
 - Ghim version Godot; CI dùng đúng version (`../deployment/ci-cd-pipeline.md`).
 
+### 1a. Version pin (nguồn sự thật — Phase 03)
+
+| Thành phần | Pin | Nguồn sự thật | Ghi chú |
+|---|---|---|---|
+| **Godot** | **4.7** (`4.7-stable`) | `client/project.godot` (`config/features` chứa `"4.7"`) **và** `ci-client.yml` `env.GODOT_VERSION` | Hai nơi phải khớp; CI có bước guard `--version`. Tải binary Linux x86_64 chính thức + verify `SHA512-SUMS.txt`, cache theo release. Không dùng `latest`. |
+| **gdUnit4** | **v6.2.0** (MIT) | `client/addons/gdUnit4/plugin.cfg` (`version="6.2.0"`) + `ci-client.yml` `env.GDUNIT4_VERSION` | Addon **vendored/commit** (599 file, kèm `LICENSE`). Yêu cầu Godot ≥ 4.5. Enable ở `project.godot [editor_plugins]`; plugin tự bỏ qua UI khi headless/`--import`/CLI. |
+
 ## 2. Editor tools (nội bộ)
 | Tool | Mục đích |
 |---|---|
@@ -38,8 +45,9 @@
 **Ưu tiên test:** combat sim (determinism), math fixed-point, mapping config → resource. UI test ở mức smoke.
 
 ## 5. Chạy test trong CI
-- Godot headless chạy test client (`../deployment/ci-cd-pipeline.md`).
-- Golden vector combat chạy **cả client & server** để đảm bảo khớp.
+- Godot headless chạy test client (`../deployment/ci-cd-pipeline.md` §4c).
+- **Hiện trạng Phase 03 (nền):** `ci-client.yml` = tải+verify Godot 4.7 → `godot --headless --import --path client` (import gate) → gdUnit4 chạy `runtest.sh -a res://tests -rd reports` dưới `xvfb-run` → xuất **JUnit** `client/reports/report_<n>/results.xml` (upload artifact `gdunit4-results`). Mới ở mức 1 smoke test tất định.
+- Golden vector combat chạy **cả client & server** để đảm bảo khớp — **để Phase 26** (ADR-011), chưa có ở cổng nền.
 
 ## 6. Liên kết
 - Testing tổng: `../testing/README.md`, `../testing/godot-testing.md`
