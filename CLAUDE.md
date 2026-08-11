@@ -100,6 +100,24 @@ volume); API liveness at **`GET /health`** → `{"status":"ok"}`. Canonical how-
 - When modifying it, keep **`.env.example` + compose + scripts + docs + this AI guidance in sync** (doc-sync
   matrix, §5).
 
+**Shared contracts are standardized (Phase 05 — closed & verified).** The client↔server contract spine has
+one source of truth: **C# `GameTeam.Contracts`** (one public type/file, references Domain only) — six shared
+enums (`Faction`/`Class`/`Element`/`Role`/`Currency`/`Rarity`; `None=0` sentinel, explicit numeric values)
+and foundation DTOs (`AuthGuest{Request,Response}`, `ProfileDto`, `ConfigBundleDto`/`ConfigVersion`,
+`ErrorResponse` + `ErrorEnvelope` wrapper, `HealthResponse`, `ApiVersions`). **OpenAPI is generated from
+code** (.NET 9 `Microsoft.AspNetCore.OpenApi` + `Microsoft.Extensions.ApiDescription.Server`, build-time) to
+**`shared/contracts/openapi.json`** — the single source for client codegen (Phase 08). API versioning is
+`/api/v1`; base routes are **501 metadata stubs** (real handlers = Phase 13). Canonical rules:
+`docs/backend/api-and-versioning.md` §4; decision log: `.memory/0003-shared-contracts-standardized.md`.
+
+- Future agents **MUST inspect and reuse** `GameTeam.Contracts` + `shared/contracts/openapi.json` before
+  adding any enum/DTO/contract; **MUST NOT** create a second contract source or hand-edit the generated spec.
+- Contract evolution is **additive-only** (new endpoints, optional fields, new enum values); **never**
+  renumber/reuse an enum value or make a breaking change inside a major — that requires a new `/api/vN`.
+- When changing a contract, keep **`GameTeam.Contracts` + regenerated `openapi.json` + `EnumStabilityTests`
+  + `docs/backend/api-and-versioning.md` in sync** (doc-sync matrix, §5); the CI OpenAPI drift-guard enforces
+  the regenerate step.
+
 ## 5. Definition of Done & the update policy
 
 - A change is **Done** only per `docs/ai/review-and-dod.md` §4 (acceptance met, review checklist

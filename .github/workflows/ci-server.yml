@@ -58,6 +58,11 @@ jobs:
       - name: Build (warnings-as-error)
         run: dotnet build server/GameTeam.sln --no-restore --configuration Release
 
+      # OpenAPI single-source (Phase 05): build vừa sinh lại shared/contracts/openapi.json từ
+      # GameTeam.Contracts. Nếu bản commit đã cũ (drift với code) → CI đỏ. Buộc regenerate + commit.
+      - name: OpenAPI drift guard
+        run: git diff --exit-code -- shared/contracts/openapi.json
+
       - name: Test (+ coverage)
         run: >-
           dotnet test server/GameTeam.sln --no-build --configuration Release

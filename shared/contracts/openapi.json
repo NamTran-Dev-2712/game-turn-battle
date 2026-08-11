@@ -1,0 +1,336 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "GameTeam.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "Health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/guest": {
+      "post": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "AuthGuest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthGuestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthGuestResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetProfile",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config/{version}": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetConfigBundle",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigBundleDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Faction": {
+        "enum": [
+          "None"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+      },
+      "Class": {
+        "enum": [
+          "None",
+          "Warrior",
+          "Mage",
+          "Ranger",
+          "Support"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+      },
+      "Element": {
+        "enum": [
+          "None",
+          "Fire",
+          "Water",
+          "Earth",
+          "Light",
+          "Dark"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+      },
+      "Role": {
+        "enum": [
+          "None",
+          "Tank",
+          "Dps",
+          "Support",
+          "Healer"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+      },
+      "Rarity": {
+        "enum": [
+          "None",
+          "Three",
+          "Four",
+          "Five"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+      },
+      "Currency": {
+        "enum": [
+          "None",
+          "Gold",
+          "Gem",
+          "Ticket"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+      },
+      "AuthGuestRequest": {
+        "required": [
+          "deviceId"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AuthGuestResponse": {
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresInSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ConfigBundleDto": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ConfigVersion"
+          }
+        }
+      },
+      "ConfigVersion": {
+        "required": [
+          "bundle",
+          "schema"
+        ],
+        "type": "object",
+        "properties": {
+          "bundle": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "required": [
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorResponse"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "required": [
+          "code",
+          "message",
+          "traceId"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "HealthResponse": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileDto": {
+        "required": [
+          "playerId",
+          "displayName",
+          "level",
+          "schemaVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "GameTeam.Api"
+    }
+  ]
+}

@@ -41,12 +41,12 @@ Tạo bộ contract skeleton: OpenAPI mô tả các endpoint nền (health, auth
 
 # Công việc cần thực hiện
 
-- [ ] Định nghĩa enum dùng chung (Faction/Class/Element/Role, Currency, Rarity) theo glossary [`../mvp/12-glossary.md`](../mvp/12-glossary.md); giá trị enum ổn định (không đổi số thứ tự tuỳ tiện).
-- [ ] Định nghĩa DTO nền: `AuthGuestRequest/Response`, `ProfileDto`, `ConfigBundleDto`/`ConfigVersion`, `ErrorResponse` (code/message/traceId).
-- [ ] Chuẩn hoá quy ước `/api/v{major}/...`; ghi rõ chính sách breaking change.
-- [ ] Cấu hình xuất OpenAPI (từ annotations/Swashbuckle hoặc source-gen) ra `shared/contracts/`.
-- [ ] Thêm test: DTO serialize/deserialize round-trip, enum stable.
-- [ ] Cập nhật `../backend/api-and-versioning.md` (error envelope, versioning).
+- [x] Định nghĩa enum dùng chung (Faction/Class/Element/Role, Currency, Rarity) theo glossary [`../mvp/12-glossary.md`](../mvp/12-glossary.md); giá trị enum ổn định (không đổi số thứ tự tuỳ tiện). → `server/src/GameTeam.Contracts/Enums/*.cs` (6 enum, `None=0` sentinel, số cố định). Faction chỉ có `None` vì danh sách phe (GP2) chưa chốt trong SSOT (`../mvp/10-open-questions.md`) — thêm additive khi chốt. Guard: `EnumStabilityTests` (36 test Contracts **xanh**; negative test: đổi `Class.Mage=9` → test **đỏ** đúng như kỳ vọng, đã revert).
+- [x] Định nghĩa DTO nền: `AuthGuestRequest/Response`, `ProfileDto`, `ConfigBundleDto`/`ConfigVersion`, `ErrorResponse` (code/message/traceId). → `server/src/GameTeam.Contracts/{Auth,Profile,Config,Common}/*.cs` (record, một public type/file) + `ErrorEnvelope` (vỏ `{error:…}`) + `HealthResponse` + `ApiVersions`. Round-trip test **xanh**.
+- [x] Chuẩn hoá quy ước `/api/v{major}/...`; ghi rõ chính sách breaking change. → `ApiVersions.V1Prefix=/api/v1`; route nền khai báo dưới `/api/v1` (Program.cs, stub 501 — chưa hiện thực); chính sách compatible/breaking + ổn định enum ghi ở `../backend/api-and-versioning.md` §4.
+- [x] Cấu hình xuất OpenAPI (từ annotations/Swashbuckle hoặc source-gen) ra `shared/contracts/`. → .NET 9 first-party `Microsoft.AspNetCore.OpenApi` (`AddOpenApi`/`MapOpenApi`) + `Microsoft.Extensions.ApiDescription.Server` (build-time) → `shared/contracts/openapi.json` (14 schema: 6 enum chuỗi + 8 DTO; 4 path). Transformer publish enum dùng chung vào components. Regenerate ổn định (diff clean).
+- [x] Thêm test: DTO serialize/deserialize round-trip, enum stable. → `GameTeam.Contracts.Tests` (SerializationTests + EnumStabilityTests, 36) + `OpenApiContractTests` (validate OpenAPI bằng `Microsoft.OpenApi.Readers`, kiểm path/schema/enum-chuỗi, 20) + NetArchTest `Contracts` không ref App/Infra/Api (negative test **đỏ** khi inject dependency, đã revert). `dotnet test` **63 xanh**.
+- [x] Cập nhật `../backend/api-and-versioning.md` (error envelope, versioning). → §3 error envelope `{error:{code,message,traceId}}` camelCase + tên DTO + quy tắc không rò nội bộ; §4/§4.1–4.4 major=v1, danh sách compatible/breaking, chính sách ổn định enum, contract-first/OpenAPI single-source + đường dẫn `shared/contracts/openapi.json`.
 
 # Tiêu chí hoàn thành
 
@@ -81,7 +81,18 @@ Tạo bộ contract skeleton: OpenAPI mô tả các endpoint nền (health, auth
 
 # Phase Review
 
-Đóng khi contract nền + enum + OpenAPI spec ổn định, test round-trip xanh, hướng phụ thuộc đúng.
+**PASS (local) — đủ điều kiện đóng, chờ CI xanh trên PR.**
+
+Bằng chứng xác minh (chạy thật, .NET SDK 9.0.306, Windows):
+- `dotnet build server/GameTeam.sln -c Release` → **0 Warning, 0 Error** (warnings-as-error bật).
+- `dotnet test server/GameTeam.sln -c Release` → **63 pass / 0 fail** (Domain 1, Contracts 36, Application 4, Infrastructure 1, Api.IntegrationTests 21).
+- OpenAPI: `shared/contracts/openapi.json` sinh từ code lúc build; hợp lệ (0 lỗi diagnostic của `Microsoft.OpenApi.Readers`); regenerate cho kết quả **không drift**.
+- Dependency direction: NetArchTest xác nhận `Contracts` chỉ → Domain (không App/Infra/Api). **Negative test** (inject Domain-ref + cấm Domain) → **đỏ** đúng kỳ vọng, đã revert & re-verify xanh.
+- Enum stability: **negative test** (đổi `Class.Mage=2→9`) → **đỏ** đúng kỳ vọng, đã revert.
+
+Còn lại (CI-verification pending): job `ci-server` (build-test + bước mới *OpenAPI drift guard* + `architecture-test`) cần xanh trên GitHub Actions của PR — chưa chứng minh local vì chỉ chạy trên runner. Tất cả lệnh tương ứng đã xanh local.
+
+Phạm vi: KHÔNG hiện thực handler nghiệp vụ (stub 501 — Phase 13), KHÔNG DTO feature (hero/gacha/battle), KHÔNG codegen client (Phase 08). Đúng ranh giới phase.
 
 ---
 

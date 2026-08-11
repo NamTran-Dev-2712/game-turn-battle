@@ -1,9 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <!-- Api: Presentation + composition root (DI). Chỉ Api biết Infrastructure cụ thể
        để wiring (docs/backend/solution-structure.md §1). -->
+
+  <!-- OpenAPI single-source: sinh spec từ contract C# ra shared/contracts/openapi.json lúc build
+       (Phase 05 — docs/backend/api-and-versioning.md). Không sửa tay file sinh ra. -->
+  <PropertyGroup>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../../../shared/contracts</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name openapi</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\GameTeam.Application\GameTeam.Application.csproj" />
     <ProjectReference Include="..\GameTeam.Infrastructure\GameTeam.Infrastructure.csproj" />
     <ProjectReference Include="..\GameTeam.Contracts\GameTeam.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>

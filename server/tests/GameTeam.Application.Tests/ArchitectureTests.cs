@@ -36,4 +36,21 @@ public class ArchitectureTests
         result.IsSuccessful.Should().BeTrue(
             "Application chỉ phụ thuộc interface (DIP), không phụ thuộc Infrastructure cụ thể.");
     }
+
+    [Fact]
+    public void Contracts_should_not_depend_on_application_or_infrastructure()
+    {
+        // Hướng phụ thuộc hợp lệ: Contracts → Domain (enum/hằng) MÀ THÔI
+        // (docs/architecture/dependency-graph.md §2/§6, Phase 05 completion criteria).
+        TestResult result = Types.InAssembly(typeof(GameTeam.Contracts.AssemblyMarker).Assembly)
+            .Should()
+            .NotHaveDependencyOnAny(
+                "GameTeam.Application",
+                "GameTeam.Infrastructure",
+                "GameTeam.Api")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(
+            "Contracts là spine dùng chung, chỉ được phụ thuộc Domain — không App/Infra/Api.");
+    }
 }

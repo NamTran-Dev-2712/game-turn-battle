@@ -14,5 +14,6 @@
 - [`README-format.md`](README-format.md) — format một mục nhật ký quyết định.
 - [`0001-ai-execution-layer.md`](0001-ai-execution-layer.md) — quyết định tách execution layer khỏi docs SSOT.
 - [`0002-dev-environment-standardized.md`](0002-dev-environment-standardized.md) — dev env một lệnh (Phase 04): compose Postgres16/Redis7, network `game-team-dev`, profile `api`, `.env`, script up/down đa nền tảng.
+- [`0003-shared-contracts-standardized.md`](0003-shared-contracts-standardized.md) — contract spine (Phase 05): `GameTeam.Contracts` là nguồn (enum + DTO nền), OpenAPI sinh từ code ra `shared/contracts/openapi.json` (single-source, CI drift guard), enum ổn định additive-only, `/api/v1`.
 
 > Quyết định kiến trúc **luôn** đi vào `docs/adr/`, không chỉ ở đây.
