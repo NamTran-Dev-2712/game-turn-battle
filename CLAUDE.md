@@ -76,6 +76,30 @@ When the task is a **roadmap phase** (`docs/roadmap/NN-*.md`), the Strict Phase 
    every checklist item is `[x]` with evidence and no `TODO`/blocker remains (Gate condition set).
    An unchecked item means the phase is **not** complete.
 
+## 4.6 Completed-phase constraints (established infrastructure — reuse, don't reinvent)
+
+**Completed Phase Preservation Rule.** A closed, verified phase is an **established project constraint**.
+Inspect its existing implementation before modifying or replacing it. You may **extend** it when a later
+phase requires it, but never silently swap a completed convention for a new architecture. When a phase
+changes repository behavior, its roadmap checklist/`# Phase Review` **and** the relevant AI/vibe-code docs
+must be updated in the same change so the decision stays visible to future agents.
+
+**Dev environment is standardized (Phase 04 — closed & verified).** One-command local dev via
+**Docker Compose** (`deploy/compose/docker-compose.yml`): **`postgres:16-alpine`** + **`redis:7-alpine`**
+(always-on, real healthchecks) on the **`game-team-dev`** network, with the **`api` profile** building from
+`server/Dockerfile` and injecting `ConnectionStrings__Postgres/__Redis`; config from **`.env`** (local-only,
+git-ignored) templated by **`.env.example`**; cross-platform **`scripts/dev/up.{ps1,sh}`** (`-Api`/`--api`,
+healthcheck-driven readiness) and **`down.{ps1,sh}`** (`-Volumes`/`-v`; default **preserves** the pgdata
+volume); API liveness at **`GET /health`** → `{"status":"ok"}`. Canonical how-to + troubleshooting:
+`docs/deployment/README.md` → **Local development**.
+
+- Future agents **MUST inspect and reuse** this dev environment/scripts before creating any new local
+  infra, compose file, ports, env-var conventions, or startup scripts.
+- Future agents **MUST NOT reinvent** the Phase 04 dev environment unless a later phase explicitly requires
+  an extension (e.g. Testcontainers, a new service).
+- When modifying it, keep **`.env.example` + compose + scripts + docs + this AI guidance in sync** (doc-sync
+  matrix, §5).
+
 ## 5. Definition of Done & the update policy
 
 - A change is **Done** only per `docs/ai/review-and-dod.md` §4 (acceptance met, review checklist

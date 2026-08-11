@@ -15,6 +15,8 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - game-team-dev
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gameteam}"]
       interval: 10s
@@ -25,6 +27,8 @@ services:
     image: redis:7-alpine
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - game-team-dev
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -42,11 +46,19 @@ services:
       ConnectionStrings__Redis: "redis:6379"
     ports:
       - "${API_PORT:-8080}:8080"
+    networks:
+      - game-team-dev
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+# Mạng dev cố định (network `game-team-dev`) — service gọi nhau qua tên service
+# (postgres/redis) trên mạng này; không phụ thuộc host cụ thể.
+networks:
+  game-team-dev:
+    name: game-team-dev
 
 volumes:
   pgdata:

@@ -13,5 +13,6 @@
 ## Nội dung
 - [`README-format.md`](README-format.md) — format một mục nhật ký quyết định.
 - [`0001-ai-execution-layer.md`](0001-ai-execution-layer.md) — quyết định tách execution layer khỏi docs SSOT.
+- [`0002-dev-environment-standardized.md`](0002-dev-environment-standardized.md) — dev env một lệnh (Phase 04): compose Postgres16/Redis7, network `game-team-dev`, profile `api`, `.env`, script up/down đa nền tảng.
 
 > Quyết định kiến trúc **luôn** đi vào `docs/adr/`, không chỉ ở đây.

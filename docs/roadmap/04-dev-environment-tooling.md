@@ -41,13 +41,13 @@ Các phase backend (auth/save/config service, nhóm 2–4) cần Postgres+Redis 
 
 # Công việc cần thực hiện
 
-- [ ] Rà `docker-compose.yml`: image pin (`postgres:16-alpine`, `redis:7-alpine`), healthcheck, volume, network `game-team-dev`.
-- [ ] Profile `api` build từ `server/Dockerfile`, phụ thuộc DB healthy, inject connection strings.
-- [ ] `scripts/dev/up.ps1|sh`: `docker compose up -d` (+`--profile api` tuỳ cờ), chờ healthy, in trạng thái.
-- [ ] `scripts/dev/down.ps1|sh`: `docker compose down` (giữ/volume tuỳ cờ `-v`).
-- [ ] Đồng bộ `.env.example` với biến compose cần; kiểm `.gitignore` chặn `.env`.
-- [ ] Thử `up` → gọi `GET /health` trả `{status:"ok"}` khi bật profile api.
-- [ ] Viết mục hướng dẫn chạy local + troubleshooting cổng bận.
+- [x] Rà `docker-compose.yml`: image pin (`postgres:16-alpine`, `redis:7-alpine`), healthcheck, volume, network `game-team-dev`. → thêm network cấp cao `game-team-dev` (trước chỉ có `name:` project ⇒ mạng là `game-team-dev_default`); `docker compose config` xác nhận network đúng tên; `docker network ls` khi chạy = `game-team-dev`.
+- [x] Profile `api` build từ `server/Dockerfile`, phụ thuộc DB healthy, inject connection strings. → build image thành công (dotnet publish trong container); `depends_on: condition: service_healthy`; `docker exec printenv` xác nhận `ConnectionStrings__Postgres=Host=postgres;…` + `ConnectionStrings__Redis=redis:6379` (dùng tên service, không `localhost`).
+- [x] `scripts/dev/up.ps1|sh`: `docker compose up -d` (+`--profile api` tuỳ cờ `-Api`/`--api`), chờ healthy (poll `docker inspect .State.Health`, không sleep cứng), in `docker compose ps`. → chạy thật cả PowerShell lẫn bash: Postgres+Redis `(healthy)`, exit 0.
+- [x] `scripts/dev/down.ps1|sh`: `docker compose down` mặc định **giữ** volume; cờ `-Volumes`/`-v` xoá volume; idempotent. → verify: down thường giữ `game-team-dev_pgdata`; `-v` xoá; chạy lại khi rỗng vẫn exit 0.
+- [x] Đồng bộ `.env.example` với biến compose cần; kiểm `.gitignore` chặn `.env`. → 7/7 biến compose (`POSTGRES_*`, `REDIS_PORT`, `ASPNETCORE_ENVIRONMENT`, `API_PORT`) có đủ; `git check-ignore .env` → exit 0 (ignored), `.env.example` committable.
+- [x] Thử `up` → gọi `GET /health` trả `{status:"ok"}` khi bật profile api. → `up -Api`/`--api`: `curl /health` → **HTTP 200** body `{"status":"ok"}` (script tự chờ /health=200 mới báo xong).
+- [x] Viết mục hướng dẫn chạy local + troubleshooting cổng bận. → mục **Local development** trong [`../deployment/README.md`](../deployment/README.md) (prereq → up → api → health → down → xoá volume → override cổng → bảng troubleshooting 5432/6379/8080 + Docker/unhealthy/connect); đồng bộ `SETUP.md`, `scripts/dev/README.md`, `deploy/compose/README.md`.
 
 # Tiêu chí hoàn thành
 
@@ -84,6 +84,34 @@ Các phase backend (auth/save/config service, nhóm 2–4) cần Postgres+Redis 
 # Phase Review
 
 Đóng khi stack dev lên bằng 1 lệnh, healthcheck xanh, `/health` phản hồi khi bật api, script chạy đa nền tảng.
+
+**Đủ điều kiện đóng (eligible to close).** Toàn bộ 7 `# Công việc cần thực hiện` và 4 `# Tiêu chí hoàn thành`
+đã đo được và xác minh chạy thật với Docker Desktop (Engine 28.5.1) trên cùng host Windows.
+
+## Bằng chứng xác minh (chạy thật, Phase 04)
+
+- **Compose:** `docker compose -f deploy/compose/docker-compose.yml config` hợp lệ; network = `game-team-dev`
+  (đã thêm network cấp cao — trước đó chỉ là `game-team-dev_default`). Image pin `postgres:16-alpine` +
+  `redis:7-alpine`; volume `pgdata`; healthcheck `pg_isready` / `redis-cli ping`.
+- **up (base):** `scripts\dev\up.ps1` **và** `bash scripts/dev/up.sh` → Postgres+Redis `Up (healthy)` < ~30s,
+  in `docker compose ps`, exit 0. Script poll `.State.Health` (không sleep cứng).
+- **up (api):** `up.ps1 -Api` / `up.sh --api` → build `server/Dockerfile` (dotnet publish OK), chờ deps
+  healthy rồi chờ `/health`; `curl http://localhost:<API_PORT>/health` → **200 `{"status":"ok"}`**.
+  `docker exec … printenv` xác nhận `ConnectionStrings__Postgres/__Redis` inject đúng (tên service).
+- **Override cổng:** cổng host **8080 đang bận** (PID khác) ⇒ `up -Api` **fail rõ ràng** (exit 1, in lỗi
+  bind + log api). Đặt `API_PORT=18080` (cơ chế `.env`/env) ⇒ api chạy `18080->8080`, `/health`=200 →
+  chứng minh troubleshooting "cổng bận" hoạt động.
+- **down:** `down.*` mặc định xoá container+network, **giữ** volume `game-team-dev_pgdata`;
+  `down.ps1 -Volumes` / `down.sh -v` xoá volume; chạy lại khi rỗng vẫn exit 0 (idempotent).
+- **.env:** `git check-ignore .env` → exit 0 (ignored); `.env.example` committable, đủ 7 biến compose.
+- **Đa nền tảng:** PowerShell **và** Git Bash (bash thật) **đều chạy thật** trên host này với Docker CLI
+  Windows. *Lưu ý trung thực:* chưa chạy trên **Linux kernel** thật (Git Bash là môi trường bash trên
+  Windows) — cú pháp `.sh` đã `bash -n` sạch, không dùng lệnh chỉ có ở 1 OS; CI integration Linux ở phase sau.
+- **Sửa trong lúc verify:** `down.sh -v` ban đầu exit 1 (dòng cuối `[ test ] && echo` dưới `set -e`) → đổi
+  thành `if`; re-verify exit 0.
+
+**Kết luận:** **PASS.** Đủ điều kiện đóng theo Strict Phase Gate §5 (mọi hạng mục xác minh chạy thật, không
+còn TODO/blocker). Không nợ kỹ thuật mở trong phạm vi phase 04.
 
 ---
 

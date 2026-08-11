@@ -20,11 +20,13 @@ cp .env.example .env          # chỉnh nếu cần (giá trị dev, KHÔNG ph�
 dotnet build server/GameTeam.sln
 dotnet test  server/GameTeam.sln
 
-# 4) Hạ tầng local (Postgres + Redis)
+# 4) Hạ tầng local (Postgres + Redis) — chờ healthy rồi in trạng thái
 scripts/dev/up.sh             # Windows: scripts\dev\up.ps1
-#   dừng: scripts/dev/down.sh
+#   kèm API trong container:  scripts/dev/up.sh --api   (Windows: up.ps1 -Api)
+#   dừng (giữ dữ liệu):       scripts/dev/down.sh       (Windows: down.ps1)
+#   dừng + xoá volume DB:     scripts/dev/down.sh -v    (Windows: down.ps1 -Volumes)
 
-# 5) Chạy API
+# 5) Chạy API (host, không qua container)
 dotnet run --project server/src/GameTeam.Api    # GET /health -> {"status":"ok"}
 
 # 6) Client: mở client/project.godot bằng Godot 4.x
@@ -40,6 +42,8 @@ dotnet run --project server/src/GameTeam.Api    # GET /health -> {"status":"ok"}
 |---|---|
 | Sai SDK .NET | Cài .NET 9; `global.json` sẽ pin |
 | Docker chưa chạy | Mở Docker Desktop trước `scripts/dev/up` |
-| Cổng bận (5432/6379/8080) | Sửa cổng trong `.env` |
+| Cổng bận (5432/6379/8080) | Sửa cổng trong `.env` (`POSTGRES_PORT`/`REDIS_PORT`/`API_PORT`) |
+| Container unhealthy / `up` treo | `docker compose -f deploy/compose/docker-compose.yml ps` + `logs <service>` |
 
-Chi tiết môi trường & CI: [docs/deployment/README.md](docs/deployment/README.md).
+Chi tiết môi trường, profile `api`, xoá volume & troubleshooting đầy đủ:
+[docs/deployment/README.md](docs/deployment/README.md) → mục **Local development**.
