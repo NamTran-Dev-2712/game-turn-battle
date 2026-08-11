@@ -58,6 +58,7 @@ Có `concurrency` (huỷ run cũ cùng ref) và `permissions: contents: read` (l
 | 3 | **Restore** | `dotnet restore server/GameTeam.sln`. |
 | 4 | **Build Release** | `dotnet build … -c Release --no-restore`. |
 | 5 | **Warnings-as-error** | Bật ở `server/Directory.Build.props`: compiler `TreatWarningsAsErrors=true` (cảnh báo compiler = lỗi, vỡ build). `CodeAnalysisTreatWarningsAsErrors=false` — cảnh báo analyzer **cố ý** không chặn build ở bootstrap (siết dần). Workflow không override chính sách này. |
+| 5b | **OpenAPI drift guard** (Phase 05) | Sau Build (đã regenerate `shared/contracts/openapi.json` từ `GameTeam.Contracts`), chạy `git diff --exit-code -- shared/contracts/openapi.json`. Spec commit lệch code ⇒ job **đỏ** (buộc regenerate + commit). Đảm bảo OpenAPI = single-source, không drift. |
 | 6 | **Test** | `dotnet test … -c Release --no-build`; test fail ⇒ job đỏ. |
 | 7 | **Coverage** | `--collect:"XPlat Code Coverage"` (coverlet.collector) → `coverage/**/coverage.cobertura.xml`. |
 | 8 | **Coverage artifact** | `actions/upload-artifact@v4` tên `coverage-server`, `if-no-files-found: error` (không sinh coverage ⇒ job đỏ). |

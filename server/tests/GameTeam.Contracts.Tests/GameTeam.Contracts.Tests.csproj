@@ -4,15 +4,13 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\GameTeam.Api\GameTeam.Api.csproj" />
+    <ProjectReference Include="..\..\src\GameTeam.Contracts\GameTeam.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
-    <PackageReference Include="Microsoft.OpenApi.Readers" />
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>
 </Project>

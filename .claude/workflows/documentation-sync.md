@@ -22,7 +22,7 @@
 | Reverses/supersedes a decision | Mark old ADR `Superseded`, add new ADR, fix cross-refs |
 | Adds/removes a dependency (NuGet/addon) | ADR-010 rationale (in PR) + `server/Directory.Packages.props` (or Godot addon note in `docs/godot/tooling-and-testing.md`) |
 | Changes the config schema | `shared/config-schema/*.schema.json` + `docs/liveops/remote-config.md` + `docs/gameplay/configuration-and-data.md` + `config/*/README.md` if a domain is affected |
-| Changes a client↔server contract/DTO | `server/GameTeam.Contracts` + `shared/contracts/` (OpenAPI) + `docs/backend/api-and-versioning.md`; regenerate `shared/codegen` output |
+| Changes a client↔server contract/DTO | `server/GameTeam.Contracts` (one public type/file, additive-only) → **rebuild** to regenerate `shared/contracts/openapi.json` (never hand-edit; CI drift-guard enforces) + `docs/backend/api-and-versioning.md`; regenerate `shared/codegen` output. **Enum change:** keep numeric values stable (add-only, deprecate not reuse), update `EnumStabilityTests` deliberately (`server/tests/GameTeam.Contracts.Tests`) |
 | Changes combat sim behavior | ADR-011 (if the decision changes) + `docs/gameplay/combat-framework.md` + update golden vectors deliberately |
 | Adds/changes a module boundary | `docs/architecture/dependency-graph.md` + the module doc (`docs/backend/`, `docs/godot/`, `docs/gameplay/`) + that folder's `README.md` |
 | Changes public behavior of a feature | The module doc + module `README.md`; note in `CHANGELOG.md` |

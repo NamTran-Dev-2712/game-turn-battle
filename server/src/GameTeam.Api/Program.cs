@@ -1,5 +1,9 @@
 using GameTeam.Api;
 using GameTeam.Application;
+using GameTeam.Contracts.Auth;
+using GameTeam.Contracts.Common;
+using GameTeam.Contracts.Config;
+using GameTeam.Contracts.Profile;
 using GameTeam.Infrastructure;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -12,9 +16,37 @@ builder.Services
 
 WebApplication app = builder.Build();
 
-// Health endpoint hạ tầng (KHÔNG phải API game) — xác nhận host chạy & dùng cho
-// liveness/readiness. API nghiệp vụ thêm ở phase Core Framework trở đi.
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+// OpenAPI (nguồn shared/contracts): phục vụ /openapi/v1.json và là nguồn xuất spec (ADR-008).
+app.MapOpenApi();
+
+// Health endpoint hạ tầng (KHÔNG phải API game) — liveness/readiness. Kiểu hoá bằng HealthResponse
+// để mô tả được trong OpenAPI; giữ nguyên hình dạng { "status": "ok" }.
+app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")))
+    .WithName("Health");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTRACT SKELETON (Phase 05): khai báo HÌNH DẠNG endpoint nền cho OpenAPI —
+// KHÔNG hiện thực nghiệp vụ. Tất cả trả 501 Not Implemented; handler thật ở Phase 13.
+// ─────────────────────────────────────────────────────────────────────────────
+RouteGroupBuilder apiV1 = app.MapGroup(ApiVersions.V1Prefix);
+
+// TODO Phase 13: real handler — cấp JWT guest.
+apiV1.MapPost("/auth/guest", (AuthGuestRequest request) => Results.StatusCode(StatusCodes.Status501NotImplemented))
+    .WithName("AuthGuest")
+    .Produces<AuthGuestResponse>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest);
+
+// TODO Phase 13: real handler — trả hồ sơ người chơi hiện tại.
+apiV1.MapGet("/profile", () => Results.StatusCode(StatusCodes.Status501NotImplemented))
+    .WithName("GetProfile")
+    .Produces<ProfileDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// TODO Phase 13: real handler — trả gói cấu hình theo version.
+apiV1.MapGet("/config/{version}", (string version) => Results.StatusCode(StatusCodes.Status501NotImplemented))
+    .WithName("GetConfigBundle")
+    .Produces<ConfigBundleDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
 
 await app.RunAsync();
 

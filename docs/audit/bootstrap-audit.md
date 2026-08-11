@@ -12,7 +12,7 @@ Ngày: khi hoàn tất P0 · Nhánh: `feature/1-feature-base-structure-project`.
 |---|---|
 | **client/** | Godot project **di chuyển từ root** (git rename, giữ history) + cây feature-based; README mọi thư mục; `export_presets.cfg` placeholder. |
 | **server/** | Solution .NET 9 **compile được**: 5 project `src` + 4 project test; CPM (`Directory.Packages.props`); `Directory.Build.props`; `Dockerfile`; DI stub mỗi tầng; `/health`. |
-| **shared/** | `contracts/`, `config-schema/` (+ `config-bundle.schema.json` mẫu), `codegen/`. |
+| **shared/** | `contracts/`, `config-schema/` (+ `config-bundle.schema.json` mẫu), `codegen/`. **Phase 05 (đã đóng):** `contracts/openapi.json` **sinh từ `GameTeam.Contracts`** (6 enum dùng chung + DTO nền + `ErrorEnvelope`; 4 path `/api/v1` stub 501 + `/health`); OpenAPI single-source (.NET 9 first-party, build-time) + CI drift guard. |
 | **config/** | 10 thư mục data-driven (README trỏ `docs/mvp/*`); chưa author giá trị. |
 | **tools/scripts/deploy/** | README + stub; `deploy/compose/docker-compose.yml` (Postgres+Redis+API). **Phase 04 (đã đóng):** dev env **một lệnh** — network `game-team-dev`, healthcheck xanh, `scripts/dev/up|down.{ps1,sh}` idempotent (cờ `-Api`/`--api`, `-Volumes`/`-v`), profile `api` → `/health`=200; xác minh chạy thật (PowerShell + bash) với Docker 28.5.1. |
 | **.github/** | 4 workflow skeleton, issue/PR/discussion template, CODEOWNERS, dependabot, labels/project docs. |
