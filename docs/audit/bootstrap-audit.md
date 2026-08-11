@@ -14,7 +14,7 @@ Ngày: khi hoàn tất P0 · Nhánh: `feature/1-feature-base-structure-project`.
 | **server/** | Solution .NET 9 **compile được**: 5 project `src` + 4 project test; CPM (`Directory.Packages.props`); `Directory.Build.props`; `Dockerfile`; DI stub mỗi tầng; `/health`. |
 | **shared/** | `contracts/`, `config-schema/` (+ `config-bundle.schema.json` mẫu), `codegen/`. |
 | **config/** | 10 thư mục data-driven (README trỏ `docs/mvp/*`); chưa author giá trị. |
-| **tools/scripts/deploy/** | README + stub; `deploy/compose/docker-compose.yml` (Postgres+Redis+API). |
+| **tools/scripts/deploy/** | README + stub; `deploy/compose/docker-compose.yml` (Postgres+Redis+API). **Phase 04 (đã đóng):** dev env **một lệnh** — network `game-team-dev`, healthcheck xanh, `scripts/dev/up|down.{ps1,sh}` idempotent (cờ `-Api`/`--api`, `-Volumes`/`-v`), profile `api` → `/health`=200; xác minh chạy thật (PowerShell + bash) với Docker 28.5.1. |
 | **.github/** | 4 workflow skeleton, issue/PR/discussion template, CODEOWNERS, dependabot, labels/project docs. |
 | **Cấu hình dev** | `.editorconfig`, `.gitattributes`, `.gitignore`, `global.json` (pin SDK 9), `.env.example`, `.vscode/`, `.githooks/` + `.pre-commit-config.yaml`. |
 | **Docs gốc** | 15 file (README, CONTRIBUTING, CODE_OF_CONDUCT, CHANGELOG, ROADMAP, SECURITY, SUPPORT, ARCHITECTURE, DECISIONS, AI_GUIDE, DEVELOPMENT_GUIDE, SETUP, DEPLOYMENT, TESTING, STYLE_GUIDE) — **thin, trỏ vào `docs/`**. |
