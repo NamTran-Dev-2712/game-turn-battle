@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/economy.schema.json",
+  "title": "Economy config",
+  "description": "Cấu trúc source/sink & đường cong cost (level/sao), tham số energy (ADR-004). Bám ../../docs/gameplay/progression-and-economy.md. Các bước đường cong là integer cấu trúc — GIÁ TRỊ THẬT là tuning, schema không cố định đường cong.",
+  "type": "object",
+  "required": ["schema_version", "id"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/economy_id" },
+    "cost_curves": {
+      "type": "object",
+      "description": "Ánh xạ tên đường cong (vd level_up, ascension) -> mảng bước chi phí integer. Nội dung bước là tuning.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      }
+    },
+    "energy": {
+      "type": "object",
+      "description": "Tham số energy (cấu trúc). Giá trị thật là tuning.",
+      "required": ["max", "regen_per_hour", "battle_cost"],
+      "properties": {
+        "max": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "regen_per_hour": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "battle_cost": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

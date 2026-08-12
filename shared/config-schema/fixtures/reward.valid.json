@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "reward_sample_clear",
+  "entries": [
+    { "reward_type": "currency", "ref_id": "gold", "amount": 0 }
+  ]
+}

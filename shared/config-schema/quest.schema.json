@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/quest.schema.json",
+  "title": "Quest config",
+  "description": "Định nghĩa quest: điều kiện + mục tiêu + reward refs + chu kỳ reset (ADR-004). Bám ../../docs/gameplay/quest-system.md. condition_type có handler đăng ký (event-driven), không switch. Không hardcode nội dung/balance.",
+  "type": "object",
+  "required": ["schema_version", "id", "condition_type", "target", "reward_refs", "reset_cycle"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/quest_id" },
+    "condition_type": {
+      "type": "string",
+      "enum": ["battles_won", "summons_done", "login"],
+      "description": "Loại điều kiện MVP (quest-system.md), gắn domain event. Thêm loại mới = thêm handler + enum additive."
+    },
+    "target": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Số lần cần đạt (N). Integer >= 1; nội dung cụ thể là tuning."
+    },
+    "reward_refs": {
+      "type": "array",
+      "description": "Tham chiếu reward table trao khi hoàn thành (quest -> reward id).",
+      "minItems": 1,
+      "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/reward_id" },
+      "uniqueItems": true
+    },
+    "reset_cycle": {
+      "type": "string",
+      "enum": ["daily", "weekly"],
+      "description": "Chu kỳ reset theo server time (ADR-006/008). MVP = daily; weekly là Post-MVP."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/hero.schema.json",
+  "title": "Hero config",
+  "description": "Định nghĩa tĩnh của một hero (ADR-004). Bám ../../docs/gameplay/hero-system.md. Chỉ ràng buộc cấu trúc/kiểu — base_stats là integer (ADR-011), giá trị thật là tuning.",
+  "type": "object",
+  "required": ["schema_version", "id", "faction", "class", "element", "role", "rarity", "base_stats", "skills"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/hero_id" },
+    "faction": { "$ref": "https://game-team/schema/common.schema.json#/$defs/faction" },
+    "class": { "$ref": "https://game-team/schema/common.schema.json#/$defs/class" },
+    "element": { "$ref": "https://game-team/schema/common.schema.json#/$defs/element" },
+    "role": { "$ref": "https://game-team/schema/common.schema.json#/$defs/role" },
+    "rarity": { "$ref": "https://game-team/schema/common.schema.json#/$defs/rarity" },
+    "base_stats": {
+      "type": "object",
+      "description": "Chỉ số nền — integer (ADR-011). Giá trị 0 ở fixture; balance thật là tuning.",
+      "required": ["hp", "atk", "def", "spd"],
+      "properties": {
+        "hp": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "atk": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "def": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "spd": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "type": "array",
+      "description": "Tham chiếu skill id (hero -> skill). Tồn tại id kiểm ở phase 07 (validator).",
+      "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/skill_id" },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

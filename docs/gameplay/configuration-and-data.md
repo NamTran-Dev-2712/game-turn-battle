@@ -23,6 +23,23 @@
 | `quests/` | Quest definition | Quest |
 | `liveops/` | Event/season/flag (schedule) — Post-MVP | LiveOps |
 
+## 2b. Ánh xạ schema (phase 06)
+
+Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/config-schema/` — định nghĩa **cấu trúc/kiểu**, không chứa giá trị balance. `common.schema.json` giữ `$defs` dùng lại (id prefix, `combat_int`, enum khớp `GameTeam.Contracts`).
+
+| Config type | Schema | Nguồn gameplay | Tham chiếu chính | Ghi chú |
+|---|---|---|---|---|
+| hero | `hero.schema.json` | `hero-system.md` | `skills` → skill id | `base_stats` integer; `faction` chuỗi (GP2 chưa chốt) |
+| skill | `skill.schema.json` | `skill-framework.md` | `effects[].effect_type` (registry) | effect_type: damage/heal/apply_buff/apply_debuff/shield; `params` mở |
+| stage | `stage.schema.json` | `progression-and-economy.md` | `enemies[].hero_id` → hero; `rewards[]` → reward | `energy_cost` integer |
+| reward | `reward.schema.json` | `progression-and-economy.md` | `entries[].ref_id` (currency/hero/fragment/item) | `amount` integer |
+| gacha | `gacha.schema.json` | `progression-and-economy.md` | `pool[]` → hero; `rates[].rarity` | rate/pity **cấu trúc**, không giá trị |
+| shop | `shop.schema.json` | `progression-and-economy.md` | `items[].reward_ref` → reward; `cost.currency` | `cost.amount` integer |
+| economy | `economy.schema.json` | `progression-and-economy.md` | `cost_curves`, `energy` | bước đường cong integer, không cố định |
+| quest | `quest.schema.json` | `quest-system.md` | `reward_refs[]` → reward; `condition_type` | condition_type: battles_won/summons_done/login |
+
+> **Cấp độ tham chiếu:** JSON Schema chỉ ràng buộc **định dạng/cấu trúc** của ref (prefix id, kiểu). **Kiểm tồn tại id chéo file** (hero→skill…) là việc của validator (phase 07 — §3, §6), không phải schema đơn. Fixture pass/fail ở `../../shared/config-schema/fixtures/`; quy tắc migration ở `../../shared/config-schema/_versions/`.
+
 ## 3. Quan hệ id (referential integrity)
 
 ```mermaid

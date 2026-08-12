@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/common.schema.json",
+  "title": "Common config defs (shared)",
+  "description": "Định nghĩa dùng lại cho mọi schema config (ADR-004/005). Chỉ ràng buộc kiểu/cấu trúc — KHÔNG chứa giá trị balance. Enum khớp GameTeam.Contracts (phase 05). Số combat là integer (ADR-011).",
+  "type": "object",
+  "$defs": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Phiên bản cấu trúc schema; tăng khi đổi cấu trúc (có migration trong _versions/)."
+    },
+    "combat_int": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Giá trị gameplay/combat tất định — integer, không float (ADR-011). Giá trị thật là tuning, không đặt ở schema."
+    },
+    "rarity": {
+      "type": "integer",
+      "enum": [3, 4, 5],
+      "description": "Số sao; khớp GameTeam.Contracts.Rarity (Three=3, Four=4, Five=5). Bậc cao thêm additive về sau."
+    },
+    "faction": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Phe của hero. Danh sách phe CHƯA chốt (open question GP2, ../mvp/10) — schema chỉ ràng buộc chuỗi không rỗng, chưa khoá enum để tránh invent gameplay."
+    },
+    "class": {
+      "type": "string",
+      "enum": ["warrior", "mage", "ranger", "support"],
+      "description": "Lối đánh; khớp GameTeam.Contracts.Class."
+    },
+    "element": {
+      "type": "string",
+      "enum": ["fire", "water", "earth", "light", "dark"],
+      "description": "Nguyên tố (khắc chế); khớp GameTeam.Contracts.Element."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["tank", "dps", "support", "healer"],
+      "description": "Vai trò đội hình; khớp GameTeam.Contracts.Role."
+    },
+    "currency": {
+      "type": "string",
+      "enum": ["gold", "gem", "ticket"],
+      "description": "Loại tiền tệ MVP; khớp GameTeam.Contracts.Currency. Energy/Fragment là resource riêng, thêm additive về sau."
+    },
+    "hero_id": {
+      "type": "string",
+      "pattern": "^hero_[a-z0-9_]+$",
+      "description": "Id hero, prefix 'hero_' (vd hero_ignis)."
+    },
+    "skill_id": {
+      "type": "string",
+      "pattern": "^skill_[a-z0-9_]+$",
+      "description": "Id skill, prefix 'skill_' (vd skill_ignis_ult)."
+    },
+    "stage_id": {
+      "type": "string",
+      "pattern": "^stage_[a-z0-9_]+$",
+      "description": "Id stage, prefix 'stage_' (vd stage_ch01_05)."
+    },
+    "gacha_id": {
+      "type": "string",
+      "pattern": "^gacha_[a-z0-9_]+$",
+      "description": "Id banner gacha, prefix 'gacha_'."
+    },
+    "shop_id": {
+      "type": "string",
+      "pattern": "^shop_[a-z0-9_]+$",
+      "description": "Id shop, prefix 'shop_'."
+    },
+    "reward_id": {
+      "type": "string",
+      "pattern": "^reward_[a-z0-9_]+$",
+      "description": "Id reward table, prefix 'reward_'."
+    },
+    "economy_id": {
+      "type": "string",
+      "pattern": "^economy_[a-z0-9_]+$",
+      "description": "Id cấu hình economy, prefix 'economy_'."
+    },
+    "quest_id": {
+      "type": "string",
+      "pattern": "^quest_[a-z0-9_]+$",
+      "description": "Id quest, prefix 'quest_'."
+    },
+    "cost": {
+      "type": "object",
+      "description": "Chi phí tiền tệ (cấu trúc). amount là giá trị tuning, không đặt ở schema.",
+      "required": ["currency", "amount"],
+      "properties": {
+        "currency": { "$ref": "https://game-team/schema/common.schema.json#/$defs/currency" },
+        "amount": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

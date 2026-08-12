@@ -40,6 +40,21 @@
 - Đổi cấu trúc → tăng `schema_version` + migration/compat (ADR-005).
 - Id không tái sử dụng cho thực thể khác.
 
+**ID prefix theo type** (phase 06 — schema kiểm định dạng qua pattern `^<prefix>_[a-z0-9_]+$`):
+
+| Type | Prefix | Ví dụ |
+|---|---|---|
+| hero | `hero_` | `hero_ignis` |
+| skill | `skill_` | `skill_ignis_ult` |
+| stage | `stage_` | `stage_ch01_05` |
+| gacha | `gacha_` | `gacha_launch` |
+| shop | `shop_` | `shop_daily` |
+| reward | `reward_` | `reward_first_clear` |
+| economy | `economy_` | `economy_core` |
+| quest | `quest_` | `quest_daily_battle` |
+
+> Prefix + pattern kiểm được bằng JSON Schema (định dạng). **Kiểm id tham chiếu tồn tại** (chéo file) là validator phase 07. Schema per-type: `../../shared/config-schema/`.
+
 ## 2. Markdown style (tài liệu)
 
 | Quy tắc | Chi tiết |

@@ -41,14 +41,14 @@ Data-driven là nền của **mọi** gameplay & LiveOps. Schema phải có trư
 
 # Công việc cần thực hiện
 
-- [ ] Viết schema `hero.schema.json` (id, faction/class/element/role enum, base stats integer, skill refs) — bám [`../gameplay/hero-system.md`](../gameplay/hero-system.md).
-- [ ] `skill.schema.json`: effect-data + type (theo registry, ADR-004) — bám [`../gameplay/skill-framework.md`](../gameplay/skill-framework.md).
-- [ ] `stage.schema.json`, `reward.schema.json`, `gacha.schema.json` (cấu trúc rate/pity, không số) — bám [`../gameplay/progression-and-economy.md`](../gameplay/progression-and-economy.md).
-- [ ] `shop.schema.json`, `economy.schema.json` (cấu trúc source/sink & đường cong), `quest.schema.json` — bám [`../gameplay/quest-system.md`](../gameplay/quest-system.md).
-- [ ] Ràng buộc: `required`, kiểu integer cho giá trị combat, `additionalProperties:false` nơi cần chặt, `schema_version`.
-- [ ] Định nghĩa quy ước ID + prefix; ghi cách tham chiếu chéo (hero→skill id).
-- [ ] Tạo fixture mẫu tối thiểu cho mỗi type để test.
-- [ ] Cập nhật `../gameplay/configuration-and-data.md` bảng ánh xạ schema.
+- [x] Viết schema `hero.schema.json` (id, faction/class/element/role enum, base stats integer, skill refs) — bám [`../gameplay/hero-system.md`](../gameplay/hero-system.md).
+- [x] `skill.schema.json`: effect-data + type (theo registry, ADR-004) — bám [`../gameplay/skill-framework.md`](../gameplay/skill-framework.md).
+- [x] `stage.schema.json`, `reward.schema.json`, `gacha.schema.json` (cấu trúc rate/pity, không số) — bám [`../gameplay/progression-and-economy.md`](../gameplay/progression-and-economy.md).
+- [x] `shop.schema.json`, `economy.schema.json` (cấu trúc source/sink & đường cong), `quest.schema.json` — bám [`../gameplay/quest-system.md`](../gameplay/quest-system.md).
+- [x] Ràng buộc: `required`, kiểu integer cho giá trị combat, `additionalProperties:false` nơi cần chặt, `schema_version`.
+- [x] Định nghĩa quy ước ID + prefix; ghi cách tham chiếu chéo (hero→skill id).
+- [x] Tạo fixture mẫu tối thiểu cho mỗi type để test.
+- [x] Cập nhật `../gameplay/configuration-and-data.md` bảng ánh xạ schema.
 
 # Tiêu chí hoàn thành
 

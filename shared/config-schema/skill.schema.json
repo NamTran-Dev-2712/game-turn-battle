@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/skill.schema.json",
+  "title": "Skill config",
+  "description": "Skill = tổ hợp effect-data + type theo registry (ADR-004). Bám ../../docs/gameplay/skill-framework.md. KHÔNG switch(skillId); effect_type có handler đăng ký. Không hardcode giá trị balance.",
+  "type": "object",
+  "required": ["schema_version", "id", "target", "trigger", "effects"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/skill_id" },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Quy tắc chọn mục tiêu (vd single_enemy, all_allies). Danh mục target rule mở rộng dần; chưa khoá enum để tránh invent gameplay."
+    },
+    "trigger": {
+      "type": "object",
+      "description": "Điều kiện kích hoạt (energy/cooldown). value là số cấu trúc, giá trị thật là tuning.",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["energy", "cooldown"],
+          "description": "Cơ chế kích hoạt skill."
+        },
+        "value": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      },
+      "additionalProperties": false
+    },
+    "effects": {
+      "type": "array",
+      "description": "Danh sách effect primitive; mỗi effect_type có handler riêng. params để mở (schema per-effect chi tiết là phase feature).",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["effect_type"],
+        "properties": {
+          "effect_type": {
+            "type": "string",
+            "enum": ["damage", "heal", "apply_buff", "apply_debuff", "shield"],
+            "description": "Loại effect theo registry MVP (skill-framework.md). Thêm loại mới = thêm handler + enum additive."
+          },
+          "target": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Ghi đè target cho riêng effect (tuỳ chọn)."
+          },
+          "params": {
+            "type": "object",
+            "description": "Tham số riêng của effect_type (vd power, duration). Cấu trúc/giá trị chi tiết theo từng effect là phase feature — để mở ở phase 06."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

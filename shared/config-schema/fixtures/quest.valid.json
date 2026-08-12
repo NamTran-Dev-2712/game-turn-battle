@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "quest_sample_daily",
+  "condition_type": "battles_won",
+  "target": 1,
+  "reward_refs": ["reward_sample_clear"],
+  "reset_cycle": "daily"
+}

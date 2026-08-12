@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://game-team/schema/config-bundle.schema.json",
-  "title": "ConfigBundle (PLACEHOLDER — bootstrap)",
-  "description": "Khung tối thiểu cho metadata một config bundle versioned (ADR-005). Schema đầy đủ cho từng loại config thêm ở phase Core Framework (S2). KHÔNG dùng cho gameplay values ở bootstrap.",
+  "title": "ConfigBundle (envelope)",
+  "description": "Envelope metadata cho một config bundle versioned (ADR-005): mang schema_version + config_version, giữ tương thích config@vN. Schema per-type (hero/skill/stage/gacha/shop/reward/economy/quest) nằm ở các file cùng thư mục; mỗi file config gameplay có schema_version riêng. Envelope KHÔNG chứa gameplay values.",
   "type": "object",
   "required": ["schema_version", "config_version"],
   "properties": {
