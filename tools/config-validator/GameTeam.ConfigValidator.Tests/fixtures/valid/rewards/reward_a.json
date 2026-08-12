@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "reward_a", "entries": [ { "reward_type": "currency", "ref_id": "gold", "amount": 0 }, { "reward_type": "hero", "ref_id": "hero_a", "amount": 0 } ] }

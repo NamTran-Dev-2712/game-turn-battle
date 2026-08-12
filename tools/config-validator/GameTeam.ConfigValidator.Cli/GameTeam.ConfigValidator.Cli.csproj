@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CLI mỏng: parse args, gọi core, in report, đặt exit code. Không chứa logic validate. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>config-validator</AssemblyName>
+    <RootNamespace>GameTeam.ConfigValidator.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GameTeam.ConfigValidator\GameTeam.ConfigValidator.csproj" />
+  </ItemGroup>
+</Project>

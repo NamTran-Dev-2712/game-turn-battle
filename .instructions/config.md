@@ -6,7 +6,8 @@ Prompt: `.prompts/config-change.md`.
 - Data-driven: all gameplay balance lives in config, never in code (ADR-004).
 - Domain/Application read config only through `IConfigProvider` — never read files directly (ADR-005).
 - Values needing tuning → mark in `docs/mvp/10-open-questions.md` (EC), don't invent final numbers.
-- CI `validate-config` must pass (schema + referential integrity when tooling lands — phase 07).
+- CI `validate-config` must pass (schema + referential integrity + `schema_version`) — GATE is live (phase 07).
+  Run it after any `config/**` or `shared/config-schema/**` change: `bash tools/config-validator/run.sh config shared/config-schema`.
 
 ## Config schemas (phase 06 — closed & verified)
 
@@ -22,10 +23,22 @@ The contract lives in `shared/config-schema/` (JSON Schema draft 2020-12). Reuse
 - **Versioning:** breaking change (remove/rename field, tighten type, narrow enum, change meaning) ⇒ bump
   `schema_version` + add a migration under `shared/config-schema/_versions/` + doc-sync. Additive change
   (new optional field, new enum value) does NOT bump. See `_versions/README.md`.
-- **After changing schema:** run schema self-validation + fixture validation (valid pass / invalid fail) and
-  a documentation-consistency check. Draft 2020-12 tool: Python `jsonschema` or AJV.
+- **After changing schema OR config:** run `bash tools/config-validator/run.sh config shared/config-schema`
+  (schema + referential integrity + version) — exit 0 required. Update the validator tests when you change
+  validator behavior; never edit config to silence a real violation or bypass the gate to make CI green.
 - **Cross-references:** schema validates only the *format* of an id ref (prefix/pattern). Existence of a
-  referenced id across files (hero→skill, stage→reward…) is **referential integrity = phase 07 validator** —
-  JSON Schema alone does NOT validate cross-file id existence. Do not claim otherwise.
-- **Boundaries:** validator tool + CI gate = phase 07; runtime Configuration Service = phase 21; real
-  balance = feature/tuning phases.
+  referenced id across files (hero→skill, stage→reward…) is **referential integrity = the phase-07 validator**
+  (`tools/config-validator`, codes `REF001`/`REF002`) — JSON Schema alone does NOT validate cross-file id
+  existence. Do not claim otherwise.
+
+## Config validator (phase 07 — closed & verified)
+
+- **One tool:** `tools/config-validator` (.NET 9, `JsonSchema.Net`). Core lib `GameTeam.ConfigValidator` is the
+  reusable validation boundary; the CLI is thin. Reuse it — do NOT reinvent a second validation mechanism.
+- **A new config type MUST** ship: its schema (phase-06 rules) + validator support (`ConfigFileMapper` mapping +
+  `ReferenceValidator` refs) + a test — in the same change. Do NOT invent config relationships or `schema_version`
+  values not backed by the schemas + gameplay docs + ADRs.
+- **Error codes** (`JSON001`/`MAP001`/`SCH001`/`VER001`/`VER002`/`REF001`/`REF002`) + report format
+  `file:jsonpath:CODE message`: see `tools/config-validator/README.md`.
+- **Boundaries:** validator tool + CI gate = phase 07 (done); runtime Configuration Service = phase 21 (reuses the
+  validator core via `ConfigValidationRunner.Run(...)`); real balance = feature/tuning phases.

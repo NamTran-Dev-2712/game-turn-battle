@@ -65,7 +65,7 @@ Có `concurrency` (huỷ run cũ cùng ref) và `permissions: contents: read` (l
 | 9 | **Architecture gate** | Job **tách riêng** `architecture-test`: chạy `GameTeam.Application.Tests` lọc `FullyQualifiedName~ArchitectureTests` (NetArchTest). Tách khỏi `build-test` để lỗi dependency-rule hiện rõ trong CI graph. |
 | 10 | **Domain→Infrastructure** | Rule `Domain_should_not_depend_on_outer_layers` (ADR-003): Domain phụ thuộc Infrastructure ⇒ `architecture-test` **đỏ**. Đã xác minh negative test (thêm leak ⇒ đỏ → revert). |
 | 11 | **Path filter** | Xem danh sách `paths` ở trên (backend/shared/build-props kích hoạt; client-only thì không). |
-| 12 | **`config-validate`** (hook) | **PLACEHOLDER** — job in ghi chú TODO, chưa validate thật. Bản thật: **Phase 07** (`validate-config.yml`: JSON Schema + referential integrity). |
+| 12 | **`config-validate`** (con trỏ) | **MOVED** — GATE thật đã bật ở `validate-config.yml` (**Phase 07**: `tools/config-validator` — JSON Schema + referential integrity + `schema_version`). Job ở `ci-server.yml` chỉ còn là con trỏ. |
 | 13 | **`golden-vector`** (hook) | **PLACEHOLDER** — job in ghi chú TODO, chưa so khớp vector. Bản thật: **Phase 26** (sim server vs client, ADR-011 — xem §4). |
 
 **Chưa có ở `ci-server.yml` (đích §3, để phase sau):** `publish` + Docker image, lint/format gate,
@@ -95,16 +95,20 @@ CodeQL/security (xem §1). Negative test architecture chạy thủ công/local, 
 **Chưa có ở `ci-client.yml` (để phase sau):** golden vector client so khớp server (**Phase 26**, ADR-011),
 feature test client thật (nhóm phase 3+), export Android (**Phase 55**).
 
-## 4d. `validate-config.yml` chi tiết (Phase 03 — hiện trạng thực tế)
+## 4d. `validate-config.yml` chi tiết (Phase 07 — GATE bắt buộc)
 
 **Trigger & path filter.** `push`/`pull_request` khi đụng `config/**`, `shared/config-schema/**`,
-`.github/workflows/validate-config.yml`. Có `concurrency`, `permissions: contents: read`, `timeout-minutes: 10`.
+`tools/config-validator/**`, `global.json`, `.github/workflows/validate-config.yml`. Có `concurrency`,
+`permissions: contents: read`, `timeout-minutes: 10`.
 
 | # | Nội dung | Chi tiết |
 |---|---|---|
-| 1 | **JSON parse-check** | Giữ nguyên (bootstrap): `python3 json.load` từng file `config/**/*.json` + `shared/config-schema/**/*.json`; JSON hỏng ⇒ `::error` + job đỏ. Hiện chỉ có `config-bundle.schema.json` (chưa có config data). |
-| 2 | **`config-validator` hook** | Ngữ nghĩa `--if-present`: chạy `tools/config-validator/run.sh` nếu **executable**; nếu chưa (trước Phase 07) → in SKIP, **no-op giữ xanh**. |
-| 3 | **Đường nâng cấp** | **Phase 07** chỉ cần thêm `tools/config-validator/run.sh` (JSON Schema draft 2020-12 + referential integrity) → bước hook tự động thành **GATE bắt buộc**, không phải sửa workflow. |
+| 1 | **JSON parse-check** | Giữ nguyên (bootstrap, nhanh): `python3 json.load` từng file `config/**/*.json` + `shared/config-schema/**/*.json`; JSON hỏng ⇒ `::error` + job đỏ. |
+| 2 | **Setup .NET + cache NuGet** | `actions/setup-dotnet@v4` pin theo `global.json` (SDK 9.0.306) + cache `~/.nuget/packages` theo `tools/config-validator/Directory.Packages.props`. |
+| 3 | **GATE: config-validator** | Chạy `tools/config-validator/run.sh config shared/config-schema` (bắt buộc). Validate **schema (draft 2020-12) + referential integrity + `schema_version`**; lỗi ⇒ report `file:jsonpath:CODE` + exit ≠ 0 ⇒ job đỏ. `run.sh` phải executable (`100755`); thiếu exec bit ⇒ FAIL (không SKIP). Chi tiết + mã lỗi: `tools/config-validator/README.md`. |
+
+> Bản thật của validator (core lib .NET tái dùng cho Config Service Phase 21) = `tools/config-validator`.
+> Job placeholder `config-validate` ở `ci-server.yml` đã chuyển thành con trỏ "MOVED" tới workflow này.
 
 ## 4e. `release.yml` chi tiết (Phase 03 — hiện trạng thực tế)
 

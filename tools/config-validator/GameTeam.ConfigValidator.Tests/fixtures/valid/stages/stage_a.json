@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "stage_a", "enemies": [ { "hero_id": "hero_a", "level": 0 } ], "rewards": ["reward_a"], "requirements": { "energy_cost": 0 } }

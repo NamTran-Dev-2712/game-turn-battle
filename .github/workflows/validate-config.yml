@@ -1,14 +1,24 @@
 name: validate-config
 
-# Gate merge: validate config data-driven theo JSON Schema + referential integrity (ADR-005).
-# Phase 03: giữ JSON parse-check (cú pháp) + thêm hook gọi tools/config-validator theo ngữ nghĩa
-# `--if-present` (no-op tới khi Phase 07 hiện thực validator thật → khi đó thành GATE bắt buộc).
+# Gate merge BẮT BUỘC: validate config data-driven theo JSON Schema + referential integrity + schema_version
+# (ADR-004/005). Phase 07: tools/config-validator (CLI .NET 9) là GATE thật — config sai KHÔNG vào runtime.
+# Bước 1 giữ JSON parse-check (cú pháp, nhanh). Bước 2 chạy validator (schema + reference + version).
 on:
   push:
     branches: [main, dev]
-    paths: ["config/**", "shared/config-schema/**", ".github/workflows/validate-config.yml"]
+    paths:
+      - "config/**"
+      - "shared/config-schema/**"
+      - "tools/config-validator/**"
+      - "global.json"
+      - ".github/workflows/validate-config.yml"
   pull_request:
-    paths: ["config/**", "shared/config-schema/**", ".github/workflows/validate-config.yml"]
+    paths:
+      - "config/**"
+      - "shared/config-schema/**"
+      - "tools/config-validator/**"
+      - "global.json"
+      - ".github/workflows/validate-config.yml"
 
 concurrency:
   group: validate-config-${{ github.ref }}
@@ -37,18 +47,28 @@ jobs:
           done
           exit $fail
 
-      # Hook validator (`--if-present`): gọi tools/config-validator nếu đã có entrypoint chạy được;
-      # nếu chưa (trước Phase 07) → no-op giữ workflow xanh. Phase 07 chỉ cần thêm run.sh để bật GATE.
-      - name: config-validator hook (--if-present, no-op tới Phase 07)
+      - name: Setup .NET (pin theo global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-config-validator-${{ runner.os }}-${{ hashFiles('tools/config-validator/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-config-validator-${{ runner.os }}-
+
+      # GATE BẮT BUỘC: chạy validator thật. run.sh phải là entrypoint chạy được (exec bit trong git).
+      # Nếu thiếu/không chạy được → FAIL (không SKIP) vì gate đã bắt buộc từ Phase 07.
+      - name: Validate config (schema + referential integrity + version)
         shell: bash
         run: |
           set -euo pipefail
           runner="tools/config-validator/run.sh"
-          if [ -x "$runner" ]; then
-            echo "config-validator hiện diện — chạy GATE thật."
-            "$runner" config shared/config-schema
-          else
-            echo "STATUS : SKIP (--if-present)"
-            echo "REASON : tools/config-validator/run.sh chưa hiện thực"
-            echo "OWNER  : Phase 07 — khi có run.sh, bước này tự động thành GATE bắt buộc"
+          if [ ! -x "$runner" ]; then
+            echo "::error file=$runner::run.sh thiếu hoặc không có quyền thực thi (cần exec bit trong git)."
+            exit 1
           fi
+          "$runner" config shared/config-schema

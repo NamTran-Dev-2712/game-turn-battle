@@ -1,0 +1,19 @@
+<Project>
+  <!-- Thiết lập chung cho MỌI project trong tools/config-validator/ (Phase 07).
+       Bám sát server/Directory.Build.props để giữ đồng nhất toolchain .NET 9. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Cảnh báo compiler chặn build; cảnh báo analyzer không chặn (siết dần) —
+         giống server/Directory.Build.props. -->
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CA1014</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -140,6 +140,40 @@ only — never balance values**. Canonical rules: `docs/gameplay/configuration-a
 - When changing a schema, keep **schemas + `fixtures/` + `_versions/` + `docs/gameplay/configuration-and-data.md`
   + `docs/liveops/remote-config.md` + `.instructions/config.md` in sync** (doc-sync matrix, §5).
 
+**Config validator is standardized (Phase 07 — closed & verified).** Config correctness is enforced by ONE tool:
+**`tools/config-validator`** — a **.NET 9 console** (`JsonSchema.Net`, CPM per ADR-010) split into a reusable
+**core lib** (`GameTeam.ConfigValidator`: `SchemaSet`/`ConfigFileMapper`/`ConfigLoader`/`IdIndex`/`SchemaValidator`/
+`ReferenceValidator`/`VersionValidator`/`ConfigValidationRunner`) + a **thin CLI** + xUnit tests. It validates every
+`config/**` file for **(1)** JSON Schema (draft 2020-12), **(2)** cross-file **referential integrity**
+(hero→skill; stage→hero/reward/stage; gacha→hero; shop→reward; quest→reward; `reward.entries[].ref_id` polymorphic
+by `reward_type`), **(3)** `schema_version` (supported = `1`). Errors aggregate (never stop at first) and print as
+**`file:jsonpath:CODE message`** with stable codes **`JSON001`/`MAP001`/`SCH001`/`VER001`/`VER002`/`REF001`/`REF002`**
+(exit `0` ok / `1` invalid / `2` tool error). It is a **mandatory CI gate**: `.github/workflows/validate-config.yml`
+runs `tools/config-validator/run.sh config shared/config-schema` (setup-dotnet via `global.json`; `run.sh` is exec
+`100755`). Canonical how-to + error-code table: `tools/config-validator/README.md`; decision log:
+`.memory/0005-config-validator-standardized.md`.
+
+- Future agents **MUST run the validator** (`bash tools/config-validator/run.sh config shared/config-schema`) after
+  any change to `config/**` or `shared/config-schema/**`, and **MUST NOT bypass or weaken it to make CI green**
+  (no editing config to silence a real contract violation; fix the correct layer — validator, schema, or config).
+- **Referential integrity must never be bypassed.** A new config type MUST ship its schema (Phase 06 rules) **and**
+  validator support (`ConfigFileMapper` + `ReferenceValidator` + a test) in the same change. **Do NOT invent**
+  config relationships or `schema_version` values not backed by the schemas + `docs/gameplay/*` + ADRs.
+- **Reuse, don't reinvent:** Config Service (Phase 21) **MUST project-reference the core lib** and call
+  `ConfigValidationRunner.Run(...)` before publishing bundles — never a second validation implementation. Phase 07
+  does **not** implement Config Service / bundle publishing / runtime loading / migration execution.
+- When changing validator behavior/error codes, keep **`tools/config-validator` (core + tests) + its README +
+  `.github/workflows/validate-config.yml` + `docs/gameplay/configuration-and-data.md` + `docs/deployment/ci-cd-pipeline.md`
+  + `.instructions/config.md` in sync** (doc-sync matrix, §5); validator tests are the behavior contract — update them.
+
+**Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
+relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
+criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,
+`.claude/workflows/*`, `.memory/*`) **before** declaring the task complete. Never claim a phase/task complete without
+verification; never leave a finished checklist item unchecked; never silently skip a phase requirement or invent a
+missing one. If a requirement is blocked by a missing dependency, **report it explicitly and leave it unchecked** —
+do not mark it done. CI-only gates stay `[ ]` ("CI-verification pending") until the Actions result exists (§4.5).
+
 ## 5. Definition of Done & the update policy
 
 - A change is **Done** only per `docs/ai/review-and-dod.md` §4 (acceptance met, review checklist

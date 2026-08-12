@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "skill_a", "target": "single_enemy", "trigger": { "type": "energy", "value": 0 }, "effects": [ { "effect_type": "damage", "params": {} } ] }

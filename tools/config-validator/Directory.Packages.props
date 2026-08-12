@@ -1,0 +1,22 @@
+<Project>
+  <!-- Central Package Management (ADR-010): phiên bản gói khai báo TẬP TRUNG ở đây;
+       csproj chỉ <PackageReference Include="..."/> không kèm Version.
+       Solution này TÁCH RIÊNG khỏi server/ nên có Directory.Packages.props riêng. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Validator">
+    <!-- JSON Schema draft 2020-12 (json-everything). Giải $ref theo $id cục bộ (không fetch mạng). -->
+    <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+</Project>
