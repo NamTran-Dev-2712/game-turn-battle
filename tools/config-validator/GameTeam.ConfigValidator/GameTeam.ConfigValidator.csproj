@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Core library: logic validate schema + referential integrity + version.
+       KHÔNG chứa Console/Environment.Exit (ranh giới tái dùng cho Phase 21 — Config Service). -->
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+</Project>

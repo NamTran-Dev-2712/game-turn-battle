@@ -12,10 +12,13 @@ DESIGN & DECISION
 
 RULES
 - Gameplay values live in config, never hardcoded. Domain/App read via IConfigProvider only.
-- Schema change ⇒ bump config_version per ADR-005 and update the schema + validator expectations.
+- Schema change ⇒ bump config_version per ADR-005 and update the schema + validator (tools/config-validator:
+  ConfigFileMapper/ReferenceValidator) + its tests. A new config type needs schema + validator support + a test.
+- Never edit config to silence a real violation or bypass the gate to make CI green — fix the correct layer.
 - Balance values needing tuning ⇒ mark per docs/mvp/10-open-questions.md (EC), don't guess final numbers.
 
 DONE
-- config validates (schema + referential integrity). CI validate-config green.
-- Docs synced (.claude/workflows/documentation-sync.md: config-schema row).
+- Ran `bash tools/config-validator/run.sh config shared/config-schema` → exit 0 (schema + referential
+  integrity + schema_version). CI validate-config green. Error codes: tools/config-validator/README.md.
+- Docs synced (.claude/workflows/documentation-sync.md: config-schema + config-validator rows).
 ```

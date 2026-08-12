@@ -63,7 +63,10 @@ flowchart LR
 - Combat sim đọc chỉ số từ config version cụ thể (đảm bảo re-sim tất định — ADR-011).
 
 ## 6. Tooling
-- `tools/config-validator`: validate schema + referential integrity (CI gate).
+- `tools/config-validator` (Phase 07 — **GATE CI bắt buộc**, .NET 9): validate schema (draft 2020-12) +
+  referential integrity + `schema_version` cho `config/**`. Chạy: `bash tools/config-validator/run.sh config
+  shared/config-schema`. Report `file:jsonpath:CODE`; mã lỗi (`JSON001`/`MAP001`/`SCH001`/`VER001`/`VER002`/`REF001`/`REF002`)
+  ở `../../tools/config-validator/README.md`. Core lib tái dùng cho Config Service (Phase 21).
 - `tools/content-importer` (Post-MVP): import bảng (csv/xlsx) → config json.
 
 ## 7. Liên kết

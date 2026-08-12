@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "economy_a", "cost_curves": { "level_up": [0, 0, 0] }, "energy": { "max": 0, "regen_per_hour": 0, "battle_cost": 0 } }

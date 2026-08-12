@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "shop_a", "items": [ { "item_id": "slot_1", "cost": { "currency": "gem", "amount": 0 }, "reward_ref": "reward_a" } ] }

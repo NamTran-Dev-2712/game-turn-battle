@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "quest_a", "condition_type": "battles_won", "target": 1, "reward_refs": ["reward_a"], "reset_cycle": "daily" }

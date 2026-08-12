@@ -108,19 +108,19 @@ jobs:
           --filter "FullyQualifiedName~ArchitectureTests"
           --verbosity normal
 
-  # PLACEHOLDER — chỉ là hook, KHÔNG thực thi validator thật ở phase này.
-  # Owner: Phase 07 (docs/roadmap/07-*.md). TODO: chạy tools/config-validator
-  # (JSON Schema + referential integrity) trên config/** & shared/config-schema/**.
+  # ĐÃ CHUYỂN — Phase 07 (docs/roadmap/07-*.md) đã hiện thực GATE thật ở workflow riêng
+  # `.github/workflows/validate-config.yml` (tools/config-validator: JSON Schema + referential
+  # integrity + schema_version). Job này giữ lại như con trỏ, KHÔNG lặp lại gate ở ci-server.
   config-validate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Placeholder notice
+      - name: Pointer notice
         run: |
-          echo "STATUS : PLACEHOLDER (chưa thực thi)"
-          echo "GATE   : config-validate"
-          echo "TODO   : JSON Schema + referential-integrity validation cho config bundle"
-          echo "OWNER  : Phase 07 — docs/roadmap (validate-config.yml sẽ đảm nhiệm bản thật)"
+          echo "STATUS : MOVED (gate thật đã bật ở Phase 07)"
+          echo "GATE   : config-validate → .github/workflows/validate-config.yml"
+          echo "SCOPE  : JSON Schema + referential integrity + schema_version (tools/config-validator)"
+          echo "OWNER  : Phase 07 — docs/roadmap/07-config-validator-tool.md"
 
   # PLACEHOLDER — chỉ là hook, KHÔNG chạy so khớp golden vector ở phase này.
   # Owner: Phase 26 (docs/roadmap/26-*.md). TODO: chạy sim server + client trên cùng test vector,

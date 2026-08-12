@@ -48,7 +48,7 @@ Quy tắc đã theo: **SSOT (`docs/`) thắng** khi prompt mâu thuẫn (owner �
 
 | Hạng mục | Nơi | Phase |
 |---|---|---|
-| `tools/config-validator` (JSON Schema + referential integrity) — hiện `validate-config.yml` chỉ check cú pháp JSON | `tools/config-validator` | Core Framework (P1) |
+| ~~`tools/config-validator` (JSON Schema + referential integrity)~~ ✅ **XONG (Phase 07)** — `validate-config.yml` là GATE bắt buộc (schema + referential integrity + `schema_version`) | `tools/config-validator` | Core Framework (P1) |
 | `tools/codegen` (contracts → client model) | `tools/codegen` | P1 |
 | CI client Godot headless (import/test/export) + gdUnit4 | `.github/workflows/ci-client.yml` | P1 |
 | Golden vector combat (client == server) | `docs/testing`, sim 2 phía | Gameplay (P2) |

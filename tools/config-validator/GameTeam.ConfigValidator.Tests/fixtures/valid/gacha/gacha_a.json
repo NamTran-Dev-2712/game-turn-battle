@@ -1,0 +1,1 @@
+{ "schema_version": 1, "id": "gacha_a", "pool": ["hero_a"], "rates": [ { "rarity": 5, "weight": 0 } ], "pity": { "enabled": true, "threshold": 0 } }

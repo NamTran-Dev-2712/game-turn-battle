@@ -12,7 +12,9 @@
 | **Owner** | Platform/tooling team. |
 | **Future expansion** | Thêm tool build/analyze. |
 
-> **Bootstrap:** mỗi tool hiện là **README + TODO stub** — hiện thực thật ở phase Core Framework (config-validator ưu tiên, cần cho CI `validate-config.yml`).
+> **Trạng thái:** `config-validator` đã **hiện thực (Phase 07)** — .NET 9 CLI + core lib tái dùng, là **GATE
+> CI bắt buộc** ở `validate-config.yml` (schema + referential integrity + `schema_version`); xem
+> `config-validator/README.md`. `codegen` (P08) và `content-importer` (Post-MVP) vẫn là **README + TODO stub**.
 
 ## Thư mục con
 `config-validator/` · `codegen/` · `content-importer/`
