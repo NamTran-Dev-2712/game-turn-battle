@@ -1,0 +1,71 @@
+name: codegen-check
+
+# Gate BẮT BUỘC: model client GDScript ở client/src/data/generated/ phải KHỚP hợp đồng
+# shared/contracts/openapi.json. Regenerate → nếu khác committed = generated bị lệch (stale) → FAIL.
+# (Phase 08 — docs/roadmap/08-codegen-pipeline.md; ADR-008 contract single-source + client codegen.)
+# Import Godot headless của model generated do ci-client.yml đảm nhiệm (trigger trên client/**).
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "shared/contracts/openapi.json"
+      - "shared/codegen/**"
+      - "client/src/data/generated/**"
+      - "global.json"
+      - ".github/workflows/codegen-check.yml"
+  pull_request:
+    paths:
+      - "shared/contracts/openapi.json"
+      - "shared/codegen/**"
+      - "client/src/data/generated/**"
+      - "global.json"
+      - ".github/workflows/codegen-check.yml"
+
+concurrency:
+  group: codegen-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET (pin theo global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-codegen-${{ runner.os }}-${{ hashFiles('shared/codegen/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-codegen-${{ runner.os }}-
+
+      # Chạy generator thật. run.sh phải là entrypoint chạy được (exec bit trong git).
+      - name: Regenerate client models
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner="shared/codegen/run.sh"
+          if [ ! -x "$runner" ]; then
+            echo "::error file=$runner::run.sh thiếu hoặc không có quyền thực thi (cần exec bit trong git)."
+            exit 1
+          fi
+          "$runner"
+
+      # DRIFT CHECK: generated committed phải khớp output vừa sinh. Khác → FAIL (regenerate + commit).
+      - name: Codegen drift check (git diff --exit-code)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- client/src/data/generated; then
+            echo "::error::Model client generated bị lệch hợp đồng. Chạy 'bash shared/codegen/run.sh' rồi commit."
+            exit 1
+          fi

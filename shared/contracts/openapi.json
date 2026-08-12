@@ -143,7 +143,13 @@
           "None"
         ],
         "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None"
+        ],
+        "x-enum-values": [
+          0
+        ]
       },
       "Class": {
         "enum": [
@@ -154,7 +160,21 @@
           "Support"
         ],
         "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Warrior",
+          "Mage",
+          "Ranger",
+          "Support"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
       },
       "Element": {
         "enum": [
@@ -166,7 +186,23 @@
           "Dark"
         ],
         "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Fire",
+          "Water",
+          "Earth",
+          "Light",
+          "Dark"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
       },
       "Role": {
         "enum": [
@@ -177,7 +213,21 @@
           "Healer"
         ],
         "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Tank",
+          "Dps",
+          "Support",
+          "Healer"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
       },
       "Rarity": {
         "enum": [
@@ -187,7 +237,19 @@
           "Five"
         ],
         "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Three",
+          "Four",
+          "Five"
+        ],
+        "x-enum-values": [
+          0,
+          3,
+          4,
+          5
+        ]
       },
       "Currency": {
         "enum": [
@@ -197,7 +259,19 @@
           "Ticket"
         ],
         "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4."
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Gold",
+          "Gem",
+          "Ticket"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3
+        ]
       },
       "AuthGuestRequest": {
         "required": [

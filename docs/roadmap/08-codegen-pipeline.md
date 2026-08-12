@@ -41,13 +41,13 @@ ADR-008 yêu cầu contract single-source + client codegen. Sinh tự động tr
 
 # Công việc cần thực hiện
 
-- [ ] Khảo sát generator OpenAPI→GDScript; nếu không đạt, viết template codegen tối giản (Jinja/Scriban) từ OpenAPI JSON.
-- [ ] Cấu hình đầu vào = OpenAPI xuất ở phase 05; đầu ra = `client/src/data/generated/`.
-- [ ] Sinh DTO nền + enum (map kiểu C#→GDScript, enum→const/enum GDScript).
-- [ ] Thêm header "AUTO-GENERATED — DO NOT EDIT" + đường dẫn nguồn.
-- [ ] Thêm CI step: chạy codegen → `git diff --exit-code` (drift check).
-- [ ] Loại thư mục generated khỏi format/lint gây nhiễu (nếu cần).
-- [ ] README `shared/codegen/`: cách chạy, khi nào chạy (khi contract đổi), quy tắc không sửa tay.
+- [x] Khảo sát generator OpenAPI→GDScript; nếu không đạt, viết template codegen tối giản từ OpenAPI JSON. → Không có generator OpenAPI→GDScript đạt yêu cầu (openapi-generator/NSwag không có target GDScript) → **tự viết** template .NET 9 tối giản, deterministic, không gói ngoài (`shared/codegen`, `System.Text.Json`). Ghi rõ ở `.memory/0006` §Not this.
+- [x] Cấu hình đầu vào = OpenAPI xuất ở phase 05; đầu ra = `client/src/data/generated/`. → CLI `codegen [openapi-path] [output-dir]` mặc định `shared/contracts/openapi.json` → `client/src/data/generated/`.
+- [x] Sinh DTO nền + enum (map kiểu C#→GDScript, enum→enum GDScript). → 6 enum + 8 DTO. Enum `class_name <Name>` + `enum {…}` **giữ đúng số C#** (`Rarity` 0,3,4,5) nhờ enrich spec `x-enum-values` (`ContractEnumsDocumentTransformer`). DTO `class_name <Name> extends Resource`, biến typed; bảng kiểu ở `shared/codegen/README.md`. Cấu trúc chưa hỗ trợ ⇒ fail rõ (`schema:property:reason`).
+- [x] Thêm header "AUTO-GENERATED — DO NOT EDIT" + đường dẫn nguồn. → Mọi file mở đầu `# AUTO-GENERATED — DO NOT EDIT.` + `# Source: shared/contracts/openapi.json (schema: <Name>)`.
+- [x] Thêm CI step: chạy codegen → `git diff --exit-code` (drift check). → `.github/workflows/codegen-check.yml` (regenerate → `git diff --exit-code -- client/src/data/generated`). **CI-verification pending** (chờ Actions xanh trên PR); logic đã chứng minh local (drift test đỏ→revert xanh).
+- [x] Loại thư mục generated khỏi format/lint gây nhiễu (nếu cần). → gdformat/gdlint đang **hoãn** (enforcement-map §4) → chưa có formatter chạy để loại; generator phát LF + newline cuối + không trailing whitespace (khớp hook pre-commit hiện có). `.gitattributes`: `client/src/data/generated/** linguist-generated`. `.uid` do Godot import sinh được `.gitignore`.
+- [x] README `shared/codegen/`: cách chạy, khi nào chạy (khi contract đổi), quy tắc không sửa tay. → `shared/codegen/README.md` (tiếng Việt, đầy đủ: input/output/chạy/khi nào/CI/bảng kiểu/giới hạn/mở rộng).
 
 # Tiêu chí hoàn thành
 
@@ -82,7 +82,22 @@ ADR-008 yêu cầu contract single-source + client codegen. Sinh tự động tr
 
 # Phase Review
 
-Đóng khi codegen sinh model client từ contract, CI drift check hoạt động, model khớp enum/DTO nền, Godot import sạch.
+**Đủ điều kiện đóng** (local PASS 2026-08-12, SDK 9.0.306 + Godot 4.7-stable, Windows):
+
+- **Codegen chạy được:** `shared/codegen` (.NET 9, không gói ngoài) đọc `shared/contracts/openapi.json` → sinh 14 file
+  GDScript vào `client/src/data/generated/` (6 enum + 8 DTO). CLI/`run.sh` theo khuôn Phase 07 (core lib + CLI mỏng + xUnit).
+- **Model khớp contract:** enum giữ đúng số `GameTeam.Contracts` (`Rarity` = 0,3,4,5 qua `x-enum-values`); DTO map kiểu đúng
+  (String/int/float/bool/Array/`$ref`/nullable), field snake_case + `## wire:` cho parse Phase 15.
+- **Header + tách thư mục:** mọi file có `AUTO-GENERATED — DO NOT EDIT` + nguồn; nằm riêng `client/src/data/generated/`.
+- **Deterministic/idempotent:** chạy 2 lần byte-identical (LF, không CRLF, 1 newline cuối) — test + `git diff` xác nhận.
+- **Godot import sạch:** `godot --headless --import --path client` exit 0, **0 lỗi**, 14 class đăng ký (kể cả `class_name Class`).
+- **Drift check:** đổi `ProfileDto` → rebuild → regenerate → `profile_dto.gd` có field mới, `git diff --exit-code` **đỏ**;
+  revert → **xanh**. Test tự động: **34 codegen** + **66 server** (Api 24 gồm khoá `x-enum-values`).
+- **Test/CI xanh; doc-sync xong** (CLAUDE.md §4.6, doc-sync matrix, bootstrap-audit, api-and-versioning, resources-and-assets,
+  ci-cd-pipeline, `.instructions/client.md`, `.memory/0006`); không TODO/blocker.
+
+**CI-verification pending:** kết quả Actions của `codegen-check.yml` + `ci-client.yml` trên PR (gate CI-only, §4.5) — logic đã
+chứng minh local; đánh dấu xanh khi Actions xanh.
 
 ---
 

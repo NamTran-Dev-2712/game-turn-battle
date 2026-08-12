@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CLI mỏng: parse args, gọi core, in report, đặt exit code. Không chứa logic sinh mã. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>codegen</AssemblyName>
+    <RootNamespace>GameTeam.Codegen.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GameTeam.Codegen\GameTeam.Codegen.csproj" />
+  </ItemGroup>
+</Project>

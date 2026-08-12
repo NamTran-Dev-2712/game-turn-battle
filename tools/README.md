@@ -14,7 +14,9 @@
 
 > **Trạng thái:** `config-validator` đã **hiện thực (Phase 07)** — .NET 9 CLI + core lib tái dùng, là **GATE
 > CI bắt buộc** ở `validate-config.yml` (schema + referential integrity + `schema_version`); xem
-> `config-validator/README.md`. `codegen` (P08) và `content-importer` (Post-MVP) vẫn là **README + TODO stub**.
+> `config-validator/README.md`. `codegen` đã **hiện thực (Phase 08) ở `../shared/codegen/`** (OpenAPI → GDScript,
+> GATE `codegen-check.yml`); thư mục `tools/codegen/` chỉ còn con trỏ "MOVED". `content-importer` (Post-MVP) vẫn là
+> **README + TODO stub**.
 
 ## Thư mục con
 `config-validator/` · `codegen/` · `content-importer/`

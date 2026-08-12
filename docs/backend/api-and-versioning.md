@@ -80,16 +80,23 @@ Body lỗi là **envelope** bọc một đối tượng lỗi (hình dạng trê
 ### 4.3 Chính sách ổn định enum (contract-stable)
 Enum dùng chung ở `GameTeam.Contracts.Enums` là hợp đồng: **không** đổi/tái dùng giá trị số đã tồn tại;
 chỉ **thêm** (additive); giá trị bỏ đi thì **deprecate**, không tái dùng số. Enum serialize dạng **chuỗi**
-(canonical name) trong JSON & schema OpenAPI để ổn định cho codegen. Guard: `EnumStabilityTests`
-(`server/tests/GameTeam.Contracts.Tests`).
+(canonical name) trong JSON & schema OpenAPI để ổn định cho codegen. Số nền C# (kể cả enum có "khoảng trống"
+như `Rarity` = `0,3,4,5`) được đưa vào spec qua **`x-enum-varnames` + `x-enum-values`**
+(`ContractEnumsDocumentTransformer`) để codegen client (Phase 08) sinh enum GDScript **giữ đúng số**. Guard:
+`EnumStabilityTests` + `OpenApiContractTests` (`server/tests/GameTeam.*.Tests`).
 
 ## 4.4 Contract-first & OpenAPI single-source
 - **Nguồn sự thật** của contract là C# `GameTeam.Contracts` (DTO/enum, một public type/file).
 - OpenAPI spec **sinh từ code** (Microsoft.AspNetCore.OpenApi + Microsoft.Extensions.ApiDescription.Server,
   build-time) ra **`shared/contracts/openapi.json`** — **KHÔNG** sửa tay file này.
-- Đổi contract ⇒ rebuild (regenerate) + doc-sync + regenerate codegen client (Phase 08).
+- Đổi contract ⇒ rebuild (regenerate) + doc-sync + **regenerate codegen client** (Phase 08).
 - CI `ci-server` có bước **OpenAPI drift guard** (`git diff --exit-code` trên `shared/contracts/openapi.json`)
   để chặn spec commit bị lệch với code.
+- **Codegen client (Phase 08, đã chốt):** `shared/codegen` sinh model GDScript từ `openapi.json` vào
+  **`client/src/data/generated/`** (enum + DTO nền, header `AUTO-GENERATED — DO NOT EDIT`, deterministic). Đổi
+  contract ⇒ `bash shared/codegen/run.sh` → commit diff generated (KHÔNG sửa tay). GATE
+  `codegen-check.yml` (`git diff --exit-code -- client/src/data/generated`) chặn generated lệch; import Godot
+  headless model do `ci-client.yml`. Chi tiết: `shared/codegen/README.md`.
 
 ## 5. DB & Schema Versioning
 - DB: EF Core Migrations, additive-first (`infrastructure.md`).

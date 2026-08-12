@@ -1,6 +1,7 @@
 using GameTeam.Contracts.Enums;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Any;
+using Microsoft.OpenApi.Interfaces;
 using Microsoft.OpenApi.Models;
 
 namespace GameTeam.Api.OpenApi;
@@ -37,16 +38,36 @@ public sealed class ContractEnumsDocumentTransformer : IOpenApiDocumentTransform
 
         foreach (Type enumType in SharedEnums)
         {
+            // Tên canonical + giá trị số nền, giữ nguyên thứ tự khai báo (deterministic).
+            string[] names = Enum.GetNames(enumType);
+            int[] values = Enum.GetValuesAsUnderlyingType(enumType).Cast<object>()
+                .Select(v => Convert.ToInt32(v, System.Globalization.CultureInfo.InvariantCulture))
+                .ToArray();
+
             OpenApiSchema schema = new()
             {
                 Type = "string",
                 Description =
                     "Enum dùng chung (ổn định, chỉ thêm — additive). "
                     + "docs/backend/api-and-versioning.md §4.",
-                Enum = Enum.GetNames(enumType)
-                    .Select(name => (IOpenApiAny)new OpenApiString(name))
-                    .ToList(),
+                Enum = names.Select(name => (IOpenApiAny)new OpenApiString(name)).ToList(),
+                Extensions = new Dictionary<string, IOpenApiExtension>
+                {
+                    // x-enum-varnames + x-enum-values: mang giá trị số C# (vd Rarity=0,3,4,5 có "khoảng
+                    // trống") qua spec — nguồn DUY NHẤT để codegen client (Phase 08) sinh enum GDScript
+                    // KHỚP số của GameTeam.Contracts. Wire serialize vẫn là CHUỖI (JsonStringEnumConverter).
+                    ["x-enum-varnames"] = new OpenApiArray(),
+                    ["x-enum-values"] = new OpenApiArray(),
+                },
             };
+
+            var varnames = (OpenApiArray)schema.Extensions["x-enum-varnames"];
+            var enumValues = (OpenApiArray)schema.Extensions["x-enum-values"];
+            for (int i = 0; i < names.Length; i++)
+            {
+                varnames.Add(new OpenApiString(names[i]));
+                enumValues.Add(new OpenApiInteger(values[i]));
+            }
 
             document.Components.Schemas[enumType.Name] = schema;
         }

@@ -11,6 +11,7 @@
 | `ci-server.yml` | PR/push (server/**) | Build .NET, unit+integration, architecture test, golden vector (server) |
 | `ci-client.yml` | PR/push (client/**) | Godot headless: build, unit, golden vector (client), smoke |
 | `validate-config.yml` | PR/push (config/**, shared/config-schema/**) | Config validator (schema + referential integrity) |
+| `codegen-check.yml` | PR/push (openapi.json, shared/codegen/**, client/src/data/generated/**) | Regenerate model client → drift check (`git diff --exit-code`) |
 | `release.yml` | Tag `v*` | Build artifact, Docker image, publish config bundle, tạo release |
 | `codeql/security` | schedule/PR | Quét bảo mật (Post-bootstrap) |
 
@@ -124,6 +125,22 @@ release/rollback ở `release-operations.md`.
 **Phase 03 cố ý KHÔNG làm (để Phase 55):** push image lên registry, ký/xuất client (Android/iOS),
 publish config bundle versioned, tự động publish release (chỉ tạo **draft**). Không có secret/credential
 registry ở workflow này.
+
+## 4f. `codegen-check.yml` chi tiết (Phase 08 — GATE bắt buộc)
+
+**Trigger & path filter.** `push`/`pull_request` khi đụng `shared/contracts/openapi.json`, `shared/codegen/**`,
+`client/src/data/generated/**`, `global.json`, `.github/workflows/codegen-check.yml`. Có `concurrency`,
+`permissions: contents: read`, `timeout-minutes: 10`.
+
+| # | Nội dung | Chi tiết |
+|---|---|---|
+| 1 | **Setup .NET + cache NuGet** | `actions/setup-dotnet@v4` pin theo `global.json` (SDK 9.0.306) + cache `~/.nuget/packages` theo `shared/codegen/Directory.Packages.props`. |
+| 2 | **Regenerate model** | `shared/codegen/run.sh` (build CLI `-c Release` → sinh GDScript vào `client/src/data/generated/`). `run.sh` phải executable (`100755`); thiếu exec bit ⇒ FAIL (không SKIP). |
+| 3 | **GATE: drift check** | `git diff --exit-code -- client/src/data/generated`. Generated committed lệch output vừa sinh (stale) ⇒ job **đỏ** (buộc regenerate + commit). |
+
+> Import Godot headless của model generated do `ci-client.yml` đảm nhiệm (`--headless --import` trên `client/**`).
+> Nguồn `openapi.json` đã được `ci-server` (OpenAPI drift guard, §5b) bảo đảm khớp `GameTeam.Contracts`.
+> Chi tiết + bảng kiểu/giới hạn: `shared/codegen/README.md`.
 
 ## 5. Secrets management
 | Nguyên tắc | Chi tiết |

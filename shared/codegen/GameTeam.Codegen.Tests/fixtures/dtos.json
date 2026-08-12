@@ -1,0 +1,33 @@
+{
+  "openapi": "3.0.1",
+  "components": {
+    "schemas": {
+      "Rarity": {
+        "enum": ["None", "Three"],
+        "type": "string",
+        "x-enum-varnames": ["None", "Three"],
+        "x-enum-values": [0, 3]
+      },
+      "ConfigVersion": {
+        "type": "object",
+        "properties": {
+          "bundle": { "type": "integer", "format": "int32" }
+        }
+      },
+      "SampleDto": {
+        "type": "object",
+        "properties": {
+          "playerName": { "type": "string" },
+          "level": { "type": "integer", "format": "int32" },
+          "ratio": { "type": "number", "format": "double" },
+          "isActive": { "type": "boolean" },
+          "deviceId": { "type": "string", "nullable": true },
+          "version": { "$ref": "#/components/schemas/ConfigVersion" },
+          "rarity": { "$ref": "#/components/schemas/Rarity" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "nestedVersion": { "$ref": "#/components/schemas/ConfigVersion", "nullable": true }
+        }
+      }
+    }
+  }
+}

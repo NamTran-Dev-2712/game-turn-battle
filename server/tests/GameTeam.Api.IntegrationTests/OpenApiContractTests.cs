@@ -1,6 +1,7 @@
 using System.Net;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Readers;
 using Xunit;
@@ -80,6 +81,24 @@ public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>
         OpenApiSchema schema = doc.Components.Schemas[enumName];
         schema.Type.Should().Be("string", $"{enumName} phải serialize dạng chuỗi (ổn định cho codegen).");
         schema.Enum.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("Rarity", new[] { 0, 3, 4, 5 })] // "khoảng trống" 1,2 — phải giữ đúng.
+    [InlineData("Currency", new[] { 0, 1, 2, 3 })]
+    [InlineData("Faction", new[] { 0 })]
+    public async Task Shared_enums_carry_numeric_values_for_codegen(string enumName, int[] expected)
+    {
+        (OpenApiDocument doc, _) = await ReadDocumentAsync();
+
+        OpenApiSchema schema = doc.Components.Schemas[enumName];
+        // x-enum-values là NGUỒN để codegen client sinh enum GDScript khớp số của GameTeam.Contracts.
+        schema.Extensions.Should().ContainKey("x-enum-values");
+        var values = (OpenApiArray)schema.Extensions["x-enum-values"];
+        values.Select(v => ((OpenApiInteger)v).Value).Should().Equal(expected);
+
+        var varnames = (OpenApiArray)schema.Extensions["x-enum-varnames"];
+        varnames.Should().HaveCount(expected.Length);
     }
 
     [Fact]

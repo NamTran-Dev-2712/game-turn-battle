@@ -9,7 +9,7 @@
     "editor.insertSpaces": false
   },
   "dotnet.defaultSolution": "server/GameTeam.sln",
-  "godotTools.editorPath.godot4": "",
+  "godotTools.editorPath.godot4": "d:\\Godot_v4.7.1-stable_win64.exe\\Godot_v4.7.1-stable_win64.exe",
   "files.exclude": {
     "**/bin": true,
     "**/obj": true,

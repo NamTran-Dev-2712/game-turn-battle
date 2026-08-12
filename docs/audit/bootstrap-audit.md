@@ -49,7 +49,7 @@ Quy tắc đã theo: **SSOT (`docs/`) thắng** khi prompt mâu thuẫn (owner �
 | Hạng mục | Nơi | Phase |
 |---|---|---|
 | ~~`tools/config-validator` (JSON Schema + referential integrity)~~ ✅ **XONG (Phase 07)** — `validate-config.yml` là GATE bắt buộc (schema + referential integrity + `schema_version`) | `tools/config-validator` | Core Framework (P1) |
-| `tools/codegen` (contracts → client model) | `tools/codegen` | P1 |
+| ~~`tools/codegen` (contracts → client model)~~ ✅ **XONG (Phase 08)** — pipeline thật ở **`shared/codegen`** (.NET 9): `openapi.json` → GDScript `client/src/data/generated/` (enum giữ số C#, DTO `Resource`, header DO-NOT-EDIT); GATE `codegen-check.yml` (regenerate → `git diff --exit-code`); Godot import sạch qua `ci-client.yml` | `shared/codegen` | Core Framework (P1) |
 | CI client Godot headless (import/test/export) + gdUnit4 | `.github/workflows/ci-client.yml` | P1 |
 | Golden vector combat (client == server) | `docs/testing`, sim 2 phía | Gameplay (P2) |
 | DI thật: EF/Npgsql DbContext, Redis, JWT, Configuration Service, jobs | `GameTeam.Infrastructure` | P1 |

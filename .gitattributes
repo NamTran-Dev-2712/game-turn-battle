@@ -31,5 +31,7 @@
 # *.mp4  filter=lfs diff=lfs merge=lfs -text
 
 # ── Linguist: bỏ qua docs/generated khi tính ngôn ngữ repo ──
-docs/**            linguist-documentation
-shared/codegen/**  linguist-generated
+docs/**                          linguist-documentation
+# Model client SINH TỰ ĐỘNG (Phase 08): đánh dấu generated để GitHub gộp diff + không tính ngôn ngữ.
+# (shared/codegen/ là MÃ NGUỒN của generator — KHÔNG đánh dấu generated.)
+client/src/data/generated/**     linguist-generated

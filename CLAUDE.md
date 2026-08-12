@@ -166,6 +166,37 @@ runs `tools/config-validator/run.sh config shared/config-schema` (setup-dotnet v
   `.github/workflows/validate-config.yml` + `docs/gameplay/configuration-and-data.md` + `docs/deployment/ci-cd-pipeline.md`
   + `.instructions/config.md` in sync** (doc-sync matrix, §5); validator tests are the behavior contract — update them.
 
+**Client codegen is standardized (Phase 08 — closed & verified).** Client read-model DTOs/enums are **generated,
+never hand-written**, from the single contract source. ONE tool: **`shared/codegen`** — a **.NET 9 console**
+(zero external NuGet; only `System.Text.Json`; own solution/CPM split like Phase 07: reusable core lib
+`GameTeam.Codegen` = `OpenApiReader`/`GdTypeMapper`/`GdEmitter`/`CodegenRunner` + thin CLI `codegen` + xUnit tests) that
+reads **`shared/contracts/openapi.json`** and emits **GDScript** into **`client/src/data/generated/`** (one `*.gd` per
+schema, snake_case): 6 shared enums (`class_name <Name>` + unnamed `enum {…}`, **preserving the C# numeric values** incl.
+`Rarity` gaps `0,3,4,5`) and 8 foundation DTOs (`class_name <Name> extends Resource`, typed vars; `## wire: <jsonKey>`
+docs for Phase-15 parsing). Enums carry their numbers because Phase 05's `ContractEnumsDocumentTransformer` now emits
+**`x-enum-varnames` + `x-enum-values`** into the spec (single-source). Every generated file has an
+**`AUTO-GENERATED — DO NOT EDIT`** header + source path. Deterministic + idempotent (fixed order, LF, no timestamp).
+It is a **mandatory CI gate**: `.github/workflows/codegen-check.yml` runs `shared/codegen/run.sh` then
+`git diff --exit-code -- client/src/data/generated` (stale generated ⇒ FAIL); Godot headless `--import` of the models is
+covered by `ci-client.yml`. Canonical how-to + type-map/limitations: `shared/codegen/README.md`; decision log:
+`.memory/0006-codegen-pipeline-standardized.md`.
+
+- Future agents **MUST regenerate** (`bash shared/codegen/run.sh`) after ANY change to `shared/contracts/openapi.json`
+  (i.e. any `GameTeam.Contracts` change) and **MUST commit the generated diff**; **MUST NOT hand-edit** files under
+  `client/src/data/generated/`, **MUST NOT** hand-define duplicate client DTOs, and **MUST NOT** bypass/weaken the drift
+  gate to make CI green.
+- **Contract/DTO change workflow (binding):** edit `GameTeam.Contracts` → rebuild (regenerate `openapi.json`) →
+  `bash shared/codegen/run.sh` → verify generated diff → Godot import → drift check → doc-sync → phase/task checklist.
+  Generated models are the client's **read-model** — client never re-declares them.
+- **Reuse, don't reinvent:** the generator is **schema-driven** (no hardcoded DTO list) — new contract DTOs/enums appear
+  automatically on regenerate. Unsupported OpenAPI constructs (`oneOf`/`allOf`/map/array-without-items/dangling `$ref`)
+  **fail clearly** (`schema:property:reason`) — extend `GdTypeMapper` + a test rather than emitting wrong models. Network
+  parse/round-trip is **Phase 15**, not here (models are data-only).
+- When changing codegen behavior, keep **`shared/codegen` (core + tests) + its README + `.github/workflows/codegen-check.yml`
+  + the generated `client/src/data/generated/**` + `ContractEnumsDocumentTransformer` (+ `OpenApiContractTests`) +
+  `docs/backend/api-and-versioning.md` + `docs/godot/resources-and-assets.md` + `docs/deployment/ci-cd-pipeline.md` +
+  `.instructions/client.md` in sync** (doc-sync matrix, §5); codegen tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,
