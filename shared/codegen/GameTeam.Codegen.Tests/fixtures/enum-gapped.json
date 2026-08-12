@@ -1,0 +1,13 @@
+{
+  "openapi": "3.0.1",
+  "components": {
+    "schemas": {
+      "Rarity": {
+        "enum": ["None", "Three", "Four", "Five"],
+        "type": "string",
+        "x-enum-varnames": ["None", "Three", "Four", "Five"],
+        "x-enum-values": [0, 3, 4, 5]
+      }
+    }
+  }
+}

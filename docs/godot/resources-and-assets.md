@@ -22,6 +22,12 @@ flowchart LR
 
 > Client **phụ thuộc schema**, không phụ thuộc giá trị — đổi cân bằng không cần build client (ADR-004/005).
 
+> **Hai họ model — đừng lẫn:** (1) **Resource config-driven** ở trên (khuôn cho `shared/config-schema`, có `.tres`)
+> — do người viết. (2) **Read-model contract** ở `client/src/data/generated/` — **SINH TỰ ĐỘNG** (Phase 08) bởi
+> `shared/codegen` từ `shared/contracts/openapi.json` (DTO API + enum dùng chung; enum giữ số C#). File generated có
+> header `AUTO-GENERATED — DO NOT EDIT` — **không sửa tay, không tự định nghĩa DTO trùng**; đổi ⇒ sửa
+> `GameTeam.Contracts` → regenerate. Chi tiết: `../../shared/codegen/README.md`, ADR-008.
+
 ---
 
 ## 2. Asset loading (ADR-009)

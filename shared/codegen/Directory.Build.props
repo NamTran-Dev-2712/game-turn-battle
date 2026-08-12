@@ -1,0 +1,19 @@
+<Project>
+  <!-- Thiết lập chung cho MỌI project trong shared/codegen/ (Phase 08).
+       Bám sát tools/config-validator/Directory.Build.props + server/ để đồng nhất toolchain .NET 9. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Cảnh báo compiler chặn build; cảnh báo analyzer không chặn (siết dần). -->
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <!-- CA1834: Append(string) vs Append(char) — dùng const Lf="\n" cho rõ nghĩa, bỏ qua nit này. -->
+    <NoWarn>$(NoWarn);CA1014;CA1834</NoWarn>
+  </PropertyGroup>
+</Project>

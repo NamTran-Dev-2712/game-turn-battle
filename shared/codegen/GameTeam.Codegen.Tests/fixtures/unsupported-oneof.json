@@ -1,0 +1,13 @@
+{
+  "openapi": "3.0.1",
+  "components": {
+    "schemas": {
+      "BadDto": {
+        "type": "object",
+        "properties": {
+          "either": { "oneOf": [{ "type": "string" }, { "type": "integer" }] }
+        }
+      }
+    }
+  }
+}

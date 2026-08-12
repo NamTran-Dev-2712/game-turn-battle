@@ -7,6 +7,9 @@ export_presets.cfg.local
 *.translation
 # gdUnit4 JUnit/HTML reports sinh trong CI (ci-client.yml -rd reports) — không commit.
 client/reports/
+# Godot 4.x sinh file .uid cho mỗi script khi `--headless --import` (kể cả CI ci-client + codegen).
+# Repo KHÔNG track .uid (quy ước từ Phase 03) → bỏ qua để import không tạo rác commit.
+*.uid
 
 # ─────────────────────────── .NET (server) ────────────────────────────
 [Bb]in/

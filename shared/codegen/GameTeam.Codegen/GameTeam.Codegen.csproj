@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Core library: đọc OpenAPI → map kiểu → sinh GDScript (enum + DTO).
+       KHÔNG chứa Console/Environment.Exit (ranh giới tái dùng). KHÔNG gói ngoài (System.Text.Json built-in). -->
+</Project>
