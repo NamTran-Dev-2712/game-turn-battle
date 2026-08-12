@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/shop.schema.json",
+  "title": "Shop config",
+  "description": "Shop: mục bán + giá + tham chiếu reward (ADR-004). Bám ../../docs/gameplay/progression-and-economy.md. Giá (cost.amount) là integer cấu trúc — giá trị thật là tuning.",
+  "type": "object",
+  "required": ["schema_version", "id", "items"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/shop_id" },
+    "items": {
+      "type": "array",
+      "description": "Danh sách mục bán. reward_ref trỏ reward table (shop.items -> reward id).",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["item_id", "cost", "reward_ref"],
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Khoá mục bán trong shop (duy nhất trong shop này)."
+          },
+          "cost": { "$ref": "https://game-team/schema/common.schema.json#/$defs/cost" },
+          "reward_ref": { "$ref": "https://game-team/schema/common.schema.json#/$defs/reward_id" },
+          "stock": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "rotation": {
+      "type": "object",
+      "description": "Cấu trúc luân phiên/khả dụng (tuỳ chọn). Lịch/thời gian chi tiết là LiveOps (phase 40/49).",
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kiểu luân phiên (vd static, daily). MVP shop tĩnh; enum mở rộng dần."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

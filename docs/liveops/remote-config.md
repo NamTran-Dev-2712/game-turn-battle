@@ -34,6 +34,8 @@ flowchart LR
 - Không publish config chưa qua validator (`../testing/`).
 - Phân quyền publish (admin — `content-update-and-admin-workflow.md`).
 
+> **Schema là hợp đồng, config là giá trị.** JSON Schema per-type (`../../shared/config-schema/`, phase 06) định nghĩa **cấu trúc** — không chứa balance. Đổi schema breaking ⇒ tăng `schema_version` + migration trong `shared/config-schema/_versions/` + doc-sync. **Validator** (schema + referential integrity, CI gate) là phase 07; **Configuration Service** nạp/publish bundle runtime là phase 21.
+
 ## 6. Liên kết
 - ADR-005, ADR-006 · Config data: `../gameplay/configuration-and-data.md`
 - Feature flags: `feature-flags-and-ab-testing.md`

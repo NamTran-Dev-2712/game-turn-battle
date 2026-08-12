@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "id": "stage_ch01_01",
+  "enemies": [
+    { "hero_id": "hero_sample", "level": 0 }
+  ],
+  "rewards": ["reward_sample_clear"],
+  "requirements": { "energy_cost": 0 }
+}

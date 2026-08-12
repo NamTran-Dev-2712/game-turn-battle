@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/stage.schema.json",
+  "title": "Stage config",
+  "description": "Stage campaign/tower: địch, thưởng, yêu cầu (ADR-004). Bám ../../docs/gameplay/progression-and-economy.md. Tham chiếu hero/reward id kiểm tồn tại ở phase 07. Không hardcode balance.",
+  "type": "object",
+  "required": ["schema_version", "id", "enemies", "rewards"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/stage_id" },
+    "enemies": {
+      "type": "array",
+      "description": "Đội địch (stage.enemies -> hero id). level là integer cấu trúc.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["hero_id"],
+        "properties": {
+          "hero_id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/hero_id" },
+          "level": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "rewards": {
+      "type": "array",
+      "description": "Tham chiếu reward table (stage.rewards -> reward id).",
+      "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/reward_id" },
+      "uniqueItems": true
+    },
+    "requirements": {
+      "type": "object",
+      "description": "Điều kiện vào stage (tuỳ chọn). energy_cost integer; prerequisite_stage_id tham chiếu stage.",
+      "properties": {
+        "prerequisite_stage_id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/stage_id" },
+        "energy_cost": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

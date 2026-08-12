@@ -15,5 +15,6 @@
 - [`0001-ai-execution-layer.md`](0001-ai-execution-layer.md) — quyết định tách execution layer khỏi docs SSOT.
 - [`0002-dev-environment-standardized.md`](0002-dev-environment-standardized.md) — dev env một lệnh (Phase 04): compose Postgres16/Redis7, network `game-team-dev`, profile `api`, `.env`, script up/down đa nền tảng.
 - [`0003-shared-contracts-standardized.md`](0003-shared-contracts-standardized.md) — contract spine (Phase 05): `GameTeam.Contracts` là nguồn (enum + DTO nền), OpenAPI sinh từ code ra `shared/contracts/openapi.json` (single-source, CI drift guard), enum ổn định additive-only, `/api/v1`.
+- [`0004-config-schema-standardized.md`](0004-config-schema-standardized.md) — config schema (Phase 06): 8 schema per-type + `common.schema.json` + envelope ở `shared/config-schema/` (draft 2020-12, `snake_case`, combat integer, `schema_version`, ID prefix), fixture pass/fail + `_versions/` migration; schema là cấu trúc **không** balance; referential integrity = phase 07.
 
 > Quyết định kiến trúc **luôn** đi vào `docs/adr/`, không chỉ ở đây.

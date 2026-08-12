@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/reward.schema.json",
+  "title": "Reward table config",
+  "description": "Bảng thưởng (AFK, quest, first-clear) được tham chiếu bởi stage/shop/quest (ADR-004). Bám ../../docs/gameplay/progression-and-economy.md. amount là integer; giá trị thật là tuning.",
+  "type": "object",
+  "required": ["schema_version", "id", "entries"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/reward_id" },
+    "entries": {
+      "type": "array",
+      "description": "Các khoản thưởng. ref_id trỏ tới currency/hero/fragment/item tuỳ reward_type — tồn tại kiểm ở phase 07.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["reward_type", "ref_id", "amount"],
+        "properties": {
+          "reward_type": {
+            "type": "string",
+            "enum": ["currency", "hero", "fragment", "item"],
+            "description": "Loại thưởng. Thêm loại mới = enum additive."
+          },
+          "ref_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Khoá tham chiếu thực thể thưởng (vd gold, hero_ignis). Kiểu chuỗi; tính toàn vẹn tham chiếu kiểm ở phase 07."
+          },
+          "amount": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

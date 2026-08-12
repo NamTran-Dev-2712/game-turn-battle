@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "loot_sample",
+  "entries": [
+    { "reward_type": "currency", "ref_id": "gold", "amount": 0 }
+  ]
+}

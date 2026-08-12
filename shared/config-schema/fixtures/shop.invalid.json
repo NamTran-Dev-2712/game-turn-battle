@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "shop_sample",
+  "items": [
+    {
+      "item_id": "slot_1",
+      "cost": { "currency": "diamond", "amount": 0 },
+      "reward_ref": "reward_sample_clear"
+    }
+  ]
+}

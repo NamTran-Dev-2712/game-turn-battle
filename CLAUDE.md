@@ -118,6 +118,28 @@ code** (.NET 9 `Microsoft.AspNetCore.OpenApi` + `Microsoft.Extensions.ApiDescrip
   + `docs/backend/api-and-versioning.md` in sync** (doc-sync matrix, §5); the CI OpenAPI drift-guard enforces
   the regenerate step.
 
+**Config schemas are standardized (Phase 06 — closed & verified).** The data-driven config contract has one
+source of truth: **JSON Schema (draft 2020-12) in `shared/config-schema/`** — **8 per-type schemas**
+(`hero`/`skill`/`stage`/`gacha`/`shop`/`reward`/`economy`/`quest`) + **`common.schema.json`** (shared `$defs`:
+id prefixes, `combat_int`, enums matching `GameTeam.Contracts`, `cost`) + **`config-bundle.schema.json`**
+(the single envelope, `config@vN` compatible). Keys are `snake_case`; combat values are **integer** (ADR-011);
+every file carries `schema_version`; IDs use per-type prefixes (`hero_`, `skill_`, `stage_`, …). Minimal
+pass/fail **fixtures** live in `fixtures/`; migration rules in `_versions/`. Schemas define **structure/type
+only — never balance values**. Canonical rules: `docs/gameplay/configuration-and-data.md` (schema-mapping),
+`docs/conventions/data-and-docs-conventions.md`; decision log: `.memory/0004-config-schema-standardized.md`.
+
+- Future agents **MUST inspect and reuse** these 8 schemas + `common.schema.json` before adding any config
+  field, enum value, effect type, quest/condition type, currency, or reward type; **MUST NOT** invent
+  gameplay not backed by `docs/gameplay/*` + ADRs, and **MUST NOT** create a second config envelope.
+- Schema evolution is **additive-only** by default (new optional field, new enum value = no version bump). A
+  **breaking** change (remove/rename field, tighten type, narrow enum, change meaning) requires **`schema_version`
+  bump + migration under `_versions/` + doc-sync**.
+- Schemas hold **no balance numbers** (rates/pity/stats/curves are tuning). Cross-file **referential integrity**
+  (hero→skill, stage→reward…) is the **phase-07 validator**, not JSON Schema alone — never claim a single
+  schema validates cross-file id existence. Runtime Configuration Service is **phase 21**.
+- When changing a schema, keep **schemas + `fixtures/` + `_versions/` + `docs/gameplay/configuration-and-data.md`
+  + `docs/liveops/remote-config.md` + `.instructions/config.md` in sync** (doc-sync matrix, §5).
+
 ## 5. Definition of Done & the update policy
 
 - A change is **Done** only per `docs/ai/review-and-dod.md` §4 (acceptance met, review checklist
