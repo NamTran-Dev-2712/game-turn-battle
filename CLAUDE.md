@@ -226,6 +226,41 @@ NetArchTest `Domain_should_not_depend_on_framework_packages` green, no wall-cloc
   the NetArchTest purity facts (`GameTeam.Application.Tests/ArchitectureTests.cs`) + `docs/backend/domain-and-application.md`
   + `.instructions/backend.md` in sync** (doc-sync matrix, §5).
 
+**Application pipeline is standardized (Phase 10 — closed & verified).** The Application layer owns CQRS/MediatR
+orchestration; **cross-cutting concerns live in MediatR pipeline behaviors, never in handlers** (ADR-003) — handlers
+stay **thin**. Home: **`GameTeam.Application/Behaviors/`** = four `IPipelineBehavior<,>` in fixed execution order
+**`Logging → Validation → Transaction → Caching`** (registered via `AddOpenBehavior` in `AddApplication`; outermost
+first). **LoggingBehavior** logs request type name + elapsed ms + outcome only — never serializes the body (no
+token/PII leak). **ValidationBehavior** (`where TResponse : Result`) runs FluentValidation before the handler; failure
+short-circuits to a failed `Result` (stable code **`VALIDATION_FAILED`**, `ValidationErrors.ToError`) — handler not
+invoked, **no exception leaks** to the API. **TransactionBehavior** (`where TRequest : ITransactionalRequest`) wraps
+only opted-in write commands in `IUnitOfWork` (commit on success `Result`, rollback on failed `Result` **or**
+exception+rethrow) — **queries never enter a transaction**. **CachingBehavior** (`where TRequest : ICacheableQuery`)
+reads/writes cache by key = **`{RequestTypeName}:{CacheKey}:cfg{IConfigProvider.CurrentVersion.Bundle}`** (name +
+params + config version), TTL from the query, caches successes only. Ports (DIP) declared in Application:
+**`IUnitOfWork`**, **`IRepository<TEntity, TId>`**, **`ICacheService`**, **`IConfigProvider`** (Phase 10 uses only
+`CurrentVersion`); **`IClock`** reused from Domain (Phase 09). `AddApplication` registers MediatR + FluentValidation +
+the 4 behaviors ONLY — **no port implementation** (composition root = Api). Verified: `dotnet build -c Release` clean
+(0 warning), `dotnet test` **121 pass** (Application.Tests **25**), pipeline order proven behaviorally by
+`PipelineOrderTests` (+ negative swap ⇒ red ⇒ reverted), NetArchTest
+`Application_should_not_depend_on_infrastructure_or_api` green, no `openapi.json` drift. Canonical rules:
+`docs/backend/cross-cutting.md` §2.5; decision log: `.memory/0008-application-pipeline-standardized.md`.
+
+- Future agents **MUST reuse** these behaviors/ports/markers before adding cross-cutting; **MUST NOT** re-invent a
+  second behavior/port/`Result`/validation-error paradigm, **MUST NOT** put cross-cutting logic inside feature handlers,
+  and **MUST NOT** bypass MediatR. Every future command/query goes through the pipeline and inherits it.
+- **Marker semantics are binding:** transactionality/caching are **explicit opt-in** via `ITransactionalRequest` /
+  `ICacheableQuery` — **never** inferred from a "Command"/"Query" name. Queries must **not** be marked transactional.
+- **DIP boundary:** ports live in Application, implementations in Infrastructure (EF Core **phase 11**, Redis **phase
+  12**, Config Service **phase 21**). `GameTeam.Application` **must not** reference `GameTeam.Infrastructure`/`Api`
+  (architecture test gates it). Phase 10 does **not** implement repositories/cache/Config Service/endpoints, nor
+  `IdempotencyBehavior` (deferred). A minimal `SystemClock : IClock` adapter (Infrastructure) is registered so composed
+  handlers resolve a clock — real infra impls still deferred.
+- When changing pipeline behavior, keep **`GameTeam.Application/Behaviors/*` + ports (`Abstractions/*`) + markers +
+  `AddApplication` order + `GameTeam.Application.Tests` (behavior + `PipelineOrderTests` + architecture test) +
+  `docs/backend/cross-cutting.md` §2.5 + `docs/backend/domain-and-application.md` §2 + `.instructions/backend.md` +
+  `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the behavior tests are the contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

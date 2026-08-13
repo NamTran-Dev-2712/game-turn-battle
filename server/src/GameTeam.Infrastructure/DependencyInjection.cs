@@ -1,3 +1,5 @@
+using GameTeam.Domain.Common;
+using GameTeam.Infrastructure.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +22,11 @@ public static class DependencyInjection
         //   - Background jobs
         // Wiring thuần — KHÔNG logic gameplay.
         _ = configuration;
+
+        // Server-time boundary (Domain port IClock). Minimal adapter cần cho mọi handler dùng thời
+        // gian server (vd sample GetServerTimeQuery, Phase 10). Repository/cache/config thật = phase 11–12/21.
+        services.AddSingleton<IClock, SystemClock>();
+
         return services;
     }
 }

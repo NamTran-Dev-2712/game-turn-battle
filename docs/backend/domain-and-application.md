@@ -75,17 +75,29 @@ flowchart LR
     Handler --> Events[Publish Domain Events]
 ```
 
-### Pipeline Behaviors (cross-cutting chuẩn hoá)
-| Behavior | Vai trò |
-|---|---|
-| ValidationBehavior | FluentValidation trước handler |
-| LoggingBehavior | Log request/response có cấu trúc |
-| TransactionBehavior | Bọc command trong transaction (UnitOfWork) — atomic (ADR-007) |
-| CachingBehavior | Cache query đọc nhiều (Redis) |
-| IdempotencyBehavior | Chống double-execute cho command nhạy cảm (claim/summon) |
+### Pipeline Behaviors (cross-cutting chuẩn hoá — Phase 10 đã hiện thực 4 behaviors)
+
+Thứ tự thực thi cố định: **`Logging → Validation → Transaction → Caching`** (ngoài→trong). Chi tiết đầy đủ
+(ràng buộc generic, marker, quy ước cache key, ports) ở [`cross-cutting.md`](cross-cutting.md) §2.5 — không lặp lại ở đây.
+
+| Behavior | Vai trò | Trạng thái |
+|---|---|---|
+| LoggingBehavior | Log tên request + elapsed + outcome (không log body/nhạy cảm) | Phase 10 ✅ |
+| ValidationBehavior | FluentValidation **trước** handler; fail ⇒ `Result` lỗi (`VALIDATION_FAILED`), không ném thô | Phase 10 ✅ |
+| TransactionBehavior | Bọc **`ITransactionalRequest`** trong `IUnitOfWork` — commit/rollback, atomic (ADR-007) | Phase 10 ✅ |
+| CachingBehavior | Cache query có **`ICacheableQuery`** theo key+TTL (Redis ở phase 12) | Phase 10 ✅ |
+| IdempotencyBehavior | Chống double-execute cho command nhạy cảm (claim/summon) | Defer (phase sau) |
+
+> Handler **mỏng**: cross-cutting ở behaviors, không rải trong handler. Mọi command/query tương lai đi qua
+> pipeline (`IMediator.Send`) — **không** bypass MediatR.
 
 ### Ports (interface) — đảo phụ thuộc
-`IHeroRepository`, `IPlayerProfileRepository`, `IUnitOfWork`, `IConfigProvider`, `IClock`, `ICacheStore`, `IRandomProvider` (seeded), `ICombatSimulator`... — **Infrastructure implements**.
+`IHeroRepository`, `IPlayerProfileRepository`, `IUnitOfWork`, `IConfigProvider`, `IClock`, `ICacheService`, `IRandomProvider` (seeded), `ICombatSimulator`... — **Infrastructure implements**.
+
+**Ports nền đã khai báo (Phase 10):** `IUnitOfWork`, `IRepository<TEntity, TId>` (`Abstractions/Persistence`),
+`ICacheService` (`Abstractions/Caching`), `IConfigProvider` (`Abstractions/Configuration`, chỉ `CurrentVersion`;
+Config Service hiện thực ở **phase 21**). Hiện thực: EF Core (**phase 11**), Redis (**phase 12**). `SystemClock`
+(Infrastructure) đã hiện thực `IClock` ở mức tối giản (server-time boundary).
 
 > **Vị trí port:** khai báo port ở tầng **cần** nó nhất. `IClock` thuộc **`GameTeam.Domain`** (`Common/IClock.cs`, Phase 09)
 > vì Domain cần server-time cho invariant/logic mà không được chạm wall-clock; Application/Infrastructure tái dùng cùng
