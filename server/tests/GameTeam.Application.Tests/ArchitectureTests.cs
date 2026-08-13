@@ -26,6 +26,27 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void Domain_should_not_depend_on_framework_packages()
+    {
+        // Phase 09: Domain là lõi THUẦN (ADR-003) — không package/framework nào.
+        // Domain hiện không có PackageReference; test này khoá bất biến cho các phase sau.
+        TestResult result = Types.InAssembly(typeof(GameTeam.Domain.AssemblyMarker).Assembly)
+            .Should()
+            .NotHaveDependencyOnAny(
+                "Microsoft.EntityFrameworkCore",
+                "Microsoft.AspNetCore",
+                "Microsoft.Extensions",
+                "MediatR",
+                "FluentValidation",
+                "Npgsql",
+                "StackExchange.Redis")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(
+            "Domain phải thuần — không phụ thuộc EF/ASP.NET/MediatR/FluentValidation/Npgsql/Redis (ADR-003).");
+    }
+
+    [Fact]
     public void Application_should_not_depend_on_infrastructure()
     {
         TestResult result = Types.InAssembly(typeof(GameTeam.Application.AssemblyMarker).Assembly)

@@ -197,6 +197,35 @@ covered by `ci-client.yml`. Canonical how-to + type-map/limitations: `shared/cod
   `docs/backend/api-and-versioning.md` + `docs/godot/resources-and-assets.md` + `docs/deployment/ci-cd-pipeline.md` +
   `.instructions/client.md` in sync** (doc-sync matrix, §5); codegen tests are the behavior contract — update them.
 
+**Domain foundation is standardized (Phase 09 — closed & verified).** The backend Domain core has ONE home for reusable
+primitives: **`GameTeam.Domain/Common/`** — one public type/file, **BCL-only** (`GameTeam.Domain` has **zero package
+references**, enforced by NetArchTest). Types: **`Result`/`Result<T>`** (expected business failures; `Result<T>.Value`
+throws `InvalidOperationException` on failure), **`Error(Code, Message)`** (immutable value; stable `SCREAMING_SNAKE_CASE`
+code for Phase-13 API mapping; `Error.None`; no stack/DB/infra leakage), **`Entity<TId>`** (identity equality),
+**`ValueObject`** (component/value equality), **`AggregateRoot<TId> : Entity<TId>`** (owns domain events —
+`RaiseDomainEvent`/read-only `DomainEvents`/`ClearDomainEvents`), **`IDomainEvent`** (marker), **`IClock`**
+(`DateTimeOffset UtcNow` — the server-time boundary), **`Guard`** (`NotNull`/`Positive`/`InRange`, **throw** BCL argument
+exceptions). Verified: `dotnet build -c Release` clean (warnings-as-error), `dotnet test` **101 pass** (Domain.Tests 35),
+NetArchTest `Domain_should_not_depend_on_framework_packages` green, no wall-clock call site in Domain. Canonical rules:
+`docs/backend/domain-and-application.md` → "Foundation primitives (Phase 09)"; decision log:
+`.memory/0007-domain-foundation-standardized.md`.
+
+- Future agents **MUST reuse** these `Common/` primitives before adding any base type/abstraction; **MUST NOT** re-invent
+  a second `Result`/`Entity`/`ValueObject`/event base, and **MUST NOT** add EF/ASP.NET/HTTP/MediatR or any package to
+  `GameTeam.Domain` (keep it pure — the NetArchTest gate fails otherwise).
+- **Result vs Exception (binding):** **`Result`** for expected business failures (handler returns, caller handles);
+  **exceptions/`Guard`** for programming errors, invariant violations, and infrastructure failures. Do **not** create a
+  second validation paradigm (Guard never returns `Result`). Do **not** turn every exception into `Result`.
+- **Domain events:** Domain only **raises and collects** events; **dispatch** (MediatR/notification/bus) belongs to
+  Application/Infrastructure (**Phase 10/11**) — never dispatch from Domain. Feature entities (Hero/Profile/Currency),
+  persistence, and MediatR are **out of scope** for Phase 09.
+- **Server-time:** all business time comes through **`IClock.UtcNow`**; **never** use `DateTime.Now/UtcNow` or
+  `DateTimeOffset.Now/UtcNow` directly in Domain (Forbidden Pattern). `IClock` lives in **Domain** (not Application);
+  Infrastructure implements it later.
+- When changing a Domain primitive, keep **`GameTeam.Domain/Common/*` + `GameTeam.Domain.Tests` (behavior contract) +
+  the NetArchTest purity facts (`GameTeam.Application.Tests/ArchitectureTests.cs`) + `docs/backend/domain-and-application.md`
+  + `.instructions/backend.md` in sync** (doc-sync matrix, §5).
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

@@ -41,14 +41,14 @@ Clean Architecture (ADR-003): Domain là lõi thuần. Các phase nghiệp vụ 
 
 # Công việc cần thực hiện
 
-- [ ] `Result`/`Result<T>`: success/failure, error code + message, không dùng cho luồng ngoại lệ thật sự.
-- [ ] `Error` value (code, message) — mã lỗi ổn định để map API (phase 13).
-- [ ] `Entity<TId>` (định danh), `AggregateRoot` (chứa domain events), `ValueObject` (equality by components).
-- [ ] `IClock` với `UtcNow`; ghi rõ mọi thời gian nghiệp vụ dùng clock này (server-time).
-- [ ] Domain event: interface + collection trong aggregate + `ClearDomainEvents`.
-- [ ] Guard helpers (NotNull, Positive, InRange) ném/return lỗi domain nhất quán.
-- [ ] Test đầy đủ; xác nhận Domain **không** ref package ngoài (thuần).
-- [ ] Cập nhật `../backend/domain-and-application.md`.
+- [x] `Result`/`Result<T>`: success/failure, error code + message, không dùng cho luồng ngoại lệ thật sự. — `GameTeam.Domain/Common/Result.cs`, `ResultOfT.cs` (invariant success⇔`Error.None`; `Value` ném `InvalidOperationException` khi failure).
+- [x] `Error` value (code, message) — mã lỗi ổn định để map API (phase 13). — `Common/Error.cs` (`sealed record`, `Error.None`).
+- [x] `Entity<TId>` (định danh), `AggregateRoot` (chứa domain events), `ValueObject` (equality by components). — `Common/Entity.cs`, `AggregateRoot.cs` (`AggregateRoot<TId> : Entity<TId>`), `ValueObject.cs`.
+- [x] `IClock` với `UtcNow`; ghi rõ mọi thời gian nghiệp vụ dùng clock này (server-time). — `Common/IClock.cs` (`DateTimeOffset UtcNow`).
+- [x] Domain event: interface + collection trong aggregate + `ClearDomainEvents`. — `Common/IDomainEvent.cs` + `AggregateRoot` (`DomainEvents` read-only, `RaiseDomainEvent`, `ClearDomainEvents`).
+- [x] Guard helpers (NotNull, Positive, InRange) ném/return lỗi domain nhất quán. — `Common/Guard.cs` (ném BCL argument exception; Result dành cho lỗi nghiệp vụ).
+- [x] Test đầy đủ; xác nhận Domain **không** ref package ngoài (thuần). — `GameTeam.Domain.Tests` (35 pass) + NetArchTest `Domain_should_not_depend_on_framework_packages`; csproj không có PackageReference.
+- [x] Cập nhật `../backend/domain-and-application.md`. — thêm mục "Foundation primitives (Phase 09)" + ranh giới Result/Exception, domain-event dispatch, server-time; ghi rõ `IClock` thuộc Domain.
 
 # Tiêu chí hoàn thành
 
@@ -83,7 +83,20 @@ Bám [`../backend/domain-and-application.md`](../backend/domain-and-application.
 
 # Phase Review
 
-Đóng khi base types + IClock + domain event có test, Domain thuần (architecture test xanh), không wall-clock.
+**Kết luận: đủ điều kiện đóng (local PASS 2026-08-12).**
+
+- **Đã hiện thực:** `GameTeam.Domain/Common/` — `Error`, `Result`/`Result<T>`, `Entity<TId>`, `ValueObject`,
+  `AggregateRoot<TId>`, `IDomainEvent`, `IClock` (`DateTimeOffset UtcNow`), `Guard` (một public type/file, BCL-only).
+- **Test:** `dotnet test -c Release` xanh — `GameTeam.Domain.Tests` **35 pass** (Error/Result/Entity/ValueObject/
+  AggregateRoot(add/clear/không sửa được từ ngoài)/Guard/Clock); toàn solution **101 pass / 0 fail**.
+- **Architecture:** NetArchTest `Domain_should_not_depend_on_framework_packages` (mới) + `Domain_should_not_depend_on_outer_layers`
+  xanh; `GameTeam.Domain.csproj` **không có** PackageReference/ProjectReference.
+- **Build Release** sạch, warnings-as-error (compiler) — 0 error, `src/` 0 warning.
+- **Wall-clock:** grep `DateTime.Now/UtcNow`, `DateTimeOffset.Now/UtcNow` trong `server/src/GameTeam.Domain` → chỉ có
+  **prose trong doc-comment** `IClock.cs` (cảnh báo), không có call site. `IClock.UtcNow` là ranh giới duy nhất.
+- **Quyết định:** Guard **ném** BCL argument exception (không trả Result — tránh hai paradigm); `IClock.UtcNow` = `DateTimeOffset`.
+  Chi tiết: `.memory/0007-domain-foundation-standardized.md`.
+- **Ranh giới phase:** domain event chỉ raise/collect (dispatch = phase 10/11); không entity nghiệp vụ / persistence / MediatR.
 
 ---
 
