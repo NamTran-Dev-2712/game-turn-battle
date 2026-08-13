@@ -22,6 +22,38 @@
 - Không phụ thuộc Application/Infrastructure.
 - Business rule liên quan gameplay tham chiếu `../mvp/03`, `05`, `06` — **không phát minh rule mới**.
 
+### Foundation primitives (Phase 09 — đã đóng)
+
+`GameTeam.Domain/Common/` chứa base type tái dùng (một public type/file, **BCL-only**, `GameTeam.Domain`
+**không có package reference** — architecture test canh). Đây là nền cho mọi phase nghiệp vụ; **không** tự phát
+minh primitive mới trùng chức năng.
+
+| Primitive | Quy ước |
+|---|---|
+| `Result` / `Result<T>` | Dùng cho **lỗi nghiệp vụ mong đợi** (thiếu tiền, sai điều kiện…). `IsSuccess`/`IsFailure`/`Error`; `Result<T>.Value` **ném** `InvalidOperationException` nếu truy cập khi thất bại (trạng thái không hợp lệ). **KHÔNG** biến mọi exception thành Result. |
+| `Error(Code, Message)` | Value bất biến (so sánh theo giá trị). `Code` **ổn định**, `SCREAMING_SNAKE_CASE`, dùng để map API (phase 13). `Error.None` = trạng thái không lỗi. **Không** rò stack trace / chi tiết DB / hạ tầng / thông tin nhạy cảm. |
+| `Entity<TId>` | Equality theo **định danh** (`Id` + kiểu runtime), không theo giá trị thuộc tính. Không annotation persistence, không audit field. |
+| `ValueObject` | Equality theo **giá trị** (các thành phần ở `GetEqualityComponents()`); hash nhất quán với equality; an toàn null-component. |
+| `AggregateRoot<TId>` | Kế thừa `Entity<TId>`; **sở hữu** domain event. `DomainEvents` (read-only, không ép về `List` để sửa), `RaiseDomainEvent` (protected), `ClearDomainEvents`. |
+| `IDomainEvent` | Marker tối giản (không timestamp → tránh wall-clock trong Domain). |
+| `IClock` | Port thời gian, `DateTimeOffset UtcNow` — **ranh giới server-time**. Infrastructure hiện thực & inject (phase sau). |
+| `Guard` | `NotNull` / `Positive` / `InRange` bảo vệ **bất biến** → **ném** BCL argument exception (chiến lược nhất quán). |
+
+**Result vs Exception (ranh giới bắt buộc):**
+- **Result** — lỗi nghiệp vụ *mong đợi*, là một phần hợp đồng của thao tác (handler trả về, caller xử lý).
+- **Exception** — lỗi lập trình / vi phạm bất biến nội bộ / lỗi hạ tầng / điều kiện thật sự bất thường. `Guard`
+  ném exception vì vi phạm invariant là lỗi lập trình, **không** phải luồng nghiệp vụ. Không tạo **hai paradigm
+  validate** song song (Guard không trả `Result`).
+
+**Domain event lifecycle & ranh giới dispatch:**
+1. Aggregate **raise** event trong method nghiệp vụ (`RaiseDomainEvent`).
+2. Aggregate **thu thập** event (`DomainEvents`).
+3. Application/Infrastructure **dispatch** (phase 10/11) rồi gọi `ClearDomainEvents`.
+> Domain **chỉ** raise & collect — **KHÔNG** dispatch, **KHÔNG** MediatR/bus/notification trong Domain.
+
+**Server-time rule:** mọi thời gian nghiệp vụ (AFK, energy, cooldown…) lấy qua `IClock.UtcNow`; **cấm** `DateTime.Now/UtcNow`,
+`DateTimeOffset.Now/UtcNow` trực tiếp trong Domain (Forbidden Pattern, `../ai/coding-rules.md` §3) — cho test tái lập & chống gian lận giờ.
+
 ---
 
 ## 2. Application Layer — CQRS + MediatR
@@ -54,6 +86,10 @@ flowchart LR
 
 ### Ports (interface) — đảo phụ thuộc
 `IHeroRepository`, `IPlayerProfileRepository`, `IUnitOfWork`, `IConfigProvider`, `IClock`, `ICacheStore`, `IRandomProvider` (seeded), `ICombatSimulator`... — **Infrastructure implements**.
+
+> **Vị trí port:** khai báo port ở tầng **cần** nó nhất. `IClock` thuộc **`GameTeam.Domain`** (`Common/IClock.cs`, Phase 09)
+> vì Domain cần server-time cho invariant/logic mà không được chạm wall-clock; Application/Infrastructure tái dùng cùng
+> interface đó. Các repository/UnitOfWork (I/O nghiệp vụ) khai báo ở **Application**. Infrastructure hiện thực tất cả.
 
 ---
 

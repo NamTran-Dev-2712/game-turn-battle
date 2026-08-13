@@ -69,7 +69,7 @@ Quy tắc đã theo: **SSOT (`docs/`) thắng** khi prompt mâu thuẫn (owner �
 3. **Branch protection & Environments:** cần bật trên GitHub (xem `.github/project-setup.md`) — không tự động hoá được từ repo.
 4. **Git LFS:** asset nặng (`assets/`, `client/assets/`) nên cân nhắc LFS trước khi commit binary lớn (mẫu đã có trong `.gitattributes`).
 5. **`.env`:** chỉ dùng dev; secret thật phải ở GitHub Environments.
-6. **NetArchTest:** hiện chỉ 2 luật (Domain thuần; Application ⊥ Infrastructure). Mở rộng bộ luật khi thêm tầng/feature.
+6. **NetArchTest:** sau Phase 09 có 4 luật (Domain ⊥ tầng ngoài; **Domain ⊥ package framework** — mới; Application ⊥ Infrastructure; Contracts ⊥ App/Infra/Api). Mở rộng bộ luật khi thêm tầng/feature.
 
 ---
 

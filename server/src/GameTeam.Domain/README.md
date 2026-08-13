@@ -1,3 +1,5 @@
 # `GameTeam.Domain` — Domain layer
 
-Entity/Aggregate/Value Object/Domain Service/Domain Event, invariant, business rule **thuần**. **Không** phụ thuộc EF/HTTP/framework/`DateTime.Now` (inject qua port). **Owner:** Backend. Thiết kế: `../../../docs/backend/domain-and-application.md`, ADR-003. **Bootstrap:** chỉ `AssemblyMarker`.
+Entity/Aggregate/Value Object/Domain Service/Domain Event, invariant, business rule **thuần**. **Không** phụ thuộc EF/HTTP/framework/`DateTime.Now` (inject qua port). **Owner:** Backend. Thiết kế: `../../../docs/backend/domain-and-application.md`, ADR-003.
+
+**Nền tảng (Phase 09 — đã đóng):** primitive tái dùng ở `Common/` (một public type/file, BCL-only): `Result`/`Result<T>` + `Error` (lỗi nghiệp vụ mong đợi; exception cho lỗi lập trình/hạ tầng), `Entity<TId>` (equality theo định danh), `ValueObject` (equality theo giá trị), `AggregateRoot<TId>` (sở hữu domain event: raise/collect/`ClearDomainEvents`, **không dispatch**), `IDomainEvent` (marker), `IClock` (`DateTimeOffset UtcNow` — ranh giới server-time, cấm wall-clock trực tiếp), `Guard` (NotNull/Positive/InRange — **ném** BCL argument exception). Domain **không có package reference** (architecture test canh). Entity nghiệp vụ (Hero/Profile/Currency), persistence (phase 11), MediatR (phase 10) KHÔNG thuộc đây.

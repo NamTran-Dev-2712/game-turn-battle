@@ -19,15 +19,13 @@ config/icon="res://icon.svg"
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
-
-[editor_plugins]
-
-; gdUnit4 (vendored tại addons/gdUnit4, pin v6.2.0 — ADR-010). Plugin tự bỏ qua UI khi
-; chạy headless/--import/CLI (xem plugin.gd check_running_in_test_env), an toàn cho CI.
-enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
 
 [rendering]
 
