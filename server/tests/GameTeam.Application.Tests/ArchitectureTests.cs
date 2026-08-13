@@ -47,15 +47,20 @@ public class ArchitectureTests
     }
 
     [Fact]
-    public void Application_should_not_depend_on_infrastructure()
+    public void Application_should_not_depend_on_infrastructure_or_api()
     {
+        // Phase 10: Application khai báo PORT (IUnitOfWork/IRepository/ICacheService/IConfigProvider)
+        // và pipeline behaviors; Infrastructure hiện thực port (DIP). Application KHÔNG được ref
+        // Infrastructure (cụ thể) hay Api (presentation) — hướng phụ thuộc vào trong (ADR-003).
         TestResult result = Types.InAssembly(typeof(GameTeam.Application.AssemblyMarker).Assembly)
             .Should()
-            .NotHaveDependencyOn("GameTeam.Infrastructure")
+            .NotHaveDependencyOnAny(
+                "GameTeam.Infrastructure",
+                "GameTeam.Api")
             .GetResult();
 
         result.IsSuccessful.Should().BeTrue(
-            "Application chỉ phụ thuộc interface (DIP), không phụ thuộc Infrastructure cụ thể.");
+            "Application chỉ phụ thuộc interface (DIP), không phụ thuộc Infrastructure cụ thể hay Api.");
     }
 
     [Fact]

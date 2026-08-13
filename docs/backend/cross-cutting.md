@@ -22,6 +22,64 @@
 - **Không** log dữ liệu nhạy cảm (token, PII).
 - Mức log: Debug (dev), Information (nghiệp vụ chính), Warning/Error (bất thường).
 
+---
+
+## 2.5 Application pipeline behaviors (Phase 10 — đã đóng)
+
+> Cross-cutting của tầng Application nằm ở **MediatR pipeline behaviors** (ADR-003), **không** rải trong
+> handler. Mọi command/query đi qua `IMediator.Send` tự hưởng pipeline; handler chỉ điều phối nghiệp vụ
+> (thin handler). Nguồn: `GameTeam.Application/Behaviors/`, đăng ký ở `AddApplication`.
+
+### Thứ tự thực thi (cố định — có test chứng minh)
+
+**`Logging → Validation → Transaction → Caching`** (đăng ký `AddOpenBehavior` theo đúng thứ tự; đầu tiên =
+ngoài cùng). Lý do: Logging bao trọn thời gian (kể cả validation); Validation chặn **trước** khi mở
+transaction; Transaction chỉ bao command ghi; Caching chỉ bao query đọc. Command và query dùng marker rời
+nhau nên Transaction/Caching không bao giờ lồng nhau. `PipelineOrderTests` kiểm chứng chuỗi thực tế
+(`[log:before, validate, tx:begin, handler, tx:commit, log:after]` cho command;
+`[log:before, validate, cache:get, handler, cache:set, log:after]` cho query — query **không** vào transaction).
+
+### 4 behaviors
+
+| Behavior | Trách nhiệm | Ràng buộc / Marker |
+|---|---|---|
+| `LoggingBehavior` | Log tên request + elapsed (ms) + outcome (`Success`/`Failure(CODE)`/`Completed`). Chỉ log **tên kiểu request** — KHÔNG serialize body ⇒ không rò token/PII. | Áp cho **mọi** request (command & query). |
+| `ValidationBehavior` | Gom `IValidator<TRequest>`, chạy **trước** handler; fail ⇒ short-circuit trả `Result` lỗi (code `VALIDATION_FAILED`, gộp `{Property}: {Message}`). Handler **không** chạy; **không** ném exception thô lên API. Không validator ⇒ đi thẳng. | `where TResponse : Result`. |
+| `TransactionBehavior` | Bao command ghi trong `IUnitOfWork`: begin → handler → **commit** nếu `Result` thành công, **rollback** nếu `Result` lỗi hoặc ném exception (rồi rethrow). Atomic (ADR-007). | `where TRequest : ITransactionalRequest, TResponse : Result`. Query (không marker) **không** vào transaction. |
+| `CachingBehavior` | Query có marker: đọc cache (hit ⇒ trả cache, **không** gọi handler), miss ⇒ chạy handler, **chỉ** ghi cache khi `Result` thành công, theo TTL. | `where TRequest : ICacheableQuery, TResponse : class`. |
+
+### Marker interfaces (opt-in tường minh)
+
+- `ITransactionalRequest` — command tự đánh dấu cần transaction. **Không** suy ra "command" từ tên; query
+  không mang marker ⇒ không bao giờ vào transaction.
+- `ICacheableQuery` — query khai báo `CacheKey` (phần tham số) + `CacheTtl`.
+
+### Quy ước cache key
+
+`"{RequestTypeName}:{ICacheableQuery.CacheKey}:cfg{IConfigProvider.CurrentVersion.Bundle}"`
+= **tên query + tham số + config version**. Config version (bundle) khiến rollout cấu hình tự vô hiệu
+cache cũ; tên + tham số chống va chạm.
+
+### Ports (DIP — khai báo ở Application, hiện thực ở Infrastructure)
+
+| Port | Vị trí | Hiện thực (phase) |
+|---|---|---|
+| `IUnitOfWork` | `Application/Abstractions/Persistence` | EF Core — **phase 11** |
+| `IRepository<TEntity, TId>` | `Application/Abstractions/Persistence` (tối giản: `GetByIdAsync`+`AddAsync`, đặc tả feature 18+) | EF Core — **phase 11** |
+| `ICacheService` | `Application/Abstractions/Caching` | Redis — **phase 12** |
+| `IConfigProvider` | `Application/Abstractions/Configuration` (Phase 10 chỉ dùng `CurrentVersion`) | Config Service — **phase 21** |
+| `IClock` | `Domain/Common` (dùng lại Phase 09) | `SystemClock` (Infrastructure) — đã có adapter tối giản |
+
+> **Ranh giới DIP:** `GameTeam.Application` **không** ref `GameTeam.Infrastructure`/`GameTeam.Api`
+> (`ArchitectureTests.Application_should_not_depend_on_infrastructure_or_api`). `AddApplication` chỉ đăng ký
+> MediatR + FluentValidation + 4 behaviors; **không** đăng ký hiện thực port (composition root = Api).
+
+### Chưa thuộc phase này (defer)
+
+`IdempotencyBehavior` (command nhạy cảm claim/summon), hiện thực repository/cache/config thật (11–12/21),
+endpoint gọi MediatR (13). Mọi command/query tương lai **phải** đi qua pipeline — **không** nhét cross-cutting
+vào handler.
+
 ## 3. Monitoring & Observability
 | Trụ cột | Công cụ/hướng |
 |---|---|

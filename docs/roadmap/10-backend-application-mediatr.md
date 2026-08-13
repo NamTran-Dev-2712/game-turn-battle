@@ -41,15 +41,15 @@ ADR-003 quy định cross-cutting nằm ở pipeline behaviors thay vì rải tr
 
 # Công việc cần thực hiện
 
-- [ ] `ValidationBehavior`: gom FluentValidation validators, fail → trả `Result` lỗi (không throw thô lên API).
-- [ ] `LoggingBehavior`: log request name + elapsed + kết quả (không log dữ liệu nhạy cảm).
-- [ ] `TransactionBehavior`: chỉ bao command ghi (marker interface `ITransactionalRequest`), commit/rollback qua `IUnitOfWork`.
-- [ ] `CachingBehavior`: query có `ICacheableQuery` → đọc/ghi cache theo key + TTL.
-- [ ] Định nghĩa port: `IUnitOfWork`, `IRepository<T>`, `ICacheService`, `IConfigProvider` (khai báo).
-- [ ] Đăng ký behaviors đúng thứ tự (Logging → Validation → Transaction → Caching hoặc theo `../backend/cross-cutting.md`).
-- [ ] Command mẫu (`PingCommand`) + query mẫu (`GetServerTimeQuery` dùng IClock) + validators.
-- [ ] Test: validation fail dừng trước handler; transaction rollback khi lỗi; cache hit không gọi handler.
-- [ ] Cập nhật `../backend/cross-cutting.md`.
+- [x] `ValidationBehavior`: gom FluentValidation validators, fail → trả `Result` lỗi (không throw thô lên API). — `Behaviors/ValidationBehavior.cs` + `ValidationErrors` (code `VALIDATION_FAILED`); `ValidationBehaviorTests` (fail→failure, handler không chạy, không ném) xanh.
+- [x] `LoggingBehavior`: log request name + elapsed + kết quả (không log dữ liệu nhạy cảm). — `Behaviors/LoggingBehavior.cs` (chỉ log tên kiểu, không serialize body); `LoggingBehaviorTests` (name+elapsed+outcome; secret không rò) xanh.
+- [x] `TransactionBehavior`: chỉ bao command ghi (marker interface `ITransactionalRequest`), commit/rollback qua `IUnitOfWork`. — `Behaviors/TransactionBehavior.cs`; `TransactionBehaviorTests` (commit/rollback-lỗi/rollback-exception+rethrow/query-không-begin) xanh.
+- [x] `CachingBehavior`: query có `ICacheableQuery` → đọc/ghi cache theo key + TTL. — `Behaviors/CachingBehavior.cs`; `CachingBehaviorTests` (miss chạy+set TTL+key có cfg version; hit không gọi handler; fail không cache; non-cacheable bypass) xanh.
+- [x] Định nghĩa port: `IUnitOfWork`, `IRepository<T>`, `ICacheService`, `IConfigProvider` (khai báo). — `Abstractions/{Persistence,Caching,Configuration}`; `IRepository<TEntity, TId>` (id typed); `IClock` dùng lại Domain.
+- [x] Đăng ký behaviors đúng thứ tự (Logging → Validation → Transaction → Caching). — `AddApplication` `AddOpenBehavior` đúng thứ tự; `PipelineOrderTests` chứng minh chuỗi thực tế (negative: đảo Transaction↔Validation ⇒ test đỏ, đã revert).
+- [x] Command mẫu (`PingCommand`) + query mẫu (`GetServerTimeQuery` dùng IClock) + validators. — `Features/Diagnostics/{Commands,Queries}`; `PingCommandTests`/`GetServerTimeQueryTests` end-to-end qua MediatR xanh.
+- [x] Test: validation fail dừng trước handler; transaction rollback khi lỗi; cache hit không gọi handler. — có đủ (xem trên); tổng **Application.Tests 25 pass**, solution **121 pass**.
+- [x] Cập nhật `../backend/cross-cutting.md`. — thêm §2.5 (4 behaviors, thứ tự, marker, cache key, ports, DIP); đồng bộ `domain-and-application.md`, `CLAUDE.md` §4.6, `.instructions/backend.md`, agent, `.memory/0008`.
 
 # Tiêu chí hoàn thành
 
@@ -84,7 +84,23 @@ Port ở Application, hiện thực ở Infrastructure (DIP). `IConfigProvider` 
 
 # Phase Review
 
-Đóng khi pipeline 4 behaviors + port + command/query mẫu có test, thứ tự đúng, Application thuần (không ref Infra).
+**Đóng (local PASS 2026-08-13).** Pipeline 4 behaviors ở `GameTeam.Application/Behaviors/` (`Logging → Validation
+→ Transaction → Caching`, đăng ký `AddOpenBehavior` đúng thứ tự trong `AddApplication`) + ports nền
+(`IUnitOfWork`/`IRepository<TEntity,TId>`/`ICacheService`/`IConfigProvider`; `IClock` dùng lại Domain) +
+marker `ITransactionalRequest`/`ICacheableQuery` + command/query mẫu (`PingCommand`, `GetServerTimeQuery`).
+Validation fail → `Result` lỗi chuẩn (`VALIDATION_FAILED`), không ném thô; Transaction chỉ bao
+`ITransactionalRequest` (query không vào transaction); Caching chỉ bao `ICacheableQuery`, key = tên+tham số+config
+version; Logging không log body. **`PipelineOrderTests`** chứng minh chuỗi thực tế (không chỉ tin thứ tự đăng ký);
+negative check (đảo Transaction↔Validation ⇒ đỏ) đã revert. Architecture test
+`Application_should_not_depend_on_infrastructure_or_api` xanh; `GameTeam.Application` chỉ ref Domain+Contracts.
+Verify: `dotnet build -c Release` sạch (0 warning), `dotnet test` **121 pass** (Application.Tests **25**), không
+drift `shared/contracts/openapi.json`.
+
+**Ghi chú deviation (nhỏ):** thêm `SystemClock : IClock` (Infrastructure) + đăng ký trong `AddInfrastructure` —
+adapter server-time tối giản cần để composition root (Api) resolve/validate handler mẫu `GetServerTimeQuery`
+(nếu thiếu, app không boot ở Development/ValidateOnBuild). Đây là ranh giới server-time đã được `IClock` doc dự
+liệu ("Infrastructure hiện thực & inject"); repository/cache/config **thật** vẫn defer (phase 11–12/21). Deferred:
+`IdempotencyBehavior`, hiện thực repository/cache/Config Service, endpoint gọi MediatR (phase 13).
 
 ---
 
