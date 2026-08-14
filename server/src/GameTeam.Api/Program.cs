@@ -5,6 +5,7 @@ using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
 using GameTeam.Contracts.Profile;
 using GameTeam.Infrastructure;
+using StackExchange.Redis;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -19,10 +20,14 @@ WebApplication app = builder.Build();
 // OpenAPI (nguồn shared/contracts): phục vụ /openapi/v1.json và là nguồn xuất spec (ADR-008).
 app.MapOpenApi();
 
-// Health endpoint hạ tầng (KHÔNG phải API game) — liveness/readiness. Kiểu hoá bằng HealthResponse
-// để mô tả được trong OpenAPI; giữ nguyên hình dạng { "status": "ok" }.
-app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok")))
-    .WithName("Health");
+// Health endpoint hạ tầng (KHÔNG phải API game). Ping Redis (Phase 12): "ok" khi Redis truy cập được,
+// "degraded" khi không — vẫn HTTP 200 (giữ nguyên liveness semantics; full health checks = Phase 13+).
+// Kiểu hoá bằng HealthResponse để mô tả được trong OpenAPI; hình dạng { "status": "..." } không đổi.
+app.MapGet("/health", async (IConnectionMultiplexer redis) =>
+{
+    string status = await RedisIsReachableAsync(redis) ? "ok" : "degraded";
+    return TypedResults.Ok(new HealthResponse(status));
+}).WithName("Health");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTRACT SKELETON (Phase 05): khai báo HÌNH DẠNG endpoint nền cho OpenAPI —
@@ -49,6 +54,20 @@ apiV1.MapGet("/config/{version}", (string version) => Results.StatusCode(StatusC
     .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
 
 await app.RunAsync();
+
+// Ping Redis với timeout ngắn — mọi lỗi ⇒ "degraded" (không bao giờ ném từ health probe).
+static async Task<bool> RedisIsReachableAsync(IConnectionMultiplexer redis)
+{
+    try
+    {
+        await redis.GetDatabase().PingAsync().WaitAsync(TimeSpan.FromSeconds(2));
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
+}
 
 // Lộ Program cho integration test (WebApplicationFactory<Program>).
 public partial class Program { }

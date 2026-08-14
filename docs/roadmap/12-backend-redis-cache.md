@@ -41,13 +41,13 @@ ADR-005: client cache config theo version; backend cache đọc để giảm t�
 
 # Công việc cần thực hiện
 
-- [ ] Hiện thực `RedisCacheService` (get/set/remove, serialize JSON, TTL, key namespace).
-- [ ] Quy ước key: `{env}:{domain}:{name}:{configVersion?}`.
-- [ ] Xử lý Redis lỗi: log + degrade (cache miss → nguồn thật), không ném lên người dùng.
-- [ ] Đăng ký DI trong `AddInfrastructure`; connection từ config.
-- [ ] Mở rộng healthcheck: ping Redis.
-- [ ] Integration test Testcontainers Redis: set/get, TTL hết hạn, remove, down→degrade.
-- [ ] Cập nhật [`../backend/infrastructure.md`](../backend/infrastructure.md) + [`../backend/cross-cutting.md`](../backend/cross-cutting.md).
+- [x] Hiện thực `RedisCacheService` (get/set/remove, serialize JSON, TTL, key namespace). — `GameTeam.Infrastructure/Caching/RedisCacheService.cs` (`ICacheService` mở rộng thêm `RemoveAsync`); serialize `CacheSerialization.Options` (STJ + converter `Result`/`Result<T>`); TTL absolute; key qua `RedisCacheKey`. Verify: Testcontainers set/get/remove xanh.
+- [x] Quy ước key: `{env}:{domain}:{name}:{configVersion?}`. — `RedisCacheKey.Compose/ForCacheEntry` tập trung; cache query = `{env}:cache:{rawKey}` (rawKey đã gấp `cfg{version}`). Ví dụ `dev:cache:GetServerTimeQuery:server-time:cfg0`.
+- [x] Xử lý Redis lỗi: log + degrade (cache miss → nguồn thật), không ném lên người dùng. — catch `RedisException` (Get→null, Set/Remove→bỏ qua) + `JsonException` (entry hỏng→miss) + log warning; lỗi lập trình vẫn ném. Verify: `RedisCacheServiceDegradeTests` (3) + `/health` degraded-when-down xanh.
+- [x] Đăng ký DI trong `AddInfrastructure`; connection từ config. — `IConnectionMultiplexer` singleton (`AbortOnConnectFail=false`) + `ICacheService → RedisCacheService`; `ConnectionStrings:Redis` (env `ConnectionStrings__Redis`), fail-fast khi thiếu. Verify: `SmokeTests` (đăng ký + fail-fast Redis).
+- [x] Mở rộng healthcheck: ping Redis. — `/health` (Program.cs) ping `PingAsync` timeout ngắn ⇒ `ok`/`degraded`, luôn 200. Verify: `Health_reports_degraded_when_redis_unreachable`.
+- [x] Integration test Testcontainers Redis: set/get, TTL hết hạn, remove, down→degrade. — `GameTeam.Infrastructure.Tests/Caching/` (`redis:7-alpine`): set/get (incl. `Result<T>`), TTL poll expiry, remove, degrade; + `CachingBehaviorRedisIntegrationTests` (query lần 2 cache hit). Verify: 22 Infra tests xanh trên Docker Desktop 28.5.1.
+- [x] Cập nhật [`../backend/infrastructure.md`](../backend/infrastructure.md) + [`../backend/cross-cutting.md`](../backend/cross-cutting.md). — infrastructure.md §2.1 (nền cache đã chốt) + cross-cutting.md §2.5 (Redis backend + `RemoveAsync`) / §4 (healthcheck ping Redis). Doc-sync thêm: CLAUDE.md §4.6, `.instructions/backend.md`, `.claude/agents/dotnet-backend.md`, `.memory/0010`.
 
 # Tiêu chí hoàn thành
 
@@ -83,6 +83,18 @@ Cache bundle config sẽ dùng service này (phase 21) với key theo `config@vN
 # Phase Review
 
 Đóng khi Redis cache hiện thực + CachingBehavior chạy thật + degrade graceful + integration test xanh + healthcheck.
+
+**Kết luận (2026-08-14): đủ điều kiện đóng.** Toàn bộ `# Công việc cần thực hiện` `[x]` với evidence từ run thật;
+`# Tiêu chí hoàn thành` đạt:
+- **CachingBehavior chạy thật với Redis, query lần 2 cache hit** — `CachingBehaviorRedisIntegrationTests` (handler chạy đúng 1 lần qua 2 query giống nhau, Redis Testcontainers).
+- **Integration test Redis xanh (set/get/expire/remove/degrade)** — `RedisCacheServiceTests` (6) + `RedisCacheServiceDegradeTests` (3) + serialization unit (4).
+- **Redis down → API vẫn phục vụ (degrade) + log cảnh báo** — degrade tests (log warning) + `Health_reports_degraded_when_redis_unreachable` (HTTP 200 + `degraded`).
+- **Healthcheck báo trạng thái Redis** — `/health` ping Redis (`ok`/`degraded`).
+
+Verified: build Release **0 warning/0 error**; `dotnet test server/GameTeam.sln` **144 pass** (Domain 35, Contracts 36,
+Application 26, Infrastructure 22, Api.IntegrationTests 25); architecture gate (Application ⊥ Infra) xanh; `openapi.json`
+không drift. Không TODO/blocker; không code ngoài scope (Config Service phase 21, pub/sub, cache warming, leaderboard đều
+để nguyên placeholder). Decision log `.memory/0010-redis-cache-standardized.md`. Kế tiếp: Phase 13 (API layer).
 
 ---
 

@@ -60,13 +60,21 @@ nhau nên Transaction/Caching không bao giờ lồng nhau. `PipelineOrderTests`
 = **tên query + tham số + config version**. Config version (bundle) khiến rollout cấu hình tự vô hiệu
 cache cũ; tên + tham số chống va chạm.
 
+> **Redis backend (Phase 12 — đã đóng):** `ICacheService` hiện thực trên **Redis** (`RedisCacheService`,
+> StackExchange.Redis) ở Infrastructure — `CachingBehavior` chạy **thật** với Redis (query lần 2 = cache hit).
+> `RedisCacheService` thêm tiền tố namespace `{env}:cache:` trước key trên (quy ước
+> `{env}:{domain}:{name}:{configVersion?}`) và round-trip nguyên `Result<T>` (converter STJ). **Graceful
+> degradation bắt buộc:** Redis down ⇒ Get miss / Set-Remove bỏ qua + log warning, request vẫn phục vụ —
+> cache KHÔNG là điểm chết đơn. Port có thêm `RemoveAsync` (evict theo key, idempotent, degrade an toàn).
+> Chi tiết: `infrastructure.md` §2.1.
+
 ### Ports (DIP — khai báo ở Application, hiện thực ở Infrastructure)
 
 | Port | Vị trí | Hiện thực (phase) |
 |---|---|---|
 | `IUnitOfWork` | `Application/Abstractions/Persistence` | EF Core — **phase 11** |
 | `IRepository<TEntity, TId>` | `Application/Abstractions/Persistence` (tối giản: `GetByIdAsync`+`AddAsync`, đặc tả feature 18+) | EF Core — **phase 11** |
-| `ICacheService` | `Application/Abstractions/Caching` | Redis — **phase 12** |
+| `ICacheService` | `Application/Abstractions/Caching` | Redis — **phase 12 (đã đóng)**: `RedisCacheService` (StackExchange.Redis) |
 | `IConfigProvider` | `Application/Abstractions/Configuration` (Phase 10 chỉ dùng `CurrentVersion`) | Config Service — **phase 21** |
 | `IClock` | `Domain/Common` (dùng lại Phase 09) | `SystemClock` (Infrastructure) — đã có adapter tối giản |
 
@@ -90,7 +98,10 @@ vào handler.
 | Business telemetry | Sự kiện game (retention/funnel/source-sink) — `../liveops/`, `../mvp/09` LO2 |
 
 ## 4. Health Checks
-- `/health/live` (process sống), `/health/ready` (DB + Redis sẵn sàng).
+- **Hiện tại (Phase 12):** `/health` minimal endpoint **ping Redis** (`PingAsync`, timeout ngắn) → `HealthResponse`
+  `{"status":"ok"}` khi Redis truy cập được, `{"status":"degraded"}` khi không — **luôn HTTP 200** (liveness;
+  Redis down không làm API sập). Chưa dùng framework `Microsoft.Extensions.Diagnostics.HealthChecks`.
+- **Đích (phase 13+):** `/health/live` (process sống), `/health/ready` (DB + Redis sẵn sàng) qua health-checks đầy đủ.
 - Dùng cho orchestrator/deploy (`../deployment/`).
 
 ## 5. Background Jobs (tham chiếu)

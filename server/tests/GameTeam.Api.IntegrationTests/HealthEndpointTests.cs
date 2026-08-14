@@ -1,5 +1,6 @@
 using System.Net;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -23,5 +24,28 @@ public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         HttpResponseMessage response = await client.GetAsync("/health");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>
+    /// Phase 12 — graceful degradation: khi Redis KHÔNG truy cập được, API vẫn phục vụ (HTTP 200) và
+    /// healthcheck báo <c>degraded</c> (không sập). Trỏ Redis vào endpoint chết để deterministic.
+    /// </summary>
+    [Fact]
+    public async Task Health_reports_degraded_when_redis_unreachable()
+    {
+        using WebApplicationFactory<Program> factory = _factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting(
+                "ConnectionStrings:Redis",
+                "127.0.0.1:6399,abortConnect=false,connectRetry=0,connectTimeout=500");
+        });
+
+        HttpClient client = factory.CreateClient();
+
+        HttpResponseMessage response = await client.GetAsync("/health");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        string body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("degraded");
     }
 }

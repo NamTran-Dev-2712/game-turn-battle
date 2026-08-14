@@ -48,5 +48,6 @@
     <!-- Integration DB thật cho Infrastructure.Tests (ADR-007, docs/testing/backend-testing.md §1).
          Yêu cầu Docker runtime (CI ubuntu-latest có sẵn; local chạy scripts/dev/up). -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.0.0" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.0.0" />
   </ItemGroup>
 </Project>
