@@ -52,7 +52,7 @@ Quy tắc đã theo: **SSOT (`docs/`) thắng** khi prompt mâu thuẫn (owner �
 | ~~`tools/codegen` (contracts → client model)~~ ✅ **XONG (Phase 08)** — pipeline thật ở **`shared/codegen`** (.NET 9): `openapi.json` → GDScript `client/src/data/generated/` (enum giữ số C#, DTO `Resource`, header DO-NOT-EDIT); GATE `codegen-check.yml` (regenerate → `git diff --exit-code`); Godot import sạch qua `ci-client.yml` | `shared/codegen` | Core Framework (P1) |
 | CI client Godot headless (import/test/export) + gdUnit4 | `.github/workflows/ci-client.yml` | P1 |
 | Golden vector combat (client == server) | `docs/testing`, sim 2 phía | Gameplay (P2) |
-| DI thật: EF/Npgsql DbContext, Redis, JWT, Configuration Service, jobs | `GameTeam.Infrastructure` | P1 |
+| DI thật: ~~EF/Npgsql DbContext~~ ✅ **XONG (Phase 11)** — `AppDbContext`+`UnitOfWork`+`EfRepository`+domain-event dispatch tại SaveChanges + migration `Initial` (schema_metadata seed) + Testcontainers integration; còn lại Redis, JWT, Configuration Service, jobs | `GameTeam.Infrastructure` | P1 |
 | Pipeline behaviors (Validation/Logging/Transaction/Caching/Idempotency) | `GameTeam.Application/Common/Behaviors` | P1 |
 | API versioning, controllers, Swagger, error contract, health checks đầy đủ | `GameTeam.Api` | P1 |
 | CodeQL/security scan | `.github/workflows` | Post-bootstrap |
@@ -69,7 +69,7 @@ Quy tắc đã theo: **SSOT (`docs/`) thắng** khi prompt mâu thuẫn (owner �
 3. **Branch protection & Environments:** cần bật trên GitHub (xem `.github/project-setup.md`) — không tự động hoá được từ repo.
 4. **Git LFS:** asset nặng (`assets/`, `client/assets/`) nên cân nhắc LFS trước khi commit binary lớn (mẫu đã có trong `.gitattributes`).
 5. **`.env`:** chỉ dùng dev; secret thật phải ở GitHub Environments.
-6. **NetArchTest:** sau Phase 09 có 4 luật (Domain ⊥ tầng ngoài; **Domain ⊥ package framework** — mới; Application ⊥ Infrastructure; Contracts ⊥ App/Infra/Api). Mở rộng bộ luật khi thêm tầng/feature.
+6. **NetArchTest:** sau Phase 11 có 5 luật (Domain ⊥ tầng ngoài; Domain ⊥ package framework; Application ⊥ Infrastructure/Api; **Application ⊥ EF Core/Npgsql** — mới Phase 11; Contracts ⊥ App/Infra/Api). Mở rộng bộ luật khi thêm tầng/feature.
 
 ---
 

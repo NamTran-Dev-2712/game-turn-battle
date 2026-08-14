@@ -24,6 +24,11 @@
 
   <ItemGroup Label="Infrastructure">
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.10" />
+    <!-- Pin Relational (transitive) đồng nhất 9.0.10 — tránh xung đột với version Npgsql provider kéo về
+         (CentralPackageTransitivePinningEnabled). -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.10" />
+    <!-- EF Core Design: tooling migration (dotnet ef). Dev-time; PrivateAssets ở csproj. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.10" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.10" />
@@ -40,5 +45,8 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.10" />
     <PackageVersion Include="Microsoft.OpenApi.Readers" Version="1.6.24" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+    <!-- Integration DB thật cho Infrastructure.Tests (ADR-007, docs/testing/backend-testing.md §1).
+         Yêu cầu Docker runtime (CI ubuntu-latest có sẵn; local chạy scripts/dev/up). -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.0.0" />
   </ItemGroup>
 </Project>

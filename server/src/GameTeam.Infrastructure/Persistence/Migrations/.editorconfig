@@ -1,0 +1,6 @@
+# Migration là mã EF SINH TỰ ĐỘNG — coi như generated code để analyzer bỏ qua (không sửa tay theo style).
+root = false
+
+[*.cs]
+generated_code = true
+dotnet_diagnostic.CA1861.severity = none

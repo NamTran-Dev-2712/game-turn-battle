@@ -7,9 +7,16 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <!-- Design: chỉ dùng cho tooling migration (dev-time) — không propagate sang consumer. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <!-- Dispatch domain event tại SaveChanges qua MediatR IPublisher (Phase 11). -->
+    <PackageReference Include="MediatR" />
   </ItemGroup>
 </Project>

@@ -40,6 +40,18 @@
 - Idempotency & concurrency có test riêng (chạy song song mô phỏng double-claim).
 - Deterministic: inject `IClock`, `IRandomProvider` (seeded) để test tái lập.
 
+### 4.1 Persistence integration test (Phase 11 — đã hiện thực)
+- **Testcontainers PostgreSQL** (`postgres:16-alpine`) là **hợp đồng persistence** — KHÔNG mock `DbContext` để thay
+  integration test. Fixture `PostgresContainerFixture` (`IAsyncLifetime` + `PostgreSqlBuilder`, host-port ngẫu nhiên).
+- Bắt buộc phủ: **CRUD** (repo/UoW ghi→đọc), **transaction rollback** (SaveChanges trong tx rồi rollback ⇒ hàng
+  biến mất — chứng minh rollback thực), **domain-event dispatch** (aggregate raise → SaveChanges → handler nhận đúng
+  kiểu event, event được clear), **migration up/down** (tạo+seed / revert).
+- **Yêu cầu Docker runtime**: CI `ubuntu-latest` có sẵn (không cần cấu hình thêm); local chạy `scripts/dev/up`.
+  KHÔNG có cơ chế skip — thiếu Docker ⇒ test đỏ (đúng ý: integration là gate thật). Entity mẫu sống trong assembly
+  test (`TestDbContext : AppDbContext`) để giữ schema production sạch. Nguồn: `GameTeam.Infrastructure.Tests/Persistence/`.
+- **Architecture test** (Phase 11 thêm): `Application_should_not_depend_on_efcore_or_npgsql` — EF/Npgsql CHỈ ở
+  Infrastructure. Chạy cùng bộ NetArchTest trong `GameTeam.Application.Tests`.
+
 ## 5. Liên kết
 - Strategy: `README.md` · Combat: `../gameplay/combat-framework.md`, ADR-011
 - Backend design: `../backend/`

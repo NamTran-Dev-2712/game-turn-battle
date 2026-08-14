@@ -43,15 +43,15 @@ ADR-007: save server-authoritative trên PostgreSQL, có schema versioning + mig
 
 # Công việc cần thực hiện
 
-- [ ] Thêm `AppDbContext`, đăng ký Npgsql, đọc connection string qua options.
-- [ ] Cấu hình EF theo `IEntityTypeConfiguration` (một file/entity), quy ước bảng `snake_case`.
-- [ ] Hiện thực `IRepository<T>` + `IUnitOfWork` (BeginTransaction/Commit/Rollback qua EF).
-- [ ] Override SaveChanges để **dispatch domain events** thu từ aggregate (sau khi persist, cùng transaction).
-- [ ] Hiện thực `IClock` (UTC server) + đăng ký DI.
-- [ ] Tạo migration khởi tạo (`dotnet ef migrations add Initial`) + trường schema version.
-- [ ] Cập nhật `AddInfrastructure` đăng ký đầy đủ; bỏ stub.
-- [ ] Integration test Testcontainers: ghi/đọc entity mẫu, transaction rollback, domain event bắn.
-- [ ] Cập nhật [`../backend/infrastructure.md`](../backend/infrastructure.md).
+- [x] Thêm `AppDbContext`, đăng ký Npgsql, đọc connection string qua options. — `Persistence/AppDbContext.cs`; `AddInfrastructure` gọi `AddDbContext<AppDbContext>(UseNpgsql(GetConnectionString("Postgres")))`; guard ném nếu thiếu (không hardcode).
+- [x] Cấu hình EF theo `IEntityTypeConfiguration` (một file/entity), quy ước bảng `snake_case`. — `Persistence/Configurations/SchemaMetadataConfiguration.cs` (`ToTable("schema_metadata")`, cột `id`/`version`); nạp qua `ApplyConfigurationsFromAssembly`.
+- [x] Hiện thực `IRepository<T>` + `IUnitOfWork` (BeginTransaction/Commit/Rollback qua EF). — `Persistence/Repositories/EfRepository.cs` (GetById/Add, không rò `IQueryable`/`DbContext`), `Persistence/UnitOfWork.cs` (Commit tự SaveChanges rồi commit tx vì port không có SaveChanges; guard double-begin; `IAsyncDisposable`).
+- [x] Override SaveChanges để **dispatch domain events** thu từ aggregate (sau khi persist, cùng transaction). — `AppDbContext.SaveChangesAsync` thu event từ `IHasDomainEvents` → `base.SaveChanges` → `DomainEventDispatcher` (MediatR `IPublisher` + wrapper `DomainEventNotification<T>`) → clear. Vì Commit gọi SaveChanges trong tx đang mở ⇒ dispatch sau persist, cùng transaction. Integration test xác nhận.
+- [x] Hiện thực `IClock` (UTC server) + đăng ký DI. — `SystemClock` (Phase 09/10) tái dùng, `AddInfrastructure` giữ `AddSingleton<IClock, SystemClock>()`.
+- [x] Tạo migration khởi tạo (`dotnet ef migrations add Initial`) + trường schema version. — `Persistence/Migrations/*_Initial.cs` tạo `schema_metadata` + seed `version=1` (HasData). `has-pending-model-changes` sạch. `database update` up/down verify trên Postgres dev.
+- [x] Cập nhật `AddInfrastructure` đăng ký đầy đủ; bỏ stub. — DbContext + `IUnitOfWork`/`IRepository<,>` (scoped) + `DomainEventDispatcher` + `IClock`; TODO stub đã xoá.
+- [x] Integration test Testcontainers: ghi/đọc entity mẫu, transaction rollback, domain event bắn. — `Persistence/PersistenceIntegrationTests.cs` (CRUD, rollback thực, dispatch) + `MigrationIntegrationTests.cs` (up tạo+seed, down revert). 7 test Infrastructure xanh (4 integration) trên `postgres:16-alpine`.
+- [x] Cập nhật [`../backend/infrastructure.md`](../backend/infrastructure.md). — §1/§5 phản ánh hiện thực thật.
 
 # Tiêu chí hoàn thành
 
@@ -89,6 +89,15 @@ Idempotency cho claim/transaction (chống double-grant, ADR-007) đặt nền �
 # Phase Review
 
 Đóng khi DbContext+UoW+repo+migration+domain-event dispatch có integration test xanh, Infra không rò lên trên, connection từ config.
+
+**Kết luận: ĐỦ ĐIỀU KIỆN ĐÓNG** (verify local, SDK 9.0.306, Windows + Docker Desktop 28.5.1, 2026-08-13):
+- `dotnet build server/GameTeam.sln -c Release` — **0 warning / 0 error** (warnings-as-error).
+- `dotnet test server/GameTeam.sln -c Release` — **128 pass / 0 fail** (Infrastructure.Tests **7**: 3 DI smoke + 4 integration; Application.Tests **26** gồm arch test EF-boundary mới).
+- Testcontainers `postgres:16-alpine`: CRUD ghi/đọc, **rollback thực** (SaveChanges trong tx rồi rollback ⇒ hàng biến mất), **domain-event dispatch** (aggregate raise → SaveChanges → handler nhận đúng `SampleCreated`, event được clear), migration up (tạo `schema_metadata` + seed `version=1`) & down (revert) — tất cả xanh.
+- Migration trên Postgres dev (compose, port override 5544): `dotnet ef database update` tạo bảng + seed `id=1,version=1`; `dotnet ef database update 0` revert sạch (chỉ còn `__EFMigrationsHistory`). `has-pending-model-changes` = không drift.
+- Architecture gate: NetArchTest `Application_should_not_depend_on_efcore_or_npgsql` — negative (rò `DbContext` vào Application) ⇒ **đỏ** → revert ⇒ **xanh**. Domain purity gate (Phase 09) vẫn xanh (marker `IHasDomainEvents` BCL-only).
+- Connection string từ config (`ConnectionStrings:Postgres` / env `ConnectionStrings__Postgres`) — không hardcode credential runtime; guard fail-fast khi thiếu. `openapi.json` không drift.
+- Scope: KHÔNG Redis/auth/profile/hero/currency; bảng idempotency chỉ *ghi chú* nền (dùng ở 31/37); `IDomainEvent` vẫn marker thuần.
 
 ---
 

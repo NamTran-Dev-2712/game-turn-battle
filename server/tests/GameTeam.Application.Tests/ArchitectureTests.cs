@@ -64,6 +64,23 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void Application_should_not_depend_on_efcore_or_npgsql()
+    {
+        // Phase 11: EF Core/Npgsql là chi tiết persistence — CHỈ Infrastructure được dùng. Application khai
+        // báo port (IUnitOfWork/IRepository) và không được rò EF lên trên (ADR-003/007). Domain đã được canh
+        // bởi Domain_should_not_depend_on_framework_packages; đây là gác cổng cho tầng Application.
+        TestResult result = Types.InAssembly(typeof(GameTeam.Application.AssemblyMarker).Assembly)
+            .Should()
+            .NotHaveDependencyOnAny(
+                "Microsoft.EntityFrameworkCore",
+                "Npgsql")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(
+            "Application chỉ khai báo port; EF Core/Npgsql là chi tiết Infrastructure (ADR-003/007).");
+    }
+
+    [Fact]
     public void Contracts_should_not_depend_on_application_or_infrastructure()
     {
         // Hướng phụ thuộc hợp lệ: Contracts → Domain (enum/hằng) MÀ THÔI
