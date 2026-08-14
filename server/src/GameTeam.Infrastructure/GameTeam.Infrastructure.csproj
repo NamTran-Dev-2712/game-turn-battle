@@ -16,6 +16,8 @@
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <!-- ILogger<T> cho RedisCacheService (graceful-degradation warning). -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <!-- Dispatch domain event tại SaveChanges qua MediatR IPublisher (Phase 11). -->
     <PackageReference Include="MediatR" />
   </ItemGroup>

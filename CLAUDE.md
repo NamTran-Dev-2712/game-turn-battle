@@ -299,6 +299,43 @@ stays package-free). Canonical: `docs/backend/infrastructure.md` §1.1/§5.1; de
   `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the integration tests
   are the behavior contract — update them.
 
+**Redis cache is standardized (Phase 12 — closed & verified).** The distributed-cache foundation has ONE home:
+**`GameTeam.Infrastructure/Caching/`** + **`Serialization/`** (StackExchange.Redis lives **only** in Infrastructure —
+consumers depend on the Phase-10 port `ICacheService`, never on StackExchange.Redis). **`RedisCacheService`** implements
+`ICacheService` (`GetAsync`/`SetAsync`/**`RemoveAsync`** — the port was additively extended this phase): JSON serialize,
+**TTL = absolute expiry**, namespaced keys. **Graceful degradation is mandatory** — a Redis failure (`RedisException`)
+or corrupt entry (`JsonException`) is **logged (warning) + degraded** (Get→miss/null so the caller runs the real source;
+Set/Remove→skipped), **never** thrown to the API; Redis is **not** a single point of failure; programming errors
+(`ArgumentNullException`…) still throw (no blanket `catch (Exception)`). **`RedisCacheKey`** centralizes the convention
+**`{env}:{domain}:{name}:{configVersion?}`** (cache-query domain = `cache`; `CachingBehavior` already folds
+`cfg{IConfigProvider.CurrentVersion.Bundle}` into the name ⇒ a config rollout invalidates stale reads — ADR-005 immutable
+`config@vN` = safe to cache long). `Result`/`Result<T>` round-trip via **`ResultJsonConverterFactory`** (STJ; these
+Phase-09 immutables have no public ctor so default STJ can't deserialize them) with the shared read-only
+**`CacheSerialization.Options`** — Domain stays JSON-attribute-free. DI: `AddInfrastructure` registers
+**`IConnectionMultiplexer` singleton** (`AbortOnConnectFail=false` ⇒ boot never blocks when Redis is down) +
+`ICacheService → RedisCacheService`; connection from config key **`ConnectionStrings:Redis`** (env
+`ConnectionStrings__Redis`) — **never hardcoded**; fail-fasts if missing. `/health` pings Redis (`ok`/`degraded`, always
+HTTP 200; full health checks = phase 13+). Verified (Docker Desktop 28.5.1): build Release **0 warning/0 error**,
+`dotnet test` **144 pass** (Infrastructure.Tests **22** incl. Testcontainers `redis:7-alpine`: set/get, TTL expiry,
+remove, down→degrade, **CachingBehavior real cache-hit**; Api.IntegrationTests **25** incl. `/health` degraded-when-down),
+architecture gate green, no `openapi.json` drift. Canonical: `docs/backend/infrastructure.md` §2.1; decision log:
+`.memory/0010-redis-cache-standardized.md`.
+
+- Future agents **MUST reuse** `ICacheService`/`RedisCacheService`/`RedisCacheKey`/`CacheSerialization` before adding any
+  cache; **MUST NOT** create a second cache abstraction, depend on StackExchange.Redis outside Infrastructure, leak Redis
+  types out, or bypass `ICacheService` at a consumer. **MUST NOT** weaken graceful degradation (Redis errors degrade +
+  log — never crash a request) or blanket-swallow non-Redis exceptions.
+- **Cache versioning follows ADR-005:** key on the immutable config bundle version; **never** cache mutable data under a
+  version-less key. TTL is caller-declared (`ICacheableQuery.CacheTtl`) and must reach Redis (absolute expiry) — never
+  downgrade it to app-only metadata. Config Service bundle publish is **phase 21** (reuses this service) — **not** here;
+  no SignalR pub/sub, no advanced invalidation/warming, no leaderboard (phase 45).
+- **Redis integration tests use Testcontainers Redis** (`redis:7-alpine`; require Docker — CI `ubuntu-latest` has it,
+  local via `scripts/dev/up`); **never mock Redis** for the acceptance tests. Keys are per-test GUID-isolated.
+- When changing caching, keep **`GameTeam.Infrastructure/Caching/*` + `Serialization/*` + `ICacheService` (port) +
+  `GameTeam.Infrastructure.Tests/Caching` (behavior contract) + `AddInfrastructure` + `/health` + `docs/backend/infrastructure.md`
+  §2.1 + `docs/backend/cross-cutting.md` §2.5/§4 + `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync**
+  (doc-sync matrix, §5); the integration tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

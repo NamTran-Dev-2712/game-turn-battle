@@ -57,6 +57,42 @@ bền vững nằm ngoài phạm vi (nợ kỹ thuật, xem §5).
 
 **Nguyên tắc:** cache là tối ưu, **không** là nguồn sự thật; invalidation theo version/sự kiện.
 
+### 2.1 Nền cache đã chốt (Phase 12 — đóng & verify)
+
+Nguồn hiện thực ở **`GameTeam.Infrastructure/Caching/`** + **`Serialization/`** (StackExchange.Redis **CHỈ** ở
+Infrastructure; consumer phụ thuộc port `ICacheService`, **không** biết StackExchange.Redis). Hiện thực port
+Phase 10 `ICacheService`:
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| `RedisCacheService` | `Caching/RedisCacheService.cs` | Hiện thực `ICacheService` (`GetAsync`/`SetAsync`/`RemoveAsync`). Serialize JSON, TTL = **absolute expiry**, key namespaced. **Graceful degradation**: lỗi Redis (`RedisException`) hoặc entry hỏng (`JsonException`) ⇒ **log warning + degrade** (Get→miss/null, Set/Remove→bỏ qua), KHÔNG ném lên caller; lỗi lập trình (`ArgumentNullException`…) vẫn ném. |
+| `RedisCacheKey` | `Caching/RedisCacheKey.cs` | Chuẩn hoá key **tập trung** theo quy ước `{env}:{domain}:{name}:{configVersion?}`; cache query dùng domain `cache` ⇒ key đầy đủ `{env}:cache:{rawKey}` (rawKey do CachingBehavior dựng, đã chứa `cfg{version}`). |
+| `ResultJsonConverterFactory` | `Serialization/ResultJsonConverterFactory.cs` | Converter STJ cho `Result`/`Result<T>` (Phase 09 bất biến, ctor không public ⇒ STJ mặc định KHÔNG deserialize được). CachingBehavior cache nguyên `Result<T>` ⇒ bắt buộc. Giữ Domain sạch (không attribute JSON trong Domain). |
+| `CacheSerialization` | `Serialization/CacheSerialization.cs` | `JsonSerializerOptions` **dùng chung, bất biết** (Web defaults + converter, `MakeReadOnly`) ⇒ serialize deterministic. |
+| DI | `DependencyInjection.cs` | `AddInfrastructure` đăng ký `IConnectionMultiplexer` **singleton** (`AbortOnConnectFail=false` ⇒ boot không chặn/ném khi Redis down) + `ICacheService → RedisCacheService`. |
+
+**Connection string:** lấy từ config khoá **`ConnectionStrings:Redis`** (env `ConnectionStrings__Redis`) —
+**không hardcode** host/port/password; thiếu ⇒ `AddInfrastructure` fail-fast. Mặc định local ở
+`appsettings.json` (`localhost:6379`) khớp `deploy/compose/docker-compose.yml` (`redis:6379` inject cho profile
+`api`).
+
+**Quy ước key** `{env}:{domain}:{name}:{configVersion?}` — ví dụ `dev:cache:GetServerTimeQuery:server-time:cfg0`.
+`env` từ `ASPNETCORE_ENVIRONMENT` (mặc định `dev`); `configVersion` do CachingBehavior gấp vào `name`
+(`cfg{IConfigProvider.CurrentVersion.Bundle}`) ⇒ rollout config tự vô hiệu cache cũ. **TTL** là absolute expiry
+do caller khai (`ICacheableQuery.CacheTtl`); bundle config bất biến `config@vN` (ADR-005) ⇒ an toàn cache dài,
+key gắn version tránh dữ liệu cũ.
+
+**Failure behavior (graceful degradation — tiêu chí đóng phase):** Redis **không** là điểm chết đơn của request.
+Redis down ⇒ cache degrade (Get miss ⇒ caller chạy nguồn thật; Set/Remove bỏ qua) + **log warning**, request vẫn
+phục vụ. **Healthcheck** `/health` ping Redis (`PingAsync`, timeout ngắn): `{"status":"ok"}` khi truy cập được,
+`{"status":"degraded"}` khi không — vẫn HTTP 200 (liveness semantics; full health checks = phase 13+).
+
+**Integration test** (`GameTeam.Infrastructure.Tests/Caching/`): **Testcontainers Redis** (`redis:7-alpine`) — Redis
+thật, **yêu cầu Docker** (CI `ubuntu-latest` có sẵn; local `scripts/dev/up`). Bao phủ: set/get (kể cả `Result<T>`),
+**TTL hết hạn** (poll, không sleep dài), remove, **down→degrade** (endpoint chết ⇒ không ném + log warning), và
+**CachingBehavior chạy thật với Redis** (query lần 2 cache hit, handler chỉ chạy 1 lần). Key GUID để cô lập, không
+phụ thuộc thứ tự chạy.
+
 ---
 
 ## 3. Configuration Service (ADR-005)

@@ -14,4 +14,10 @@ public interface ICacheService
     /// <summary>Write a value with an absolute time-to-live.</summary>
     Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken cancellationToken)
         where T : class;
+
+    /// <summary>
+    /// Evict a cached entry by key. Idempotent (removing a missing key is a no-op) and must degrade
+    /// gracefully: a cache-backend failure is logged and swallowed, never surfaced to the caller.
+    /// </summary>
+    Task RemoveAsync(string key, CancellationToken cancellationToken);
 }

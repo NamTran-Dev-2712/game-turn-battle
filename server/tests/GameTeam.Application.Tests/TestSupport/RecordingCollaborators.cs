@@ -44,6 +44,12 @@ public sealed class RecordingCacheService(ExecutionRecorder recorder) : ICacheSe
         recorder.Add("cache:set");
         return Task.CompletedTask;
     }
+
+    public Task RemoveAsync(string key, CancellationToken cancellationToken)
+    {
+        recorder.Add("cache:remove");
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Config provider returning a fixed version (Config Service is Phase 21).</summary>
