@@ -47,9 +47,13 @@ minh primitive mới trùng chức năng.
 
 **Domain event lifecycle & ranh giới dispatch:**
 1. Aggregate **raise** event trong method nghiệp vụ (`RaiseDomainEvent`).
-2. Aggregate **thu thập** event (`DomainEvents`).
-3. Application/Infrastructure **dispatch** (phase 10/11) rồi gọi `ClearDomainEvents`.
-> Domain **chỉ** raise & collect — **KHÔNG** dispatch, **KHÔNG** MediatR/bus/notification trong Domain.
+2. Aggregate **thu thập** event (`DomainEvents`); `AggregateRoot<TId>` hiện thực marker BCL-only
+   **`IHasDomainEvents`** (`Common/IHasDomainEvents.cs`, thêm ở Phase 11) để Infrastructure phát hiện event
+   không cần biết `TId`.
+3. Infrastructure **dispatch tại `AppDbContext.SaveChangesAsync`** (Phase 11 — đã hiện thực): sau khi persist,
+   trong cùng transaction, publish qua MediatR (`DomainEventNotification<T>` + `IPublisher`) rồi `ClearDomainEvents`.
+> Domain **chỉ** raise & collect — **KHÔNG** dispatch, **KHÔNG** MediatR/bus/notification trong Domain. `IHasDomainEvents`
+> chỉ là seam đọc/clear (không kéo package vào Domain — NetArchTest purity vẫn xanh).
 
 **Server-time rule:** mọi thời gian nghiệp vụ (AFK, energy, cooldown…) lấy qua `IClock.UtcNow`; **cấm** `DateTime.Now/UtcNow`,
 `DateTimeOffset.Now/UtcNow` trực tiếp trong Domain (Forbidden Pattern, `../ai/coding-rules.md` §3) — cho test tái lập & chống gian lận giờ.
@@ -96,7 +100,8 @@ Thứ tự thực thi cố định: **`Logging → Validation → Transaction �
 
 **Ports nền đã khai báo (Phase 10):** `IUnitOfWork`, `IRepository<TEntity, TId>` (`Abstractions/Persistence`),
 `ICacheService` (`Abstractions/Caching`), `IConfigProvider` (`Abstractions/Configuration`, chỉ `CurrentVersion`;
-Config Service hiện thực ở **phase 21**). Hiện thực: EF Core (**phase 11**), Redis (**phase 12**). `SystemClock`
+Config Service hiện thực ở **phase 21**). Hiện thực: **EF Core — phase 11 ĐÃ hiện thực** (`UnitOfWork`/`EfRepository`
+trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Redis (**phase 12**). `SystemClock`
 (Infrastructure) đã hiện thực `IClock` ở mức tối giản (server-time boundary).
 
 > **Vị trí port:** khai báo port ở tầng **cần** nó nhất. `IClock` thuộc **`GameTeam.Domain`** (`Common/IClock.cs`, Phase 09)

@@ -8,7 +8,7 @@
 
 | Chủ đề | Thiết kế |
 |---|---|
-| ORM | EF Core (code-first) |
+| ORM | EF Core 9 (code-first) + Npgsql provider |
 | DB | PostgreSQL (nguồn sự thật — ADR-007) |
 | Repository | Implements port (`IHeroRepository`...); truy vấn gọn, không rò EF ra Application |
 | UnitOfWork | Bọc transaction (TransactionBehavior gọi) — atomic cho giao dịch nhạy cảm |
@@ -16,6 +16,32 @@
 | Aggregate | Ghi qua aggregate root (`PlayerProfile`) để giữ nhất quán |
 
 **Nguyên tắc:** Domain không biết EF; mapping ở Infrastructure. Query đọc nhiều có thể dùng projection/`AsNoTracking`.
+
+### 1.1 Nền persistence đã chốt (Phase 11 — đóng & verify)
+
+Nguồn hiện thực ở **`GameTeam.Infrastructure/Persistence/`** (EF Core CHỈ ở Infrastructure; NetArchTest
+`Application_should_not_depend_on_efcore_or_npgsql` gác cổng):
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| `AppDbContext` | `Persistence/AppDbContext.cs` | Ctor `(DbContextOptions<AppDbContext>, DomainEventDispatcher)`; `OnModelCreating` = `ApplyConfigurationsFromAssembly`; **override `SaveChangesAsync`** dispatch domain event. Ctor `protected` không-generic cho context dẫn xuất (test). |
+| EF configuration | `Persistence/Configurations/*` | Một `IEntityTypeConfiguration<T>`/entity; **bảng/cột `snake_case` tường minh** (`ToTable`/`HasColumnName`), key/constraint rõ. |
+| `IRepository<TEntity,TId>` | `Persistence/Repositories/EfRepository.cs` | Generic (`Set<TEntity>()`), chỉ `GetByIdAsync`+`AddAsync` (contract Phase 10); **không** rò `IQueryable`/`DbSet`/`DbContext`. |
+| `IUnitOfWork` | `Persistence/UnitOfWork.cs` | `Begin/Commit/Rollback` qua EF transaction. Port **không** có SaveChanges ⇒ **`CommitAsync` tự gọi `SaveChangesAsync`** (persist+dispatch) rồi commit tx. Scoped; `IAsyncDisposable`; guard double-begin. |
+| Domain-event dispatch | `Persistence/DomainEventDispatcher.cs` + `DomainEventNotification<T>` | Bọc mỗi `IDomainEvent` (marker thuần) trong `DomainEventNotification<TEvent> : INotification` rồi MediatR `IPublisher.Publish` (đóng generic theo kiểu runtime, cache factory). |
+| Schema version | `Persistence/SchemaMetadata.cs` (+ config) | Bảng `schema_metadata` một hàng (`id`,`version`), **seed `version=1`** ở migration `Initial` (ADR-007). Neo versioning; profile per-row version ở phase 19. |
+| Migration | `Persistence/Migrations/*_Initial.cs` | `dotnet ef migrations add Initial`. Design-time factory `AppDbContextFactory` đọc env `ConnectionStrings__Postgres` (fallback dev-compose). |
+| DI | `DependencyInjection.cs` | `AddInfrastructure` đăng ký `AppDbContext`(Npgsql) + `IUnitOfWork`/`IRepository<,>`(scoped) + `DomainEventDispatcher` + `IClock`. |
+
+**Connection string:** lấy từ config khoá **`ConnectionStrings:Postgres`** (env `ConnectionStrings__Postgres`) —
+**không hardcode**; thiếu ⇒ `AddInfrastructure` ném lỗi rõ. Mặc định local ở `appsettings.json` khớp
+`deploy/compose/docker-compose.yml` (dev-only; production override qua env/secret).
+
+**Domain-event dispatch (nhất quán — ADR-007):** `SaveChangesAsync` thu event từ mọi aggregate đang track
+(`IHasDomainEvents` — marker BCL-only ở `GameTeam.Domain/Common`, do `AggregateRoot<TId>` hiện thực) → persist
+(`base.SaveChangesAsync`) → publish → `ClearDomainEvents`. Vì `UnitOfWork.CommitAsync` gọi SaveChanges **trong**
+transaction đang mở, event dispatch **sau persist, trước commit ⇒ cùng transaction**. Handler tái nhập / outbox
+bền vững nằm ngoài phạm vi (nợ kỹ thuật, xem §5).
 
 ---
 
@@ -67,6 +93,37 @@ flowchart LR
 | Profile version | Trường version + migration dữ liệu người chơi khi đổi cấu trúc (ADR-007) |
 | Config schema version | `schema_version` + compat rule (ADR-005) |
 | Seed data | Script seed cho môi trường dev/test (`scripts/db`) |
+
+### 5.1 Cách chạy migration & integration test (Phase 11)
+
+**Migration** (design-time factory tự cấp DbContext; `add` không cần DB, `update` cần Postgres):
+```bash
+# Tạo migration mới (output vào Persistence/Migrations)
+dotnet ef migrations add <Name> \
+  --project server/src/GameTeam.Infrastructure --startup-project server/src/GameTeam.Infrastructure \
+  --output-dir Persistence/Migrations
+
+# Kiểm drift (không cần DB) — phải "No changes"
+dotnet ef migrations has-pending-model-changes \
+  --project server/src/GameTeam.Infrastructure --startup-project server/src/GameTeam.Infrastructure
+
+# Apply/rollback trên Postgres dev (scripts/dev/up trước); connection lấy từ env ConnectionStrings__Postgres
+dotnet ef database update  --project server/src/GameTeam.Infrastructure --startup-project server/src/GameTeam.Infrastructure
+dotnet ef database update 0 --project server/src/GameTeam.Infrastructure --startup-project server/src/GameTeam.Infrastructure  # down
+```
+> Migration là **artifact source-controlled**; mọi thay đổi schema đi qua migration — **không** sửa DB thủ công
+> để thay migration workflow. **Không** sửa file migration bằng tay để che lỗi model (seed dùng `HasData` ⇒ nằm
+> trong model snapshot, không drift).
+
+**Integration test** (`GameTeam.Infrastructure.Tests`): **Testcontainers PostgreSQL** (`postgres:16-alpine`) — DB
+thật cho hành vi SQL đúng. **Yêu cầu Docker runtime** (CI `ubuntu-latest` có sẵn; local chạy `scripts/dev/up`).
+Chạy: `dotnet test server/tests/GameTeam.Infrastructure.Tests/...`. Bao phủ: CRUD qua repo/UoW, **rollback thực**,
+**domain-event dispatch** sau SaveChanges, migration up/down. Entity mẫu sống trong assembly test
+(`TestDbContext : AppDbContext`) để **giữ schema production sạch** — không map bảng demo vào Infrastructure.
+
+**Nợ kỹ thuật (ghi nhận, dùng sau):** bảng/khoá **idempotency** (chống double-grant, ADR-007) đặt nền ở phase này
+nhưng **dùng thật ở phase 31 (currency)/37 (AFK)**; **outbox bền vững / handler tái nhập** chưa làm (dispatch
+in-process tối giản). Redis (phase 12), Config Service (phase 21), bảng nghiệp vụ (profile phase 19+).
 
 ---
 

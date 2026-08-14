@@ -13,5 +13,8 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="coverlet.collector" />
+    <!-- PostgreSQL thật cho integration test persistence (yêu cầu Docker runtime). -->
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="MediatR" />
   </ItemGroup>
 </Project>

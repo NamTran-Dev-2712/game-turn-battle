@@ -5,7 +5,7 @@ namespace GameTeam.Domain.Common;
 /// <see cref="Entity{TId}"/>. Chỉ raise &amp; thu thập event; dispatch do Application/Infrastructure lo (phase 10/11).
 /// </summary>
 /// <typeparam name="TId">Kiểu định danh (không null).</typeparam>
-public abstract class AggregateRoot<TId> : Entity<TId>
+public abstract class AggregateRoot<TId> : Entity<TId>, IHasDomainEvents
     where TId : notnull
 {
     private readonly List<IDomainEvent> _domainEvents = [];

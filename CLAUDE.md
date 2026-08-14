@@ -261,6 +261,44 @@ the 4 behaviors ONLY — **no port implementation** (composition root = Api). Ve
   `docs/backend/cross-cutting.md` §2.5 + `docs/backend/domain-and-application.md` §2 + `.instructions/backend.md` +
   `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the behavior tests are the contract — update them.
 
+**Persistence is standardized (Phase 11 — closed & verified).** The backend persistence foundation has ONE home:
+**`GameTeam.Infrastructure/Persistence/`** (EF Core 9 + Npgsql) — EF/Npgsql live **only** in Infrastructure
+(NetArchTest `Application_should_not_depend_on_efcore_or_npgsql` + the Phase-09 Domain-purity fact gate it).
+**`AppDbContext`** (`OnModelCreating` = `ApplyConfigurationsFromAssembly`; **overrides `SaveChangesAsync`** to
+**dispatch domain events** collected from tracked aggregates — after persist, inside the open transaction, via MediatR
+`DomainEventNotification<TEvent>` + `IPublisher`, then `ClearDomainEvents`). **`EfRepository<TEntity,TId>`** implements
+the Phase-10 port (`GetByIdAsync`+`AddAsync` only; **never leaks `IQueryable`/`DbSet`/`DbContext`**). **`UnitOfWork`**
+implements the port (`Begin/Commit/Rollback`); the port has **no** `SaveChanges`, so **`CommitAsync` itself calls
+`SaveChangesAsync`** (persist+dispatch) then commits the DB transaction ⇒ events dispatch same-transaction (ADR-007).
+EF mapping = one **`IEntityTypeConfiguration<T>`** per entity with **explicit `snake_case`** table/column names.
+Connection string comes from config key **`ConnectionStrings:Postgres`** (env `ConnectionStrings__Postgres`) — **never
+hardcoded**; `AddInfrastructure` fail-fasts if missing. Schema version anchor = **`schema_metadata`** table seeded
+`version=1` by migration `Initial` (ADR-007; per-row profile versioning = phase 19). Aggregates implement the BCL-only
+marker **`IHasDomainEvents`** (added to `GameTeam.Domain/Common/` this phase — a permitted Phase-09 extension; Domain
+stays package-free). Canonical: `docs/backend/infrastructure.md` §1.1/§5.1; decision log:
+`.memory/0009-persistence-standardized.md`.
+
+- Future agents **MUST reuse** `AppDbContext`/`EfRepository`/`UnitOfWork`/`DomainEventDispatcher` before adding any
+  persistence; **MUST NOT** create a second DbContext/UoW/repository/dispatcher, add EF/Npgsql to Application/Domain, or
+  leak `IQueryable`/`DbContext` out of Infrastructure (the architecture gates fail otherwise).
+- **Schema changes go through EF migrations** (`dotnet ef migrations add … --project GameTeam.Infrastructure
+  --output-dir Persistence/Migrations`; seed via `HasData`; `has-pending-model-changes` must be clean) — migrations are
+  **source-controlled artifacts**; **never** hand-edit the DB or a migration to mask a model change. New feature entities
+  ship their `IEntityTypeConfiguration<T>` (snake_case) + a migration in the same change.
+- **Domain-event dispatch** happens **only** at `AppDbContext.SaveChangesAsync` (after persist, same transaction) — do
+  **not** dispatch from Domain, nor add a persisted outbox / re-entrant-handler framework (deferred, noted debt). The
+  **idempotency** table (ADR-007) is only *noted* here; it is built/used at phases 31/37. Redis = phase 12, Config
+  Service = phase 21, business tables = phase 19+.
+- **Persistence tests use Testcontainers PostgreSQL** (`postgres:16-alpine`; require Docker — CI `ubuntu-latest` has it,
+  local via `scripts/dev/up`); **never mock `DbContext`** to substitute for them. Cover CRUD, **real rollback**,
+  **event dispatch**, migration up/down. The sample entity lives in the **test** assembly (`TestDbContext : AppDbContext`)
+  to keep the production schema clean.
+- When changing persistence, keep **`GameTeam.Infrastructure/Persistence/*` + `AppDbContext`/`EfRepository`/`UnitOfWork`/
+  `DomainEventDispatcher` + `GameTeam.Infrastructure.Tests` (integration contract) + the EF-boundary architecture fact +
+  `docs/backend/infrastructure.md` + `docs/testing/backend-testing.md` + `docs/backend/domain-and-application.md` +
+  `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the integration tests
+  are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,
