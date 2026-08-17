@@ -56,6 +56,24 @@ Body lỗi là **envelope** bọc một đối tượng lỗi (hình dạng trê
   DB/query, hay chi tiết dịch vụ/hạ tầng nội bộ. Chỉ `code` + `message` hiển thị được + `traceId`.
 - HTTP status hợp lý (400 validate, 401/403 auth, 409 idempotency/conflict, 422 rule nghiệp vụ, 5xx server).
 
+### 3.1 Hiện thực xử lý lỗi ở tầng Api (Phase 13 — đã chốt)
+
+Tất cả tập trung ở **`GameTeam.Api/Http/`** — endpoint **KHÔNG** tự map lỗi:
+
+- **`ErrorHttpMapping`** — MỘT bảng ánh xạ `Error.Code` → HTTP status (Phase 09 dùng `Error(Code, Message)`,
+  code `SCREAMING_SNAKE_CASE`, chưa có enum taxonomy đóng): explicit `VALIDATION_FAILED`→400, rồi **quy ước
+  hậu tố** (KHÔNG chế code cụ thể) `*_NOT_FOUND`→404, `*_CONFLICT`→409, `UNAUTHENTICATED`/`*_UNAUTHORIZED`→401,
+  `*_FORBIDDEN`→403, mặc định 400. Phase sau thêm code mới nhận đúng status mà không sửa file này.
+- **`ApiResults`** — adapter mỏng: `Result`/`Result<T>` (handler MediatR trả) → HTTP. Success → 200 (rỗng cho
+  `Result`, có body cho `Result<T>`); failure → `ErrorEnvelope` với status từ `ErrorHttpMapping`. `traceId` =
+  `Activity.Current?.Id ?? HttpContext.TraceIdentifier` (tra log). Endpoint gọi một dòng, **không rải logic map**.
+- **`GlobalExceptionHandler` (`IExceptionHandler`)** + `app.UseExceptionHandler()` — exception CHƯA bắt → **500
+  `ErrorEnvelope`** (code `INTERNAL_ERROR`, message an toàn, traceId); exception đầy đủ chỉ **log server-side**
+  (cùng traceId), **không** gửi client. `AddProblemDetails()` đăng ký làm fallback framework.
+
+> **500 dùng `ErrorEnvelope`, KHÔNG ProblemDetails** — để MỌI response lỗi (validation/nghiệp vụ **và** 500)
+> chung MỘT contract (§3). Đây là hợp đồng lỗi client dựa vào; không tạo error shape thứ hai.
+
 ---
 
 ## 4. API Versioning
@@ -97,6 +115,40 @@ như `Rarity` = `0,3,4,5`) được đưa vào spec qua **`x-enum-varnames` + `x
   contract ⇒ `bash shared/codegen/run.sh` → commit diff generated (KHÔNG sửa tay). GATE
   `codegen-check.yml` (`git diff --exit-code -- client/src/data/generated`) chặn generated lệch; import Godot
   headless model do `ci-client.yml`. Chi tiết: `shared/codegen/README.md`.
+
+## 4.5 Hiện thực tầng Api (Phase 13 — đã chốt)
+
+`GameTeam.Api` là cổng HTTP chuẩn + composition root. Convention DƯỚI ĐÂY là bắt buộc cho **mọi feature
+endpoint** về sau — không tự vẽ convention khác.
+
+- **Versioning:** `Asp.Versioning.Http` + `Asp.Versioning.Mvc.ApiExplorer` (8.1.1). `AddApiVersioning`
+  (default v1, `AssumeDefaultVersionWhenUnspecified`, `UrlSegmentApiVersionReader`, `ReportApiVersions`) +
+  `AddApiExplorer` (`GroupNameFormat="'v'VVV"`, `SubstituteApiVersionInUrl=true` ⇒ OpenAPI render path đã
+  resolve `/api/v1/...`). Endpoint mới map vào **version set**: `app.NewApiVersionSet().HasApiVersion(new
+  ApiVersion(1))...Build()` + `app.MapGroup("/api/v{version:apiVersion}").WithApiVersionSet(set)` + endpoint
+  `.MapToApiVersion(1)`. `GameTeam.Contracts.Common.ApiVersions` vẫn là nguồn hằng số version.
+  - *Lưu ý:* stub Phase 05 (`auth/guest`,`profile`,`config/{version}`) tạm giữ trên group **literal** `/api/v1`
+    vì `/config/{version}` có param `version` trùng `{version:apiVersion}` của version set prefix
+    (`RoutePatternFactory` từ chối trùng). Phase sở hữu (18/21) chuyển chúng vào version set khi reimplement.
+- **Endpoint mỏng qua MediatR:** HTTP → `ISender.Send(command/query)` → Application handler → `Result` →
+  `ApiResults` → HTTP. KHÔNG nhét nghiệp vụ vào endpoint. Mẫu: `GET /api/v1/ping` (`PingCommand`),
+  `GET /api/v1/server-time` (`GetServerTimeQuery` + `IClock` — không gọi `DateTime.UtcNow` ở endpoint).
+- **`AddApi`** chịu trách nhiệm: JSON enum-as-string, API versioning + ApiExplorer, OpenAPI first-party
+  (`AddOpenApi` + `ContractEnumsDocumentTransformer`), `AddExceptionHandler<GlobalExceptionHandler>` +
+  `AddProblemDetails`. **KHÔNG** nhồi Application/Infrastructure registration (mỗi tầng có `Add<Layer>()` riêng).
+- **Composition root** (`Program.cs`): `AddApplication().AddInfrastructure(config).AddApi()`;
+  `UseExceptionHandler()` sớm; `MapOpenApi()`; Swagger UI **dev-only**; `/health` giữ nguyên (không versioned).
+  `public partial class Program` cho `WebApplicationFactory<Program>`.
+  - `IConfigProvider` có placeholder tối thiểu `DefaultConfigProvider` (Infra, config@v1) để đủ cho
+    `CachingBehavior` — **Phase 21** thay bằng Config Service thật.
+- **Swagger:** UI (`Swashbuckle.AspNetCore.SwaggerUI`) **chỉ render** OpenAPI first-party `/openapi/v1.json`
+  ở Development — **KHÔNG** dùng SwaggerGen (giữ single-source `shared/contracts/openapi.json` §4.4). Thêm/đổi
+  endpoint ⇒ rebuild (regenerate openapi.json) + `bash shared/codegen/run.sh` + kiểm drift.
+- **Auth hook:** Phase 13 **chỉ chừa chỗ** (TODO Phase 18 trong pipeline + `AddApi`) — **KHÔNG** JWT thật,
+  **KHÔNG** fake user. `UseAuthentication/UseAuthorization` bật ở **Phase 18**.
+- **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
+  integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
+  (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.
 
 ## 5. DB & Schema Versioning
 - DB: EF Core Migrations, additive-first (`infrastructure.md`).

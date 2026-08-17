@@ -1,7 +1,9 @@
 using GameTeam.Application.Abstractions.Caching;
+using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Domain.Common;
 using GameTeam.Infrastructure.Caching;
+using GameTeam.Infrastructure.Configuration;
 using GameTeam.Infrastructure.Persistence;
 using GameTeam.Infrastructure.Persistence.Repositories;
 using GameTeam.Infrastructure.Time;
@@ -73,6 +75,11 @@ public static class DependencyInjection
 
         // ── Server-time boundary (Domain port IClock) ────────────────────────────────────────────
         services.AddSingleton<IClock, SystemClock>();
+
+        // ── Config version provider (port IConfigProvider) ───────────────────────────────────────
+        // Placeholder tối thiểu (config@v1) để composition root ĐỦ cho CachingBehavior — Phase 21
+        // (Config Service) THAY THẾ bằng bundle loading/publishing thật. Không đọc balance ở đây.
+        services.AddSingleton<IConfigProvider, DefaultConfigProvider>();
 
         return services;
     }

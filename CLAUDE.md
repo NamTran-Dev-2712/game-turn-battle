@@ -336,6 +336,46 @@ architecture gate green, no `openapi.json` drift. Canonical: `docs/backend/infra
   §2.1 + `docs/backend/cross-cutting.md` §2.5/§4 + `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync**
   (doc-sync matrix, §5); the integration tests are the behavior contract — update them.
 
+**API layer is standardized (Phase 13 — closed & verified).** `GameTeam.Api` is the HTTP gateway + composition root.
+**API versioning** = `Asp.Versioning.Http` + `Asp.Versioning.Mvc.ApiExplorer` (8.1.1): `AddApiVersioning` (default
+**v1**, `AssumeDefaultVersionWhenUnspecified`, `UrlSegmentApiVersionReader`, `ReportApiVersions`) + `AddApiExplorer`
+(`GroupNameFormat="'v'VVV"`, `SubstituteApiVersionInUrl=true` ⇒ OpenAPI renders resolved `/api/v1/...`). New endpoints
+map into the **version set**: `app.NewApiVersionSet().HasApiVersion(new ApiVersion(1))…Build()` +
+`app.MapGroup("/api/v{version:apiVersion}").WithApiVersionSet(set)` + `.MapToApiVersion(1)`; `GameTeam.Contracts.Common.ApiVersions`
+stays the version constant. **Error handling is centralized** in `GameTeam.Api/Http/`: **`ErrorHttpMapping`** (the ONE
+`Error.Code`→HTTP-status table — `VALIDATION_FAILED`→400 + suffix convention `_NOT_FOUND`→404/`_CONFLICT`→409/
+`_UNAUTHORIZED`|`UNAUTHENTICATED`→401/`_FORBIDDEN`→403, default 400), **`ApiResults`** (`Result`/`Result<T>`→HTTP; success→200,
+failure→**`ErrorEnvelope`**; `traceId = Activity.Current?.Id ?? HttpContext.TraceIdentifier`), **`GlobalExceptionHandler`**
+(`IExceptionHandler` + `app.UseExceptionHandler()`; unhandled→**500 `ErrorEnvelope`** code `INTERNAL_ERROR`, logs full
+exception server-side only, **no stack/internal leak**). **500 uses `ErrorEnvelope`, NOT ProblemDetails** — ONE error
+contract for every error (Phase-05 §3; `AddProblemDetails()` is only a framework fallback). Sample endpoints prove the
+flow: `GET /api/v1/ping` (`PingCommand`) + `GET /api/v1/server-time` (`GetServerTimeQuery` + `IClock`), both HTTP →
+`ISender` → Application → `Result` → `ApiResults`. **Swagger UI** = `Swashbuckle.AspNetCore.SwaggerUI` **UI-only, dev-only**
+over the first-party `/openapi/v1.json` — **no SwaggerGen** (first-party OpenAPI stays the single source →
+`shared/contracts/openapi.json` + drift guard + codegen). `/health` unchanged (not versioned). Verified: `dotnet build -c
+Release` 0 warning/0 error, `dotnet test` **150 pass** (Api.IntegrationTests **31**: ping ±validation, server-time
+deterministic, error-envelope shape, exception→500 no-leak, swagger json, + health/openapi-contract), runtime
+`/api/v1/ping|server-time`, `/health`, `/openapi/v1.json`, `/swagger` OK, `api-supported-versions: 1`. Canonical:
+`docs/backend/api-and-versioning.md` §3.1/§4.5; decision log: `.memory/0011-api-layer-standardized.md`.
+
+- Future agents **MUST** map every new feature endpoint into the **versioned `/api/v1`** group (version set) and route it
+  through **Application/MediatR** with a thin endpoint; **MUST reuse** `ErrorHttpMapping`/`ApiResults`/`GlobalExceptionHandler`
+  + `ErrorEnvelope` + `Result`/`Error`. **MUST NOT** invent a second versioning convention, a second error shape/envelope,
+  return raw exceptions or leak stack traces, scatter error mapping in endpoints, put business logic in endpoints, or add
+  SwaggerGen / hand-edit `openapi.json`.
+- **Contract/endpoint change workflow (binding):** edit `GameTeam.Contracts`/endpoint → rebuild (regenerate
+  `openapi.json`) → `bash shared/codegen/run.sh` → commit generated diff → **add/extend an `Api.IntegrationTests` HTTP
+  test** (status + contract + error envelope + versioned route) → doc-sync → phase checklist. Swagger/OpenAPI must stay in
+  sync with the endpoint on every change.
+- **Authentication is Phase 18.** Phase 13 only leaves a **hook** (TODO in the `Program.cs` pipeline + `AddApi`) — **MUST
+  NOT** implement real JWT/login/refresh/authorization before Phase 18, fake a user, or register a real auth scheme.
+- **`IConfigProvider`** has a minimal placeholder `DefaultConfigProvider` (Infrastructure, `config@v1`) so `CachingBehavior`
+  works; **Phase 21** (Config Service) replaces it — do not build config-reading logic onto it.
+- When changing the API layer, keep **`GameTeam.Api/Http/*` + `Program.cs` + `AddApi` + `Api.IntegrationTests` (HTTP
+  contract) + `DefaultConfigProvider`/`AddInfrastructure` + regenerated `openapi.json` + `client/src/data/generated/**` +
+  `docs/backend/api-and-versioning.md` §3.1/§4.5 + `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync**
+  (doc-sync matrix, §5); the integration tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

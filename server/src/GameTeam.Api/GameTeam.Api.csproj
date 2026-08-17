@@ -21,5 +21,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- API versioning (Phase 13): Asp.Versioning.Http = minimal-API version sets;
+         Mvc.ApiExplorer = AddApiExplorer + SubstituteApiVersionInUrl (OpenAPI render /api/v1/...). -->
+    <PackageReference Include="Asp.Versioning.Http" />
+    <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
+    <!-- Swagger UI (dev-only, UI middleware) over first-party /openapi/v1.json. -->
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
   </ItemGroup>
 </Project>

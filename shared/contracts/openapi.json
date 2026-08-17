@@ -5,6 +5,58 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/v1/ping": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "Ping",
+        "parameters": [
+          {
+            "name": "message",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/server-time": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "ServerTime",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerTimeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -397,6 +449,18 @@
           "schemaVersion": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "ServerTimeResponse": {
+        "required": [
+          "utcNow"
+        ],
+        "type": "object",
+        "properties": {
+          "utcNow": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
