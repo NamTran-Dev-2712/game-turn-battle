@@ -376,6 +376,42 @@ deterministic, error-envelope shape, exception→500 no-leak, swagger json, + he
   `docs/backend/api-and-versioning.md` §3.1/§4.5 + `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync**
   (doc-sync matrix, §5); the integration tests are the behavior contract — update them.
 
+**Client core autoloads are standardized (Phase 14 — closed & verified).** The client's loose-coupling backbone has ONE
+home: **`client/src/core/`** — two **independent, single-responsibility autoloads** (registered in `client/project.godot`
+`[autoload]`; **no** God autoload, never merged into a `GameManager`/`CoreManager`). **`EventBus`**
+(`core/events/event_bus.gd`, node `EventBus`): global pub/sub — `emit(event, payload)` / `subscribe(event, callback)` /
+`unsubscribe` / `is_known`. The event catalogue is **closed**: a const **`EVENTS: Array[StringName]`** + one declared
+**`signal <name>(payload)`** per event; `emit`/`subscribe` `assert` the event ∈ `EVENTS` ⇒ an unregistered event fails
+fast (**anti-"God channel"/"event chui"**). Backing the catalogue with real Godot signals gives automatic disconnect when
+a subscriber node frees (leak-safety) plus explicit `unsubscribe`. Convention: every event carries **one** `payload`
+(Dictionary). Phase-14 base catalogue = **one** event **`scene_changed`** (`{to, from}`); feature/network events are added
+by their owning phases. **`SceneRouter`** (`core/scene/scene_router.gd`, node `SceneRouter`): centralized navigation —
+`goto_scene(path)` (push) / `back()` (pop) / `stack_depth()` / `clear_history()` + `current_path`/`current_scene`. It uses
+a **manual scene-host** (holds the current screen as a child, swaps in place, **`queue_free`s the old scene** ⇒ no leak /
+no stale reference — ADR-009); **transition is instant** ("tối giản", advanced/animated transitions deferred to the UI
+phase); a bad path ⇒ `false` + `push_error` (never throws, never swallows). After a swap it publishes `scene_changed`
+via `EventBus` so features react **without importing** `SceneRouter`. Autoload scripts **omit `class_name`** (it collides
+with the singleton name — Godot "hides an autoload singleton") and are accessed via the global (`EventBus.emit(...)`).
+Verified (Godot 4.7.1-stable, Windows, local): `--headless --import` exit 0 (0 error/0 warning, autoloads created);
+gdUnit4 headless **11/11 pass, 0 orphan** (`client/tests/core/event_bus_test.gd` 5 + `scene_router_test.gd` 4 + smoke 2).
+Canonical: `docs/godot/state-and-signals.md` §3.1 (event catalogue) + `docs/godot/scene-architecture.md` §4.1 (router);
+decision log: `.memory/0012-client-autoloads-standardized.md`.
+
+- Future agents **MUST reuse** `EventBus`/`SceneRouter` before adding any cross-feature communication or navigation;
+  **MUST NOT** re-declare a second bus/router, merge them into a God autoload, let a feature import another feature, or
+  scatter `get_tree().change_scene*` in features (navigate only via `SceneRouter`).
+- **The event catalogue is a binding contract** (ADR-002): every event used in code **must** appear in `EVENTS` + a
+  declared `signal` + the `docs/godot/state-and-signals.md` §3.1 table — **no undocumented/"chui" events, no "God
+  channel"**. Event names are `snake_case` **past-tense** (`../conventions/naming.md` §6). If an event is only used
+  inside one feature, use a **plain signal**, not the EventBus. Only seed base events the phase's own code emits — never
+  future-phase feature events.
+- **SceneRouter frees old scenes** (`queue_free`) and never retains them; advanced/animated transitions and
+  `replace`/async-load/deep-link are **future (UI phase)** — do not build a transition framework here.
+- When changing a client core autoload, keep **`client/src/core/{events,scene}/*` + `client/tests/core/*` (behavior
+  contract) + `client/project.godot` (`[autoload]`) + `docs/godot/state-and-signals.md` §3.1 + `docs/godot/scene-architecture.md`
+  §4.1 + `.instructions/client.md` + `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests
+  are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

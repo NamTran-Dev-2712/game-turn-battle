@@ -19,5 +19,16 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
 - **Combat sim is pure:** decoupled from nodes, integer/fixed-point, seeded RNG. Must reproduce the server golden vector (ADR-011).
 - **Static typing everywhere.** `snake_case` funcs/vars, `PascalCase` `class_name`, `CONSTANT_CASE` consts, `##` doc comments, **tab** indentation (per `.editorconfig`).
 
+## Established infrastructure (closed & verified — reuse, don't reinvent)
+- **Core autoloads (Phase 14).** `EventBus` (`src/core/events/event_bus.gd`) + `SceneRouter`
+  (`src/core/scene/scene_router.gd`) are the two independent core autoloads (registered in `client/project.godot`).
+  Cross-feature events go through **`EventBus.emit/subscribe/unsubscribe`**; every event is a **declared, documented
+  catalogue signal** (`EVENTS` + `signal <name>(payload)` + the table in `docs/godot/state-and-signals.md` §3.1) — no
+  "God channel"/undocumented events. Navigate **only** via **`SceneRouter.goto_scene(path)`/`back()`** (never scatter
+  `get_tree().change_scene*`); old scenes are `queue_free`d. Autoload scripts omit `class_name` (singleton-name
+  collision) — use the global (`EventBus.emit(...)`). Never merge the two into one manager. Canonical:
+  `docs/godot/state-and-signals.md` §3.1 + `docs/godot/scene-architecture.md` §4.1; decision log
+  `.memory/0012-client-autoloads-standardized.md`.
+
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

@@ -15,3 +15,13 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   edit `server/GameTeam.Contracts` → rebuild (regenerate `openapi.json`) → `bash shared/codegen/run.sh` → commit the
   generated diff (CI `codegen-check.yml` fails on drift). Enums keep C# numeric values; wire is string. Config-driven
   `.tres` Resource models (from `shared/config-schema`) are a **separate** family — see `docs/godot/resources-and-assets.md`.
+- **Core autoloads are standardized (Phase 14 — closed & verified).** `EventBus`
+  (`src/core/events/event_bus.gd`) and `SceneRouter` (`src/core/scene/scene_router.gd`) are the two independent core
+  autoloads (registered in `client/project.godot`). **Reuse them — never re-declare a bus/router, never merge them into
+  a God autoload.** Cross-feature communication goes through **`EventBus.emit/subscribe/unsubscribe`**; every event must
+  be a **declared, documented catalogue signal** (add to `EVENTS` + a `signal <name>(payload)` + the table in
+  `docs/godot/state-and-signals.md` §3.1) — no ad-hoc "God channel"/"event chui". Navigate **only** through
+  `SceneRouter.goto_scene(path)`/`back()` (never scatter `get_tree().change_scene*` in features); old scenes are
+  `queue_free`d (no stale ref). Autoload scripts **omit `class_name`** (collides with the singleton name) — access via
+  the global (`EventBus.emit(...)`). Canonical: `docs/godot/state-and-signals.md` §3.1 + `docs/godot/scene-architecture.md`
+  §4.1; decision log `.memory/0012-client-autoloads-standardized.md`.
