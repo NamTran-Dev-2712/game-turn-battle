@@ -57,18 +57,39 @@ features/summon/
 
 | Chủ đề | Thiết kế |
 |---|---|
-| Router | `SceneRouter` autoload quản lý chuyển screen (push/replace) |
-| Transition | Fade/loading chuẩn hoá; async load screen nặng (ADR-009) |
+| Router | `SceneRouter` autoload quản lý chuyển screen tập trung (feature **không** tự điều hướng rải rác) |
+| Transition | Phase 14: tối giản (tráo tức thời). Fade/loading chuẩn hoá + async load screen nặng (ADR-009) = **phase UI sau** |
 | State giữa scene | Không nhét state vào scene tree; đọc từ `StateCache`/service |
 | Deep link | Router hỗ trợ mở thẳng một screen (vd từ notification — Post-MVP) |
 
 ```mermaid
 flowchart LR
-    Hub[Main Hub] -->|router.push| Summon[Summon Screen]
-    Summon -->|router.back| Hub
-    Hub -->|router.push| Battle[Battle Screen]
-    Battle -->|router.replace| Result[Result Screen]
+    Hub[Main Hub] -->|goto_scene| Summon[Summon Screen]
+    Summon -->|back| Hub
+    Hub -->|goto_scene| Battle[Battle Screen]
 ```
+
+### 4.1 SceneRouter — API điều hướng (Phase 14 — đã chốt)
+
+> Nguồn: `client/src/core/scene/scene_router.gd` (autoload node `SceneRouter`). Trách nhiệm **duy nhất**:
+> điều hướng scene + back stack. **Không** chứa logic feature.
+
+| Hàm | Ý nghĩa |
+|---|---|
+| `goto_scene(path: String) -> bool` | Chuyển tới scene tại `path`, đẩy scene hiện tại vào back stack. `false` + `push_error` nếu path lỗi (không ném, không nuốt lỗi). |
+| `back() -> bool` | Quay lại scene trước trong back stack. `false` nếu stack rỗng. |
+| `stack_depth() -> int` | Số phần tử back stack (kiểm thử/gỡ lỗi). |
+| `clear_history()` | Xoá back stack (không đổi scene hiện tại) — dùng khi reset điều hướng (boot/logout). |
+| `current_path` / `current_scene` | Đường dẫn + node scene đang hiển thị (`""`/`null` nếu chưa có). |
+
+- **Mô hình "scene-host":** router giữ scene hiện tại làm **node con** và tráo tại chỗ. Khi tráo, scene cũ
+  được **`queue_free()`** ⇒ giải phóng đúng cách, **không giữ tham chiếu scene cũ** (chống rò rỉ — ADR-009).
+- **Transition tối giản:** tráo tức thời (không animation). Hiệu ứng chuyển cảnh nâng cao = nợ kỹ thuật để
+  **phase UI sau** (không dựng framework transition ở Phase 14).
+- **Back stack:** `goto_scene` = *push*; `back` = *pop*. `replace` (thay không đẩy stack), async-load màn
+  nặng, và deep-link là **mở rộng tương lai** (phase UI/boot), chưa hiện thực ở Phase 14.
+- **Sự kiện:** sau mỗi lần đổi scene, router phát `scene_changed` qua `EventBus` (payload
+  `{ "to", "from" }`) ⇒ feature phản ứng mà **không import** `SceneRouter` (`state-and-signals.md` §3.1).
 
 ---
 
@@ -84,6 +105,11 @@ flowchart LR
 | `AudioManager` | Nhạc/SFX (tối giản) |
 
 **Cấm:** autoload "God" ôm nhiều trách nhiệm. Mỗi autoload SRP, có interface rõ (ADR-002).
+
+> **Trạng thái:** `EventBus` + `SceneRouter` **đã hiện thực** (Phase 14 — hai autoload độc lập, đăng ký
+> trong `client/project.godot`; xem §4.1 + `state-and-signals.md` §3.1). `NetworkClient`/`ConfigProvider`/
+> `StateCache` = Phase 15–16; boot + `AudioManager`/UI = Phase 17. **Không** gộp các autoload thành một
+> "manager" — mỗi cái một trách nhiệm.
 
 ## 6. Liên kết
 - State & signals: `state-and-signals.md`
