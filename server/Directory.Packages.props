@@ -20,6 +20,13 @@
          xuất spec ra file lúc build (single source, tránh drift). -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="9.0.10" />
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="9.0.10" />
+    <!-- API versioning (Phase 13, ADR-008): URL segment /api/v{version:apiVersion}, default v1.
+         Asp.Versioning bỏ nhánh 9.x (8.1.1 → 10.x); dùng 8.1.1 (target net8.0, roll-forward net9). -->
+    <PackageVersion Include="Asp.Versioning.Http" Version="8.1.1" />
+    <PackageVersion Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.1" />
+    <!-- Swagger UI CHỈ (dev-only) render OpenAPI first-party /openapi/v1.json — KHÔNG dùng SwaggerGen
+         (giữ nguyên single-source shared/contracts/openapi.json + drift guard). -->
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.1.0" />
   </ItemGroup>
 
   <ItemGroup Label="Infrastructure">
