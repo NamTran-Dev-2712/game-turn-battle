@@ -41,14 +41,14 @@ ADR-008: client giao tiếp server qua REST versioned + JWT, contract single-sou
 
 # Công việc cần thực hiện
 
-- [ ] Tạo `core/net/network_client.gd`: wrapper `HTTPRequest`, GET/POST JSON, base URL cấu hình.
-- [ ] Gắn header `Authorization: Bearer <jwt>` (token từ store; store nối phase 20).
-- [ ] Deserialize JSON → model generated (phase 08); lỗi parse → lỗi rõ.
-- [ ] Map `ErrorResponse` (code/message/traceId) → cấu trúc lỗi client; emit `network_error`; 401 → emit `unauthorized`.
-- [ ] Timeout + retry chỉ cho request idempotent (GET); mất mạng → báo, **không** tự tạo kết quả.
-- [ ] Static typing, tab indent; không để UI gọi trực tiếp (review guard).
-- [ ] Test gdUnit4 với HTTP mock/stub: 200 parse đúng; 4xx→error event; timeout.
-- [ ] Cập nhật [`../godot/state-and-signals.md`](../godot/state-and-signals.md) (event mạng) + [`../godot/ui-architecture.md`](../godot/ui-architecture.md) (UI không gọi net).
+- [x] Tạo `core/net/network_client.gd`: wrapper `HTTPRequest` (qua seam `HttpTransport`/`GodotHttpTransport`), GET/POST JSON, base URL cấu hình (env `GAME_TEAM_API_BASE_URL`, mặc định `http://localhost:8080`). Autoload đăng ký trong `client/project.godot`. ✅ import exit 0.
+- [x] Gắn header `Authorization: Bearer <jwt>` (token từ `TokenStore` — kho tối giản; đăng nhập/refresh thật nối phase 18/20). Chỉ gắn khi có token; **không log**. ✅
+- [x] Deserialize JSON → model generated (phase 08) qua `NetworkResponseParser` (hàm parser tường minh); lỗi parse → `PARSE_ERROR`, JSON không hợp lệ → `INVALID_JSON` (không bịa thành công). ✅ test 200 parse `ServerTimeResponse`.
+- [x] Map `ErrorResponse` (code/message/traceId) → `NetResult` chuẩn hoá; emit `network_error`; 401 → emit **thêm** `unauthorized`. ✅ test 4xx/401 (đã thêm 2 event vào danh mục `EventBus.EVENTS`).
+- [x] Timeout (`request_timeout_seconds` mặc định 10s) + retry chỉ GET/idempotent (lỗi vận chuyển tạm thời, tối đa `MAX_GET_RETRIES=2`); POST không tự retry; mất mạng → báo, **không** tự tạo kết quả. ✅ test timeout/GET-retry/POST-no-retry.
+- [x] Static typing, tab indent; `HTTPRequest` chỉ ở `core/net/` (grep guard xanh — UI/feature không gọi trực tiếp). ✅
+- [x] Test gdUnit4 với HTTP stub (`FakeHttpTransport`): 200 parse đúng; 4xx/5xx/401→error event; JSON không hợp lệ; parse lỗi; timeout; GET retry; POST no-retry; autoload hiện diện. ✅ **21/21 pass, 0 orphan**.
+- [x] Cập nhật [`../godot/state-and-signals.md`](../godot/state-and-signals.md) §3.1 (2 event mạng) + §4 (NetworkClient) + [`../godot/ui-architecture.md`](../godot/ui-architecture.md) §1 (UI không gọi net). ✅
 
 # Tiêu chí hoàn thành
 
@@ -83,7 +83,23 @@ Client **không bao giờ** tự quyết kết quả/phần thưởng (ADR-008/0
 
 # Phase Review
 
-Đóng khi NetworkClient gọi API thật + parse model + xử lý lỗi/timeout + UI không gọi net trực tiếp, test gdUnit4 xanh.
+**Đủ điều kiện đóng (2026-08-19, cục bộ).** `NetworkClient` là kênh giao tiếp server DUY NHẤT: autoload đăng ký,
+`get_json`/`post_json` qua seam `HttpTransport`, base URL env, JWT qua `TokenStore`, parse model generated qua
+`NetworkResponseParser`, chuẩn hoá lỗi `NetResult`, phát `network_error`/`unauthorized`, timeout + retry chỉ GET.
+
+- **Tiêu chí hoàn thành:** (1) Server thật (.NET cục bộ `:5080`, Redis tắt→graceful) — `NetworkClient` (transport
+  HTTPRequest thật) GET `/api/v1/server-time` → parse `ServerTimeResponse.utc_now` đúng (test tạm, đã xoá).
+  (2) 4xx/5xx→map `ErrorResponse` + `network_error`; 401→`unauthorized`. (3) timeout/mất mạng→lỗi rõ, không bịa.
+  (4) `HTTPRequest` chỉ ở `core/net/` (grep guard). Tất cả ✅.
+- **Verify:** Godot 4.7.1-stable `--headless --import` exit 0 (0 warning); gdUnit4 `runtest.cmd -a res://tests`
+  **21/21 pass, 0 error/failure/orphan** (`network_client_test` 10 + Phase-14 11). Không drift
+  `client/src/data/generated`. Không log token/Authorization; không hardcode credential.
+- **CI-verification pending:** `.github/workflows/ci-client.yml` (Godot headless import + gdUnit trên Actions) — cập
+  nhật `[x]` khi có kết quả Actions xanh.
+- **Nợ có chủ đích (không kéo vào Phase 15):** refresh/lưu token thật (18/20), offline queue nâng cao (20/48),
+  `Idempotency-Key` POST (server 31), SignalR (Post-MVP), retry backoff.
+
+Decision log: `.memory/0013-client-networkclient-standardized.md`. Kế tiếp: Phase 16 (ConfigProvider + StateCache).
 
 ---
 

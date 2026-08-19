@@ -66,9 +66,13 @@ flowchart LR
 | Event (`snake_case`, past-tense) | Ý nghĩa | Payload | Producer | Consumer |
 |---|---|---|---|---|
 | `scene_changed` | Điều hướng scene đã hoàn tất | `{ "to": String, "from": String }` | `SceneRouter` | feature bất kỳ cần phản ứng khi đổi scene |
+| `network_error` | Một request mạng thất bại (HTTP 4xx/5xx, JSON/parse lỗi, timeout, mất mạng) | `{ "kind": int (NetResult.Kind), "code": String, "message": String, "trace_id": Variant, "status": int }` | `NetworkClient` | UI/feature hiển thị lỗi, retry, thông báo |
+| `unauthorized` | Request bị từ chối do chưa/không còn xác thực (HTTP 401) — phát **kèm** `network_error` | `{ "kind": int, "code": String, "message": String, "trace_id": Variant, "status": 401 }` | `NetworkClient` | lớp auth (phase 18/20) kích hoạt đăng nhập lại / refresh |
 
-> Phase 14 chỉ có **một** event nền (`scene_changed`) — event nghiệp vụ (vd `battle_finished`,
-> `currency_changed`) do **phase sở hữu feature** thêm về sau.
+> Phase 14 seed một event nền (`scene_changed`). **Phase 15** thêm `network_error` + `unauthorized`
+> (producer = `NetworkClient`). Event nghiệp vụ (vd `battle_finished`, `currency_changed`) do
+> **phase sở hữu feature** thêm về sau. Mọi thất bại mạng đi qua **một kênh** `network_error`; 401
+> phát **thêm** `unauthorized` để lớp auth phản ứng riêng.
 
 **Thêm event mới (quy trình bắt buộc):**
 1. Đặt tên `snake_case`, **thể quá khứ/sự kiện** (không mệnh lệnh) — `../conventions/naming.md` §6.
@@ -76,14 +80,27 @@ flowchart LR
 3. Ghi một dòng vào **bảng danh mục** trên (ý nghĩa/payload/producer/consumer).
 4. Không thêm event chỉ để "cho đủ"; nếu chỉ dùng trong một feature → dùng **signal thường**, không EventBus.
 
-## 4. NetworkClient
+## 4. NetworkClient (Phase 15 — đã chốt)
+
+> Nguồn: `client/src/core/net/` (autoload node `NetworkClient`, đăng ký trong `client/project.godot`).
+> **Kênh giao tiếp server DUY NHẤT của client** — UI/feature **không** gọi `HTTPRequest` trực tiếp
+> (§ `ui-architecture.md` §1). Autoload bỏ `class_name` (trùng tên singleton) — truy cập qua global
+> `NetworkClient`. Các lớp phụ trợ (không autoload) có `class_name`: `HttpTransport`/`GodotHttpTransport`
+> (seam vận chuyển — nơi DUY NHẤT chạm `HTTPRequest`), `TokenStore` (kho JWT tối giản), `NetResult`
+> (kết quả chuẩn hoá), `NetworkResponseParser` (JSON → model generated).
+
 | Trách nhiệm | Chi tiết |
 |---|---|
-| Gọi REST + JWT | Wrap HTTP, gắn token, xử lý refresh (ADR-008) |
-| Serialize/deserialize | Dùng model sinh từ contracts (codegen) |
-| Idempotency | Gửi `Idempotency-Key` cho command nhạy cảm |
-| Lỗi mạng | Trả Result rõ ràng; UI hiển thị cache + retry/thông báo (`../mvp/10` UX3) |
-| Không quyết nghiệp vụ | Chỉ truyền tải; kết quả do server (ADR-011) |
+| Gọi REST + JWT | `get_json(path, parser)` / `post_json(path, body, parser)`; base URL từ env `GAME_TEAM_API_BASE_URL` (mặc định `http://localhost:8080`), path dưới `/api/v1`; header `Authorization: Bearer <jwt>` chỉ khi `TokenStore` có token (đăng nhập/refresh thật = phase 18/20). **Không log token/Authorization.** |
+| Serialize/deserialize | Body → JSON; response → model generated (phase 08) qua `parser: Callable` (vd `NetworkResponseParser.parse_server_time`). Model generated là DO-NOT-EDIT (không `from_dict`) ⇒ parser sống ở `core/net/response_parser.gd`; thêm DTO mới = thêm một hàm parse ở đó. |
+| Chuẩn hoá lỗi | Map `ErrorResponse` `{code, message, traceId}` (hoặc tổng hợp phía client) → `NetResult` (`ok`/`value`/`error`/`status_code`/`kind`). Phân biệt: 2xx, 4xx, 5xx, 401, JSON không hợp lệ, parse lệch model, timeout, mất mạng. |
+| Sự kiện lỗi | Mọi thất bại phát `network_error` qua EventBus (một kênh nhất quán); **401 phát thêm `unauthorized`** (§3.1). |
+| Timeout + retry | Timeout mỗi request (`request_timeout_seconds`, mặc định 10s). Retry **chỉ GET/idempotent-safe** trên lỗi vận chuyển tạm thời (timeout/mất kết nối), tối đa `MAX_GET_RETRIES`. **POST không bao giờ tự retry** (tránh double-effect; `Idempotency-Key` cho command nhạy cảm = server phase 31). |
+| Không quyết nghiệp vụ | Chỉ truyền tải; mất mạng → **báo lỗi, KHÔNG bịa kết quả/phần thưởng** (ADR-008/011). |
+
+> **Ngoài phạm vi phase 15 (nợ có chủ đích):** đăng nhập/lấy token thật + refresh (phase 18/20),
+> lưu token bền, offline queue nâng cao (phase 20/48), `Idempotency-Key` POST (server phase 31),
+> SignalR realtime (Post-MVP), config bundle caching (phase 16).
 
 ## 5. Combat state (đặc thù)
 - Client chạy sim **để hiển thị** dựa trên `seed` server trả; state kết quả/thưởng lấy từ server response.

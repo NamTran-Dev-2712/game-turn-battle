@@ -18,6 +18,7 @@ config/icon="res://icon.svg"
 
 EventBus="*res://src/core/events/event_bus.gd"
 SceneRouter="*res://src/core/scene/scene_router.gd"
+NetworkClient="*res://src/core/net/network_client.gd"
 
 [display]
 

@@ -29,6 +29,16 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   collision) — use the global (`EventBus.emit(...)`). Never merge the two into one manager. Canonical:
   `docs/godot/state-and-signals.md` §3.1 + `docs/godot/scene-architecture.md` §4.1; decision log
   `.memory/0012-client-autoloads-standardized.md`.
+- **NetworkClient (Phase 15).** `NetworkClient` (`src/core/net/network_client.gd`, autoload) is the **single
+  server-communication gateway**. **UI/feature never call `HTTPRequest`/REST directly** — `HTTPRequest` lives **only** in
+  `src/core/net/` (grep guard). Call **`get_json(path, parser)` / `post_json(path, body, parser)`** (base URL env
+  `GAME_TEAM_API_BASE_URL`, default `http://localhost:8080`; paths under `/api/v1`). Parse responses into **generated
+  models (Phase 08)** via `NetworkResponseParser` (add a parse func in `core/net/response_parser.gd`; never hand-declare a
+  DTO). Failures → normalized **`NetResult`** + **`network_error`** event; **401 also emits `unauthorized`**. Retry **only
+  GET** on transient transport failure; **POST never auto-retried**. JWT via **`TokenStore`** (in-memory stub; real
+  login/refresh = phase 18/20) — **never log token/Authorization; never hardcode a token**. Network loss → report failure,
+  **never fabricate a result/reward** (ADR-008/011). Reuse — never add a second HTTP client. Canonical:
+  `docs/godot/state-and-signals.md` §4; decision log `.memory/0013-client-networkclient-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.
