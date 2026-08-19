@@ -25,3 +25,15 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   `queue_free`d (no stale ref). Autoload scripts **omit `class_name`** (collides with the singleton name) — access via
   the global (`EventBus.emit(...)`). Canonical: `docs/godot/state-and-signals.md` §3.1 + `docs/godot/scene-architecture.md`
   §4.1; decision log `.memory/0012-client-autoloads-standardized.md`.
+- **NetworkClient is standardized (Phase 15 — closed & verified).** `NetworkClient` (`src/core/net/network_client.gd`,
+  autoload) is the **single server-communication gateway**. **UI/feature MUST NOT call `HTTPRequest` / REST directly** —
+  `HTTPRequest` lives **only** in `src/core/net/` (grep guard). Use **`NetworkClient.get_json(path, parser)` /
+  `post_json(path, body, parser)`**; base URL from env `GAME_TEAM_API_BASE_URL` (default `http://localhost:8080`), paths
+  under `/api/v1`. Responses parse into **generated models (Phase 08)** via `NetworkResponseParser` (generated DTOs are
+  DO-NOT-EDIT / no `from_dict` — add a parse func in `core/net/response_parser.gd`, never hand-declare a DTO). Failures →
+  one normalized **`NetResult`** + **`network_error`** event; **401 also emits `unauthorized`** (both catalogue signals,
+  `docs/godot/state-and-signals.md` §3.1). Retry **only GET/idempotent-safe** on transient transport failure; **POST is
+  never auto-retried**. JWT via **`TokenStore`** (in-memory stub; real login/refresh = phase 18/20) — **never log
+  token/Authorization, never hardcode a token**. Network loss → report failure, **never fabricate a result/reward**
+  (ADR-008/011). Reuse — never add a second HTTP client or bypass NetworkClient. Canonical:
+  `docs/godot/state-and-signals.md` §4; decision log `.memory/0013-client-networkclient-standardized.md`.

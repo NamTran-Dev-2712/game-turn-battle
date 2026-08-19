@@ -9,7 +9,7 @@
 | Nguyên tắc | Chi tiết |
 |---|---|
 | Tách UI ↔ logic | UI hiển thị + nhận input; logic ở feature/view-model |
-| Không gọi network | UI → feature (view-model) → NetworkClient |
+| Không gọi network | UI → feature (view-model) → **`NetworkClient`** (Phase 15). **Cấm** `HTTPRequest`/REST trực tiếp trong UI/feature; `HTTPRequest` chỉ tồn tại trong `client/src/core/net/` (grep guard). Chi tiết kênh mạng: `state-and-signals.md` §4. |
 | Widget tái sử dụng | `ui/` chứa widget dùng chung (card, bar, dialog) |
 | Landscape-first | Bố cục ngang (`../mvp/00`); dùng anchor/container co giãn |
 | Data-binding nhẹ | View-model cập nhật UI qua signal/observable |

@@ -412,6 +412,44 @@ decision log: `.memory/0012-client-autoloads-standardized.md`.
   §4.1 + `.instructions/client.md` + `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests
   are the behavior contract — update them.
 
+**Client NetworkClient is standardized (Phase 15 — closed & verified).** The client's server-communication has ONE
+gateway: **`client/src/core/net/`** — the autoload **`NetworkClient`** (`network_client.gd`, registered in
+`client/project.godot` `[autoload]`; **omits `class_name`** — singleton-name collision — accessed via the global). It is
+the **single channel** client → server: **UI/feature MUST NOT call `HTTPRequest` / REST directly** — `HTTPRequest` lives
+**only** in `core/net/` (grep guard; ADR-002 "UI không gọi network"). Public coroutines **`get_json(path, parser)`** /
+**`post_json(path, body, parser)`**; base URL from env **`GAME_TEAM_API_BASE_URL`** (default `http://localhost:8080`),
+paths under **`/api/v1`** (ADR-008); header **`Authorization: Bearer <jwt>`** attached only when the token store holds one
+— **never logged**. Supporting types (non-autoload, with `class_name`): **`HttpTransport`**/**`GodotHttpTransport`** (the
+transport seam — the ONE place `HTTPRequest` is touched; lets tests inject a fake), **`TokenStore`** (in-memory JWT stub —
+real login/refresh = phase 18/20), **`NetResult`** (normalized result: `ok`/`value`/`error`/`status_code`/`kind`),
+**`NetworkResponseParser`** (JSON→**generated model** phase 08; generated DTOs are DO-NOT-EDIT / no `from_dict` ⇒ add a
+parse func here — never hand-declare a DTO). Failures normalize `ErrorResponse` (`{code, message, traceId}`) and emit
+**`network_error`** (one consistent channel); **401 also emits `unauthorized`** (both added to `EventBus.EVENTS` + signals
++ §3.1 catalogue). Timeout per request (`request_timeout_seconds`, default 10s); retry **only GET/idempotent-safe** on
+transient transport failure (max `MAX_GET_RETRIES=2`); **POST is never auto-retried** (double-effect; `Idempotency-Key` =
+server phase 31). **User decisions:** base URL = env-var-with-default (not project setting / `.tres` — that overlaps phase
+16); JSON→DTO = explicit parser funcs (not a generic reflection mapper). Verified (Godot 4.7.1-stable, Windows, local):
+`--headless --import` exit 0 (0 warning, `NetworkClient` created); gdUnit4 headless **21/21 pass, 0 orphan**
+(`client/tests/core/net/network_client_test.gd` 10 + Phase-14 11); real-server end-to-end (local .NET API on `:5080`,
+Redis down→graceful) GET `/api/v1/server-time` → parsed `ServerTimeResponse.utc_now` (temp test, removed); grep guard
+green (`HTTPRequest` only in `core/net/`; no token/Authorization logging); no `client/src/data/generated` drift.
+Canonical: `docs/godot/state-and-signals.md` §4 + §3.1; decision log: `.memory/0013-client-networkclient-standardized.md`.
+
+- Future agents **MUST reuse** `NetworkClient` for every server call before adding any HTTP; **MUST NOT** create a second
+  HTTP client, call `HTTPRequest`/REST from UI/features, bypass `NetworkClient`, hand-declare a client DTO, or hand-edit
+  `client/src/data/generated`. New endpoint consumption = add a parse func in `core/net/response_parser.gd` + call
+  `get_json`/`post_json` from a feature (never from UI directly).
+- **Security is binding:** **never log the token/Authorization header or a sensitive body**; **never hardcode a token**;
+  the JWT comes from `TokenStore` (real acquisition/refresh = phase 18/20 — do not implement real login/refresh here).
+- **Authority is binding (ADR-008/011):** the client **never** fabricates a result/reward on network loss/timeout —
+  report a failed `NetResult` + `network_error`. **Retry GET only**; never auto-retry POST/side-effecting requests.
+- **Out of scope (do not pull in):** real login/refresh + token persistence (18/20), advanced offline queue (20/48),
+  `Idempotency-Key` POST (server 31), SignalR (Post-MVP), config bundle caching (16), retry backoff.
+- When changing the network transport, keep **`client/src/core/net/*` + `client/tests/core/net/*` (behavior contract) +
+  `client/project.godot` + any new EventBus event (`EVENTS`+signal+§3.1) + `docs/godot/state-and-signals.md` §4 +
+  `docs/godot/ui-architecture.md` §1 + `client/src/core/net/README.md` + `.instructions/client.md` +
+  `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

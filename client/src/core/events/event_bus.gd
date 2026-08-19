@@ -11,11 +11,24 @@ extends Node
 ## rồi tài liệu hoá trong docs/godot/state-and-signals.md.
 const EVENTS: Array[StringName] = [
 	&"scene_changed",
+	&"network_error",
+	&"unauthorized",
 ]
 
 ## Điều hướng scene đã hoàn tất. payload = { "to": String, "from": String }.
 ## Producer: SceneRouter · Consumer: feature bất kỳ cần phản ứng khi đổi scene.
 signal scene_changed(payload)
+
+## Một request mạng thất bại (HTTP 4xx/5xx, JSON/parse lỗi, timeout, mất mạng).
+## payload = { "kind": int (NetResult.Kind), "code": String, "message": String,
+##            "trace_id": Variant, "status": int }.
+## Producer: NetworkClient · Consumer: UI/feature hiển thị lỗi, retry, thông báo.
+signal network_error(payload)
+
+## Request bị từ chối do chưa/không còn xác thực (HTTP 401). Kèm cả `network_error`.
+## payload giống `network_error` (status = 401). Producer: NetworkClient ·
+## Consumer: lớp auth (phase 18/20) kích hoạt đăng nhập lại / refresh token.
+signal unauthorized(payload)
 
 
 func _ready() -> void:
