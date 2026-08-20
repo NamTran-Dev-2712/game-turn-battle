@@ -31,3 +31,19 @@ static func parse_error_envelope(data: Dictionary) -> ErrorResponse:
 	# traceId nullable: giữ null nếu vắng/null, ngược lại ép chuỗi.
 	model.trace_id = null if inner.get("traceId", null) == null else str(inner["traceId"])
 	return model
+
+
+## Parse metadata bundle `{ "version": { "bundle": int, "schema": int } }` → ConfigBundleDto.
+## Dùng cho ConfigProvider so version (phase 16). `null` nếu thiếu `version`/`bundle`.
+static func parse_config_bundle(data: Dictionary) -> ConfigBundleDto:
+	if not data.has("version") or not (data["version"] is Dictionary):
+		return null
+	var inner: Dictionary = data["version"]
+	if not inner.has("bundle"):
+		return null
+	var version := ConfigVersion.new()
+	version.bundle = int(inner["bundle"])
+	version.schema = int(inner.get("schema", 0))
+	var model := ConfigBundleDto.new()
+	model.version = version
+	return model

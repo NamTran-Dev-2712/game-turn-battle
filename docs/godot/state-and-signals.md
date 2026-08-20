@@ -22,6 +22,25 @@ flowchart LR
 | Single source per domain | Mỗi loại dữ liệu có một chỗ cache; UI đọc từ đó |
 | Optimistic UI (thận trọng) | Cho phép hiển thị lạc quan **chỉ** cho thao tác nhẹ; kết quả nhạy cảm chờ server (ADR-011) |
 
+### 1.1 StateCache — read-cache trạng thái người chơi (Phase 16 — đã chốt)
+
+> Nguồn: `client/src/core/state/state_cache.gd` (autoload node `StateCache`, đăng ký trong
+> `client/project.godot`; bỏ `class_name` — trùng tên singleton, truy cập qua global `StateCache`).
+> **CHỈ HIỂN THỊ (display-only), KHÔNG phải chân lý** — nguồn sự thật luôn ở server (ADR-007).
+
+| Trách nhiệm | Chi tiết |
+|---|---|
+| Read-cache | Giữ bản sao đọc của `profile`/`currencies`/`heroes`/`progress` để UI hiển thị + offline-view. `const IS_DISPLAY_ONLY = true`. |
+| Đường ghi DUY NHẤT | `apply_snapshot(snapshot: Dictionary)` — thay **toàn bộ** cache bằng snapshot từ **server response** (invalidate dữ liệu cũ). **KHÔNG** có mutator chân lý (không `add_currency`/`spend_currency`/`set_progress`…). |
+| API đọc | `get_currency(code)`, `get_currencies()`, `get_heroes()`, `get_hero(id)`, `get_progress(key)`, `get_all_progress()`, `get_profile()` — **trả BẢN SAO** ⇒ caller không sửa được cache. |
+| Nhãn nguồn | `source()` = `"empty"｜"server"｜"cache"`; `is_offline()` (nguồn=cache ⇒ UI gắn nhãn "offline/cached"); ưu tiên server khi online. |
+| Cache đĩa | Lưu snapshot xuống `user://state_cache/snapshot.json`; boot nạp lại với nhãn `"cache"` (offline-view dữ liệu cũ) tới khi server refresh lật về `"server"`. Chỉ dữ liệu hiển thị — **không bí mật**. |
+| Sự kiện | Phát `state_refreshed` (§3.1) sau mỗi `apply_snapshot`. |
+
+**Luồng thay đổi state (bắt buộc):** `Feature/UI → NetworkClient → Server (command) → response → StateCache.apply_snapshot`.
+Client **không** tự cộng/trừ currency, **không** tự tính reward/kết quả/progress (ADR-007/011). StateCache
+**không bao giờ** là nguồn quyết định hành động nhạy cảm.
+
 ---
 
 ## 2. Signals (nội bộ scene/feature)
@@ -68,10 +87,13 @@ flowchart LR
 | `scene_changed` | Điều hướng scene đã hoàn tất | `{ "to": String, "from": String }` | `SceneRouter` | feature bất kỳ cần phản ứng khi đổi scene |
 | `network_error` | Một request mạng thất bại (HTTP 4xx/5xx, JSON/parse lỗi, timeout, mất mạng) | `{ "kind": int (NetResult.Kind), "code": String, "message": String, "trace_id": Variant, "status": int }` | `NetworkClient` | UI/feature hiển thị lỗi, retry, thông báo |
 | `unauthorized` | Request bị từ chối do chưa/không còn xác thực (HTTP 401) — phát **kèm** `network_error` | `{ "kind": int, "code": String, "message": String, "trace_id": Variant, "status": 401 }` | `NetworkClient` | lớp auth (phase 18/20) kích hoạt đăng nhập lại / refresh |
+| `config_updated` | Active config version đã đổi thành công (ConfigProvider nạp/áp bundle version mới) | `{ "version": int, "config_version": String ("config@vN") }` | `ConfigProvider` | feature/UI nạp lại dữ liệu config theo version mới |
+| `state_refreshed` | StateCache vừa refresh snapshot đọc từ server response | `{ "source": String ("server") }` | `StateCache` | UI cập nhật hiển thị currency/hero/progress từ cache mới |
 
 > Phase 14 seed một event nền (`scene_changed`). **Phase 15** thêm `network_error` + `unauthorized`
-> (producer = `NetworkClient`). Event nghiệp vụ (vd `battle_finished`, `currency_changed`) do
-> **phase sở hữu feature** thêm về sau. Mọi thất bại mạng đi qua **một kênh** `network_error`; 401
+> (producer = `NetworkClient`). **Phase 16** thêm `config_updated` (producer = `ConfigProvider`) +
+> `state_refreshed` (producer = `StateCache`). Event nghiệp vụ (vd `battle_finished`, `currency_changed`)
+> do **phase sở hữu feature** thêm về sau. Mọi thất bại mạng đi qua **một kênh** `network_error`; 401
 > phát **thêm** `unauthorized` để lớp auth phản ứng riêng.
 
 **Thêm event mới (quy trình bắt buộc):**
@@ -100,7 +122,8 @@ flowchart LR
 
 > **Ngoài phạm vi phase 15 (nợ có chủ đích):** đăng nhập/lấy token thật + refresh (phase 18/20),
 > lưu token bền, offline queue nâng cao (phase 20/48), `Idempotency-Key` POST (server phase 31),
-> SignalR realtime (Post-MVP), config bundle caching (phase 16).
+> SignalR realtime (Post-MVP). Config bundle caching = **phase 16** (§1.1 `StateCache` +
+> `resources-and-assets.md` §1.1 `ConfigProvider`, đã chốt).
 
 ## 5. Combat state (đặc thù)
 - Client chạy sim **để hiển thị** dựa trên `seed` server trả; state kết quả/thưởng lấy từ server response.

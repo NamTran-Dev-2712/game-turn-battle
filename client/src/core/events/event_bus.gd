@@ -13,6 +13,8 @@ const EVENTS: Array[StringName] = [
 	&"scene_changed",
 	&"network_error",
 	&"unauthorized",
+	&"config_updated",
+	&"state_refreshed",
 ]
 
 ## Điều hướng scene đã hoàn tất. payload = { "to": String, "from": String }.
@@ -29,6 +31,16 @@ signal network_error(payload)
 ## payload giống `network_error` (status = 401). Producer: NetworkClient ·
 ## Consumer: lớp auth (phase 18/20) kích hoạt đăng nhập lại / refresh token.
 signal unauthorized(payload)
+
+## Active config version đã đổi thành công (ConfigProvider nạp/áp bundle version mới).
+## payload = { "version": int, "config_version": String ("config@vN") }.
+## Producer: ConfigProvider · Consumer: feature/UI nạp lại dữ liệu config theo version mới.
+signal config_updated(payload)
+
+## State cache vừa được refresh từ server response (StateCache thay snapshot đọc).
+## payload = { "source": String ("server") }. Producer: StateCache ·
+## Consumer: UI cập nhật hiển thị currency/hero/progress từ cache mới.
+signal state_refreshed(payload)
 
 
 func _ready() -> void:

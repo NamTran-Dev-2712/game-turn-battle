@@ -28,6 +28,26 @@ flowchart LR
 > header `AUTO-GENERATED — DO NOT EDIT` — **không sửa tay, không tự định nghĩa DTO trùng**; đổi ⇒ sửa
 > `GameTeam.Contracts` → regenerate. Chi tiết: `../../shared/codegen/README.md`, ADR-008.
 
+### 1.1 ConfigProvider — cửa đọc config versioned (Phase 16 — đã chốt)
+
+> Nguồn: `client/src/core/config/config_provider.gd` (autoload node `ConfigProvider`, đăng ký trong
+> `client/project.godot`; bỏ `class_name` — trùng tên singleton, truy cập qua global `ConfigProvider`).
+> **Cửa đọc config DUY NHẤT** của client — feature **không** tự tải/nạp raw bundle (ADR-005/004).
+
+| Trách nhiệm | Chi tiết |
+|---|---|
+| Nhận bundle | `apply_bundle(bundle: Dictionary)` — nhận bundle envelope `config-bundle.schema.json` (`config_version` "config@vN" + `schema_version` + `data` per-type). Từ NetworkClient (`check_for_update()`) hoặc nguồn khác. |
+| Cache đĩa **BẤT BIẾN** | Ghi `user://config_cache/config@vN.json` **ghi-một-lần** — **không bao giờ ghi đè** version cũ (`config@vN` immutable, ADR-005). Con trỏ `active.json` trỏ version đang dùng. |
+| Boot | `_ready()` nạp con trỏ + bundle version tương ứng từ đĩa (offline-view); thiếu/hỏng ⇒ trạng thái rỗng, không crash. |
+| Truy vấn (data-driven) | `get_entry(type, id)`, `get_all(type)`, `has_entry(type,id)`, `get_hero(id)`, `current_version()`, `config_label()`, `has_config()` — đọc theo schema phase 06, **KHÔNG nhúng số gameplay**; trả **BẢN SAO** ⇒ caller không sửa được cache. |
+| So version | `check_for_update()` (coroutine) hỏi server version qua `NetworkClient`; version mới hơn ⇒ tải bundle mới ⇒ `apply_bundle`. Endpoint `/api/v1/config/...` là placeholder wire — Config Service hoàn thiện **phase 21**, bundle e2e **phase 22**. Mất mạng ⇒ giữ cache, không bịa. |
+| Sự kiện | Phát `config_updated` (`{version, config_version}`, §`state-and-signals.md` §3.1) khi active version **đổi**. Áp lại đúng version đang dùng = no-op. |
+
+**Luồng đọc config:** `Server → NetworkClient → ConfigProvider (cache config@vN) → Feature/UI`. Đổi
+version ⇒ tạo cache version mới, phát `config_updated`, feature nạp lại — **không rebuild client**
+(ADR-004/005). Runtime SSOT của config vẫn ở server (Config Service, phase 21); ConfigProvider chỉ
+**cache đọc bất biến** theo version.
+
 ---
 
 ## 2. Asset loading (ADR-009)

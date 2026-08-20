@@ -40,13 +40,13 @@ ADR-005: client cache config theo version, không rebuild khi đổi config. ADR
 
 # Công việc cần thực hiện
 
-- [ ] `core/config/config_provider.gd`: nhận bundle (từ NetworkClient), lưu cache đĩa theo `config@vN`, load khi boot.
-- [ ] API truy vấn config theo id/type (đọc dữ liệu theo schema phase 06, không nhúng số).
-- [ ] So version: nếu server báo version mới → tải bundle mới, emit `config_updated`.
-- [ ] `core/state/state_cache.gd`: giữ read-cache (currency/hero/progress); cập nhật khi server trả; cờ "display-only".
-- [ ] Đảm bảo không có đường ghi chân lý ở client (review guard); mọi mutation gọi server.
-- [ ] Test gdUnit4: bundle mẫu→query; version bump→reload; state set từ response→hiển thị.
-- [ ] Cập nhật [`../godot/resources-and-assets.md`](../godot/resources-and-assets.md) + [`../godot/state-and-signals.md`](../godot/state-and-signals.md).
+- [x] `core/config/config_provider.gd`: nhận bundle (từ NetworkClient), lưu cache đĩa theo `config@vN`, load khi boot. — autoload `ConfigProvider` (bỏ `class_name`), `apply_bundle` cache `user://config_cache/config@vN.json` **ghi-một-lần** + `active.json`, `_ready` nạp lại từ đĩa (offline-view; thiếu/hỏng → rỗng).
+- [x] API truy vấn config theo id/type (đọc dữ liệu theo schema phase 06, không nhúng số). — `get_entry(type,id)`/`get_all(type)`/`get_hero(id)`/`current_version()`/`config_label()`/`has_config()`, trả **bản sao**, không hardcode số (test đọc `rarity`/`base_stats` từ bundle).
+- [x] So version: nếu server báo version mới → tải bundle mới, emit `config_updated`. — `check_for_update()` qua `NetworkClient.get_json` (parser `parse_config_bundle`) → `apply_bundle`; `config_updated` `{version,config_version}` phát khi active version đổi (test: FakeHttpTransport v2).
+- [x] `core/state/state_cache.gd`: giữ read-cache (currency/hero/progress); cập nhật khi server trả; cờ "display-only". — autoload `StateCache` (`IS_DISPLAY_ONLY=true`), `apply_snapshot` từ server response, đọc trả bản sao, `source()`/`is_offline()`, persist offline-view + phát `state_refreshed`.
+- [x] Đảm bảo không có đường ghi chân lý ở client (review guard); mọi mutation gọi server. — StateCache **không** có mutator chân lý (test `has_method` false cho add/spend currency…); grep `client/src` sạch (không `currency +=`/reward/inventory); `HTTPRequest` chỉ ở `core/net/`; mutation qua `Feature/UI → NetworkClient → Server → response → StateCache`.
+- [x] Test gdUnit4: bundle mẫu→query; version bump→reload; state set từ response→hiển thị. — `tests/core/config/config_provider_test.gd` (11) + `tests/core/state/state_cache_test.gd` (6); toàn bộ suite **38/38 pass, 0 error/0 failure/0 orphan** (Godot 4.7.1 local).
+- [x] Cập nhật [`../godot/resources-and-assets.md`](../godot/resources-and-assets.md) + [`../godot/state-and-signals.md`](../godot/state-and-signals.md). — `resources-and-assets.md` §1.1 (ConfigProvider), `state-and-signals.md` §1.1 (StateCache) + §3.1 (event `config_updated`/`state_refreshed`) + §4 note; `configuration-and-data.md` §4; Vibe Code: CLAUDE.md §4.6, `.instructions/client.md`, `.claude/agents/godot-client.md`, `.claude/workflows/documentation-sync.md`, `.memory/0014`.
 
 # Tiêu chí hoàn thành
 
@@ -82,6 +82,19 @@ ADR-005: client cache config theo version, không rebuild khi đổi config. ADR
 # Phase Review
 
 Đóng khi ConfigProvider cache theo version + StateCache read-only chạy, đổi version không rebuild, test xanh, không client-authority.
+
+**Kết quả (2026-08-20 — local PASS, đủ điều kiện đóng):** Hai autoload `ConfigProvider` + `StateCache` ở
+`client/src/core/{config,state}/` (đăng ký sau `NetworkClient`, bỏ `class_name`). ConfigProvider: `apply_bundle` cache
+envelope `config@vN` **BẤT BIẾN** (ghi-một-lần, không ghi đè version cũ — ADR-005) + con trỏ `active.json`, boot nạp lại
+(offline-view), truy vấn data-driven `get_entry`/`get_hero`/`current_version` (bản sao, không hardcode số), `check_for_update`
+qua NetworkClient phát `config_updated` khi đổi version (endpoint `/api/v1/config/...` placeholder — Config Service phase 21,
+e2e phase 22). StateCache: read-cache **CHỈ HIỂN THỊ** (`IS_DISPLAY_ONLY`), chỉ `apply_snapshot` (server response) ghi —
+**không** mutator chân lý, đọc trả bản sao, `source()`/`is_offline()` nhãn cache-vs-server, persist offline-view, phát
+`state_refreshed`. Verify (Godot 4.7.1-stable, Windows, local): `--headless --import` exit 0 (0 warning, autoload tạo OK);
+gdUnit4 **toàn bộ 38/38 pass, 0 error/0 failure/0 orphan** (config 11 + state 6 + Phase-14/15 regression 21). Client-authority
+audit **PASS** (grep `client/src` sạch; `HTTPRequest` chỉ `core/net/`; StateCache không expose mutator chân lý; không EventBus
+thứ hai). Không drift `client/src/data/generated`. Docs + Vibe Code đồng bộ (§ Deliverables). **Tiêu chí hoàn thành: đạt đủ.**
+CI-pending: `ci-client.yml` trên Actions (import + gdUnit4 headless dưới xvfb).
 
 ---
 
