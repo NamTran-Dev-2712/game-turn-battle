@@ -56,7 +56,10 @@ flowchart LR
 ## 4. Versioning
 - Mỗi file có `schema_version`; bundle có version `config@vN` (ADR-005).
 - Đổi giá trị → publish version mới. Đổi cấu trúc → tăng schema_version + migration/compat.
-- Client cache theo version; chỉ tải khi có version mới.
+- Client cache theo version; chỉ tải khi có version mới. **Client-side (Phase 16):** autoload
+  `ConfigProvider` cache `config@vN` **bất biến** xuống đĩa (`user://config_cache/`, ghi-một-lần),
+  nạp khi boot, phát `config_updated` khi đổi version — **không rebuild client**. Chi tiết:
+  `../godot/resources-and-assets.md` §1.1.
 
 ## 5. Ranh giới với backend
 - Domain/Application đọc config qua `IConfigProvider` (port), **không** đọc file trực tiếp (`../backend/`).

@@ -1,0 +1,241 @@
+# ConfigProvider — autoload: CỬA ĐỌC CONFIG DUY NHẤT của client (ADR-005, ADR-004).
+# Nhận config bundle versioned (qua NetworkClient), cache BẤT BIẾN xuống đĩa theo `config@vN`,
+# nạp lại khi boot (offline-view), phục vụ truy vấn dữ liệu cho feature theo id/type (data-driven —
+# KHÔNG nhúng số gameplay). Đổi version = tạo cache mới; KHÔNG ghi đè version cũ, KHÔNG rebuild client.
+# Client CHỈ đọc/cache: bundle là dữ liệu tham chiếu bất biến, không phải chân lý (chân lý ở server).
+# Autoload BỎ `class_name` (trùng tên singleton) — truy cập qua global `ConfigProvider`.
+# Chi tiết: docs/godot/resources-and-assets.md §1.1, docs/adr/ADR-005-configuration-strategy.md.
+extends Node
+
+# Thư mục cache config trên đĩa (ghi đè được cho test). Mỗi version một file BẤT BIẾN.
+const DEFAULT_CACHE_DIR: String = "user://config_cache"
+# Con trỏ version đang kích hoạt (nằm trong cache_dir).
+const ACTIVE_POINTER_FILE: String = "active.json"
+# Tiền tố nhãn bundle bất biến (khớp config-bundle.schema.json: ^config@v[0-9]+$).
+const VERSION_PREFIX: String = "config@v"
+
+# Đường dẫn API (placeholder phase 16 — Config Service = phase 21, bundle e2e = phase 22 hoàn thiện).
+# Wire path qua NetworkClient để sẵn sàng nối; endpoint thật chốt ở phase sau.
+const CONFIG_VERSION_PATH: String = "/api/v1/config/version"
+const CONFIG_BUNDLE_PATH: String = "/api/v1/config/bundle"
+
+# Sự kiện phát khi active config version đổi thành công (khớp EventBus.EVENTS).
+const _EVENT_CONFIG_UPDATED: StringName = &"config_updated"
+
+## Thư mục cache (đổi được cho test — inject temp dir).
+var cache_dir: String = DEFAULT_CACHE_DIR
+## NetworkClient dùng để tải bundle/version (seam — mặc định autoload; inject giả cho test).
+var network_client: Node = null
+
+# Bundle đang kích hoạt (Dictionary envelope: config_version/schema_version/data). Rỗng nếu chưa nạp.
+var _active_bundle: Dictionary = {}
+# Chỉ mục truy vấn nhanh: { type(StringName): { id(String): entry(Dictionary) } }.
+var _index: Dictionary = {}
+# Version số đang kích hoạt (N trong config@vN). 0 = chưa có config.
+var _active_version: int = 0
+
+
+func _ready() -> void:
+	if network_client == null:
+		network_client = get_node_or_null(^"/root/NetworkClient")
+	_ensure_cache_dir()
+	_load_active_from_disk()
+
+
+# ── API truy vấn (đọc — trả BẢN SAO để caller không sửa được cache) ───────────────────────────────
+
+## Version số đang kích hoạt (N trong config@vN); 0 nếu chưa có bundle.
+func current_version() -> int:
+	return _active_version
+
+
+## Nhãn bundle đang kích hoạt ("config@vN") hoặc "" nếu chưa có.
+func config_label() -> String:
+	return (VERSION_PREFIX + str(_active_version)) if _active_version > 0 else ""
+
+
+## True nếu đã nạp một bundle hợp lệ.
+func has_config() -> bool:
+	return _active_version > 0
+
+
+## True nếu tồn tại entry `id` trong `type`.
+func has_entry(type: StringName, id: String) -> bool:
+	return _index.has(type) and (_index[type] as Dictionary).has(id)
+
+
+## Lấy một entry config theo `type` + `id`. Trả BẢN SAO sâu; {} nếu không có.
+func get_entry(type: StringName, id: String) -> Dictionary:
+	if not has_entry(type, id):
+		return {}
+	return (_index[type][id] as Dictionary).duplicate(true)
+
+
+## Lấy tất cả entry của một `type` (mảng BẢN SAO sâu); [] nếu không có.
+func get_all(type: StringName) -> Array:
+	if not _index.has(type):
+		return []
+	var out: Array = []
+	for id in (_index[type] as Dictionary):
+		out.append((_index[type][id] as Dictionary).duplicate(true))
+	return out
+
+
+## Tiện ích đọc một hero config theo id (ví dụ trong roadmap). = get_entry(&"hero", id).
+func get_hero(id: String) -> Dictionary:
+	return get_entry(&"hero", id)
+
+
+# ── Nạp / cache bundle ────────────────────────────────────────────────────────────────────────────
+
+## Áp một bundle (từ server HOẶC test). Validate envelope, cache BẤT BIẾN xuống đĩa (config@vN,
+## ghi-một-lần), kích hoạt, và phát `config_updated` NẾU version đổi. Trả false nếu bundle sai (không ném).
+func apply_bundle(bundle: Dictionary) -> bool:
+	var version := _extract_version(bundle)
+	if version <= 0:
+		push_warning("ConfigProvider: bundle thiếu/không hợp lệ 'config_version' — bỏ qua.")
+		return false
+	# config@vN là BẤT BIẾN: áp lại đúng version đang kích hoạt = no-op (không ghi đè, không phát event).
+	if version == _active_version:
+		return true
+	# Cache đĩa BẤT BIẾN: chỉ ghi nếu file version chưa tồn tại (không bao giờ ghi đè version cũ).
+	_persist_bundle_if_absent(version, bundle)
+	_write_active_pointer(version)
+	_activate(bundle, version)
+	EventBus.emit(_EVENT_CONFIG_UPDATED, {
+		"version": version,
+		"config_version": VERSION_PREFIX + str(version),
+	})
+	return true
+
+
+## So version với server: nếu server báo version mới hơn → tải bundle mới → apply. Trả true nếu đã cập nhật.
+## Placeholder phase 16 (endpoint hoàn thiện phase 21/22). Mất mạng/lỗi → giữ cache hiện tại, trả false.
+func check_for_update() -> bool:
+	if network_client == null:
+		return false
+	var version_result: NetResult = await network_client.get_json(CONFIG_VERSION_PATH, NetworkResponseParser.parse_config_bundle)
+	if not version_result.ok:
+		return false
+	var server_version := _version_from_dto(version_result.value)
+	if server_version <= 0 or server_version <= _active_version:
+		return false
+	var bundle_result: NetResult = await network_client.get_json(CONFIG_BUNDLE_PATH + "?version=" + str(server_version))
+	if not bundle_result.ok or not (bundle_result.value is Dictionary):
+		return false
+	return apply_bundle(bundle_result.value)
+
+
+# ── Nội bộ ──────────────────────────────────────────────────────────────────────────────────────
+
+# Đọc N từ envelope 'config_version' ("config@vN"). 0 nếu vắng/không đúng dạng.
+func _extract_version(bundle: Dictionary) -> int:
+	var label := str(bundle.get("config_version", ""))
+	if not label.begins_with(VERSION_PREFIX):
+		return 0
+	var digits := label.substr(VERSION_PREFIX.length())
+	if digits == "" or not digits.is_valid_int():
+		return 0
+	return int(digits)
+
+
+# Lấy version số từ ConfigBundleDto đã parse (version.bundle). 0 nếu null.
+func _version_from_dto(dto) -> int:
+	if dto == null or dto.version == null:
+		return 0
+	return int(dto.version.bundle)
+
+
+# Kích hoạt bundle trong bộ nhớ + dựng chỉ mục truy vấn.
+func _activate(bundle: Dictionary, version: int) -> void:
+	_active_bundle = bundle
+	_active_version = version
+	_index = _build_index(bundle)
+
+
+# Dựng { type: { id: entry } } từ bundle["data"] = { type: [ entry... ] }.
+func _build_index(bundle: Dictionary) -> Dictionary:
+	var index: Dictionary = {}
+	var data: Variant = bundle.get("data", {})
+	if not (data is Dictionary):
+		return index
+	for type in (data as Dictionary):
+		var entries: Variant = data[type]
+		if not (entries is Array):
+			continue
+		var by_id: Dictionary = {}
+		for entry in (entries as Array):
+			if entry is Dictionary and entry.has("id"):
+				by_id[str(entry["id"])] = entry
+		index[StringName(type)] = by_id
+	return index
+
+
+func _ensure_cache_dir() -> void:
+	if not DirAccess.dir_exists_absolute(cache_dir):
+		DirAccess.make_dir_recursive_absolute(cache_dir)
+
+
+func _bundle_path(version: int) -> String:
+	return cache_dir.path_join(VERSION_PREFIX + str(version) + ".json")
+
+
+func _active_pointer_path() -> String:
+	return cache_dir.path_join(ACTIVE_POINTER_FILE)
+
+
+# Ghi bundle xuống đĩa CHỈ khi file version chưa tồn tại (bất biến — không ghi đè version cũ).
+func _persist_bundle_if_absent(version: int, bundle: Dictionary) -> void:
+	var path := _bundle_path(version)
+	if FileAccess.file_exists(path):
+		return
+	_ensure_cache_dir()
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		push_warning("ConfigProvider: không ghi được cache bundle '%s'." % path)
+		return
+	file.store_string(JSON.stringify(bundle))
+	file.close()
+
+
+func _write_active_pointer(version: int) -> void:
+	_ensure_cache_dir()
+	var file := FileAccess.open(_active_pointer_path(), FileAccess.WRITE)
+	if file == null:
+		push_warning("ConfigProvider: không ghi được con trỏ active.")
+		return
+	file.store_string(JSON.stringify({"active_version": version}))
+	file.close()
+
+
+# Boot: đọc con trỏ active + bundle tương ứng từ đĩa (offline-view). Thiếu/hỏng → trạng thái rỗng.
+func _load_active_from_disk() -> void:
+	var pointer: Variant = _read_json_file(_active_pointer_path())
+	if not (pointer is Dictionary) or not pointer.has("active_version"):
+		return
+	var version := int(pointer["active_version"])
+	if version <= 0:
+		return
+	var bundle: Variant = _read_json_file(_bundle_path(version))
+	if not (bundle is Dictionary):
+		push_warning("ConfigProvider: cache bundle version %d thiếu/hỏng — bỏ qua." % version)
+		return
+	if _extract_version(bundle) != version:
+		push_warning("ConfigProvider: cache bundle version không khớp con trỏ — bỏ qua.")
+		return
+	_activate(bundle, version)
+
+
+# Đọc + parse một file JSON. Trả giá trị đã parse, hoặc null nếu thiếu/hỏng (không ném).
+func _read_json_file(path: String) -> Variant:
+	if not FileAccess.file_exists(path):
+		return null
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return null
+	var text := file.get_as_text()
+	file.close()
+	var json := JSON.new()
+	if json.parse(text) != OK:
+		return null
+	return json.data

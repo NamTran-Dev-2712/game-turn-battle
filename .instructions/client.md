@@ -37,3 +37,20 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   token/Authorization, never hardcode a token**. Network loss → report failure, **never fabricate a result/reward**
   (ADR-008/011). Reuse — never add a second HTTP client or bypass NetworkClient. Canonical:
   `docs/godot/state-and-signals.md` §4; decision log `.memory/0013-client-networkclient-standardized.md`.
+- **ConfigProvider + StateCache are standardized (Phase 16 — closed & verified).** Two independent core autoloads
+  (registered after `NetworkClient`, both **omit `class_name`**). **`ConfigProvider`** (`src/core/config/config_provider.gd`)
+  is the **single config read gate** — `apply_bundle(bundle)` caches a versioned envelope **immutably** to disk
+  (`user://config_cache/config@vN.json`, **write-once — never overwrite an old version**; ADR-005), loads on boot
+  (offline-view), and serves **data-driven** queries `get_entry(type,id)`/`get_hero(id)`/`current_version()` (reads by
+  schema, **no hardcoded numbers**, return deep copies). `check_for_update()` pulls a newer version via `NetworkClient`
+  (placeholder `/api/v1/config/...`; Config Service = phase 21, e2e = phase 22) and emits **`config_updated`** on a version
+  change (re-applying the active version = no-op). **`StateCache`** (`src/core/state/state_cache.gd`) is a **read-only,
+  display-only** player-state cache (`IS_DISPLAY_ONLY = true`) — the **only** write path is `apply_snapshot(snapshot)` from a
+  **server response** (no authoritative mutator: no `add_currency`/`spend_currency`/`set_progress`); reads return deep
+  copies; `source()`/`is_offline()` label cached-vs-server; persists last snapshot for offline-view; emits
+  **`state_refreshed`**. **Reuse both** — never load raw config in a feature, hardcode gameplay numbers, create a second
+  config/state cache, or treat `StateCache` as a source of truth. Every authoritative mutation goes
+  `Feature/UI → NetworkClient → Server → response → StateCache.apply_snapshot`; the client **never** computes
+  currency/reward/battle-result. Both new events follow the §3.1 catalogue process. Canonical:
+  `docs/godot/resources-and-assets.md` §1.1 + `docs/godot/state-and-signals.md` §1.1/§3.1; decision log
+  `.memory/0014-client-configprovider-statecache-standardized.md`.

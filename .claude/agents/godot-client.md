@@ -39,6 +39,19 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   login/refresh = phase 18/20) — **never log token/Authorization; never hardcode a token**. Network loss → report failure,
   **never fabricate a result/reward** (ADR-008/011). Reuse — never add a second HTTP client. Canonical:
   `docs/godot/state-and-signals.md` §4; decision log `.memory/0013-client-networkclient-standardized.md`.
+- **ConfigProvider + StateCache (Phase 16).** Two independent autoloads (after `NetworkClient`, omit `class_name`).
+  **`ConfigProvider`** (`src/core/config/config_provider.gd`) is the **single config read gate**: `apply_bundle(bundle)`
+  caches a versioned envelope **immutably** to disk (`user://config_cache/config@vN.json`, **write-once**; ADR-005), loads
+  on boot (offline-view), serves **data-driven** `get_entry(type,id)`/`get_hero(id)`/`current_version()` (deep copies, **no
+  hardcoded numbers**); `check_for_update()` pulls a newer version via `NetworkClient` (placeholder `/api/v1/config/...`;
+  Config Service = phase 21, e2e = phase 22) and emits **`config_updated`** on a version change. **`StateCache`**
+  (`src/core/state/state_cache.gd`) is a **read-only/display-only** state cache (`IS_DISPLAY_ONLY = true`): only
+  `apply_snapshot(snapshot)` writes (from a server response; **no authoritative mutator**), reads return deep copies,
+  `source()`/`is_offline()` label cached-vs-server, persists last snapshot for offline-view, emits **`state_refreshed`**.
+  **Reuse both** — never load raw config in a feature, hardcode gameplay numbers, add a second cache, or treat `StateCache`
+  as truth. Authoritative mutation path: `Feature/UI → NetworkClient → Server → response → StateCache.apply_snapshot`; the
+  client **never** computes currency/reward/battle-result. Canonical: `docs/godot/resources-and-assets.md` §1.1 +
+  `docs/godot/state-and-signals.md` §1.1/§3.1; decision log `.memory/0014-client-configprovider-statecache-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

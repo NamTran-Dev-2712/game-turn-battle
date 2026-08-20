@@ -450,6 +450,48 @@ Canonical: `docs/godot/state-and-signals.md` §4 + §3.1; decision log: `.memory
   `docs/godot/ui-architecture.md` §1 + `client/src/core/net/README.md` + `.instructions/client.md` +
   `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
 
+**Client ConfigProvider + StateCache are standardized (Phase 16 — closed & verified).** The client's data-reading
+backbone has two independent single-responsibility autoloads under **`client/src/core/`** (registered in
+`client/project.godot` `[autoload]` after `NetworkClient`; both **omit `class_name`** — singleton-name collision —
+accessed via the global). **`ConfigProvider`** (`core/config/config_provider.gd`): the **single config read gate** —
+`apply_bundle(bundle)` receives a versioned config-bundle envelope (`config-bundle.schema.json`: `config_version`
+"config@vN" + `schema_version` + `data` per-type), caches it **immutably** to disk (`user://config_cache/config@vN.json`,
+**write-once — never overwrites an old version**) with an `active.json` pointer, loads the active bundle on `_ready`
+(offline-view; missing/corrupt ⇒ empty, no crash), and serves **data-driven** queries `get_entry(type,id)`/`get_all(type)`/
+`get_hero(id)`/`current_version()`/`config_label()`/`has_config()` (read by schema phase 06, **no hardcoded gameplay
+numbers**; reads return **deep copies**). `check_for_update()` (coroutine) asks the server version via `NetworkClient` and,
+if newer, downloads+applies the bundle — placeholder endpoints `/api/v1/config/...` (Config Service = phase 21, e2e bundle
+= phase 22); offline ⇒ keep cache, never fabricate. Emits **`config_updated`** (`{version, config_version}`) only when the
+active version **changes** (re-applying the active version = no-op ⇒ `config@vN` immutability). **`StateCache`**
+(`core/state/state_cache.gd`): a **read-only display cache** of player state (`const IS_DISPLAY_ONLY = true`) — the **only**
+write path is `apply_snapshot(snapshot)` reflecting a **server response** (whole-snapshot replace; **no authoritative
+mutator** — no `add_currency`/`spend_currency`/`set_progress`…); reads `get_currency`/`get_currencies`/`get_heroes`/
+`get_hero`/`get_progress`/`get_all_progress`/`get_profile` return **deep copies**; `source()`=`"empty"｜"server"｜"cache"`
++ `is_offline()` label; persists the last snapshot to `user://state_cache/snapshot.json` and boots it as `"cache"`
+(offline-view) until a server refresh flips it to `"server"`; emits **`state_refreshed`** (`{source}`). Both new events are
+in `EventBus.EVENTS` + declared signals + `docs/godot/state-and-signals.md` §3.1. Verified (Godot 4.7.1-stable, Windows,
+local): `--headless --import` exit 0 (0 warning, autoloads created); gdUnit4 headless **full suite 38/38 pass, 0 error/0
+failure/0 orphan** (`tests/core/config/config_provider_test.gd` 11 + `tests/core/state/state_cache_test.gd` 6 + Phase-14/15
+regression 21); authority sweep clean (no currency/reward math, `HTTPRequest` only in `core/net/`, no duplicate EventBus);
+no `client/src/data/generated` drift (no contract change). Canonical: `docs/godot/resources-and-assets.md` §1.1
+(ConfigProvider) + `docs/godot/state-and-signals.md` §1.1 (StateCache) + §3.1; decision log:
+`.memory/0014-client-configprovider-statecache-standardized.md`.
+
+- Future agents **MUST reuse** `ConfigProvider` for all config reads and `StateCache` for all cached player-state reads
+  before adding any config/state plumbing; **MUST NOT** load a raw config bundle in a feature, hand-hardcode gameplay
+  numbers, create a second config/state cache, or use `StateCache` as a database/source of truth.
+- **`config@vN` is immutable (ADR-005):** never overwrite an existing version's on-disk cache; a new config version = a new
+  cache file + `config_updated`. Config changes must **not** require a client rebuild.
+- **Client is not authority (ADR-007/011):** every authoritative mutation goes `Feature/UI → NetworkClient → Server →
+  response → StateCache.apply_snapshot`. The client **never** computes currency/reward/battle-result/authoritative
+  progress/inventory/stats. Cached/offline data is **display-only** — never the basis for an authoritative action.
+- **Reuse the one EventBus:** `config_updated`/`state_refreshed` follow the §3.1 4-step process (name + signal + `EVENTS`
+  + catalogue row). No second event bus. Do **not** pull in phase-22 e2e bundle, signed bundles, or LiveOps here.
+- When changing these autoloads, keep **`client/src/core/{config,state}/*` + `client/tests/core/{config,state}/*` (behavior
+  contract) + `client/project.godot` `[autoload]` + `EventBus.EVENTS`/signals + `docs/godot/state-and-signals.md` §1.1/§3.1
+  + `docs/godot/resources-and-assets.md` §1.1 + `docs/gameplay/configuration-and-data.md` §4 + `.instructions/client.md` +
+  `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,
