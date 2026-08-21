@@ -61,6 +61,10 @@ version ⇒ tạo cache version mới, phát `config_updated`, feature nạp l�
 | Mapping | id → asset path/atlas trong config, không rải rác |
 | Giải phóng | Free asset khi rời scene; tránh rò rỉ |
 
+> **Trạng thái (Phase 17):** boot/hub/màn lỗi dùng UI tối giản (Label/Button dựng bằng code) — **không**
+> asset nặng ⇒ boot không block. Async/lazy/pool/atlas ở trên vẫn là **thiết kế**, hiện thực khi feature cần
+> (tối ưu asset/anim = phase 52, ADR-009). Giải phóng scene khi chuyển đã có qua `SceneRouter` (`queue_free`).
+
 ---
 
 ## 3. Memory management
