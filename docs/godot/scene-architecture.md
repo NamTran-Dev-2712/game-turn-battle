@@ -91,6 +91,35 @@ flowchart LR
 - **Sự kiện:** sau mỗi lần đổi scene, router phát `scene_changed` qua `EventBus` (payload
   `{ "to", "from" }`) ⇒ feature phản ứng mà **không import** `SceneRouter` (`state-and-signals.md` §3.1).
 
+### 4.2 Boot flow + app-shell (Phase 17 — đã chốt)
+
+> Nguồn: `client/src/ui/app_root.{gd,tscn}` (main scene), `client/src/ui/boot/` (`BootController` + `BootView` +
+> `BootErrorView`), `client/src/ui/main_hub/`. `run/main_scene = res://src/ui/app_root.tscn`.
+
+**App-shell:** main scene = `AppRoot` (Control RỖNG, không UI riêng). `AppRoot._ready` → `SceneRouter.goto(boot)`
+⇒ **SceneRouter làm CHỦ SỞ HỮU mọi screen hiển thị ngay từ frame đầu** (boot → hub, tráo tại chỗ + `queue_free`
+scene cũ — không chồng lớp, không giữ tham chiếu). Không để boot làm main scene tự-`queue_free` (footgun); mọi
+screen đi qua router đồng nhất.
+
+```mermaid
+flowchart LR
+    AppRoot[AppRoot main_scene] -->|goto| Boot[Boot]
+    Boot -->|health ok + config| Hub[Main Hub]
+    Boot -->|health fail| Err[Boot Error + Retry]
+    Err -->|retry| Boot
+```
+
+**Hợp đồng boot** (`BootController` = presenter, root của `boot.tscn`):
+1. **Health = cổng kết nối BẮT BUỘC:** `NetworkClient.get_json("/health", parse_health)`. Mất mạng/non-2xx →
+   `BootErrorView` (thông báo an toàn) + retry.
+2. **Config = BEST-EFFORT:** `ConfigProvider.check_for_update()`. Config Service thật = phase 21 ⇒ endpoint vắng/
+   lỗi hôm nay là **bình thường** (giữ cache, KHÔNG chặn boot). Siết cổng config khi phase 21/22 sẵn sàng.
+3. **Vào hub:** `SceneRouter.goto(main_hub)` + `clear_history()` (không quay lại boot). Emit `boot_succeeded`.
+
+**Main hub = shell điều hướng/bố cục** (`MainHubView` + `MainHubPresenter`): tiêu đề + nút placeholder phát intent;
+**chưa** chứa nghiệp vụ (feature thật = phase sau). Điều hướng feature sẽ qua `SceneRouter` tại presenter.
+Auth (guest login) chèn vào boot ở **phase 20** (giữa config và hub).
+
 ---
 
 ## 5. Autoload (dịch vụ nền — tối giản)
@@ -106,10 +135,11 @@ flowchart LR
 
 **Cấm:** autoload "God" ôm nhiều trách nhiệm. Mỗi autoload SRP, có interface rõ (ADR-002).
 
-> **Trạng thái:** `EventBus` + `SceneRouter` **đã hiện thực** (Phase 14 — hai autoload độc lập, đăng ký
-> trong `client/project.godot`; xem §4.1 + `state-and-signals.md` §3.1). `NetworkClient`/`ConfigProvider`/
-> `StateCache` = Phase 15–16; boot + `AudioManager`/UI = Phase 17. **Không** gộp các autoload thành một
-> "manager" — mỗi cái một trách nhiệm.
+> **Trạng thái:** `EventBus` + `SceneRouter` (Phase 14), `NetworkClient` (Phase 15), `ConfigProvider` +
+> `StateCache` (Phase 16) **đã hiện thực** (5 autoload độc lập, đăng ký trong `client/project.godot`).
+> **Boot + UI base = Phase 17** (đã hiện thực dưới dạng **scene**, KHÔNG phải autoload — `src/ui/app_root` →
+> `boot` → `main_hub`; xem §4.2). **`AudioManager` = HOÃN** (không thuộc checklist Phase 17 — chưa có audio
+> content; thêm khi cần nhạc/SFX, mỗi autoload một trách nhiệm — không gộp thành "manager").
 
 ## 6. Liên kết
 - State & signals: `state-and-signals.md`

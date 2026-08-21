@@ -33,6 +33,15 @@ static func parse_error_envelope(data: Dictionary) -> ErrorResponse:
 	return model
 
 
+## Parse `GET /health` → HealthResponse. `null` nếu thiếu `status`. (Boot dùng làm cổng kết nối — phase 17.)
+static func parse_health(data: Dictionary) -> HealthResponse:
+	if not data.has("status"):
+		return null
+	var model := HealthResponse.new()
+	model.status = str(data["status"])
+	return model
+
+
 ## Parse metadata bundle `{ "version": { "bundle": int, "schema": int } }` → ConfigBundleDto.
 ## Dùng cho ConfigProvider so version (phase 16). `null` nếu thiếu `version`/`bundle`.
 static func parse_config_bundle(data: Dictionary) -> ConfigBundleDto:

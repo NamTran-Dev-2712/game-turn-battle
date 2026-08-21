@@ -492,6 +492,52 @@ no `client/src/data/generated` drift (no contract change). Canonical: `docs/godo
   + `docs/godot/resources-and-assets.md` §1.1 + `docs/gameplay/configuration-and-data.md` §4 + `.instructions/client.md` +
   `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
 
+**Client boot flow + UI base are standardized (Phase 17 — closed & verified). CLOSES Group 3 (Client Core Framework).**
+The client's first runnable slice + the UI foundation for every feature live under **`client/src/ui/`** (boot is a
+**scene**, NOT an autoload — no new autoload was added). **App-shell:** `run/main_scene = res://src/ui/app_root.tscn`
+(`AppRoot`, an empty `Control`) → `_ready` routes to boot via `SceneRouter` ⇒ **SceneRouter owns every visible screen from
+frame one** (boot → hub, swap-in-place + `queue_free` the old scene; no overlap, no stale ref — ADR-009). **Boot**
+(`src/ui/boot/boot_controller.gd` = the **presenter**, root of `boot.tscn`, builds `BootView` + `BootErrorView` in code):
+**(1)** `NetworkClient.get_json("/health", NetworkResponseParser.parse_health)` = the **hard reachability gate** (transport
+failure / non-2xx → `BootErrorView` + retry); **(2)** `ConfigProvider.check_for_update()` = **best-effort** — the real
+Config Service is **phase 21**, so a missing/failing config endpoint today is expected (keep cache, **never blocks boot**;
+tighten the config gate when phase 21/22 lands); **(3)** `SceneRouter.goto(main_hub)` + `clear_history()`, emit
+`boot_succeeded`/`boot_failed`. **UI base** (`src/ui/base/base_view.gd`, `class_name BaseView extends Control`): a one-way
+contract — **data-in** (`set_data`→virtual `_render`) → **intent-out** (`emit_intent`→signal `intent(name, payload)`) +
+`bind`/`unbind` lifecycle hooks (called at `_enter_tree`/`_exit_tree`). **A VIEW is network-free** — it MUST NOT reference
+`NetworkClient`/`HTTPRequest`/`core/net` (grep guard over `src/ui/**`); the **presenter** (`BootController` /
+`MainHubPresenter`) is the ONLY touchpoint: it reads `StateCache`/`ConfigProvider` (display-only), calls `NetworkClient`
+via the gateway (never raw `HTTPRequest`), navigates via `SceneRouter`, and emits EventBus **only** for genuine global
+events. **User decisions:** intent = a **local `intent` signal translated by the presenter** (NOT a per-button EventBus
+event ⇒ the EventBus catalogue stays CLOSED — **no new EventBus event added in Phase 17**, §3.1); app-shell `AppRoot`
+(NOT boot-as-main-scene self-freeing). **Main hub** = a navigation/composition **shell** (`MainHubView` + `MainHubPresenter`
+reading config label / offline flag; 4 placeholder buttons emit intents) — **no feature business logic** (real features =
+later phases). **Net:** added `NetworkResponseParser.parse_health` (reuses the generated `HealthResponse`; missing `status`
+⇒ null) — no contract change ⇒ **no `client/src/data/generated` drift**. Verified (Godot 4.7.1-stable local): `--headless
+--import` exit 0 (0 error/0 warning; `BaseView`/`BootController`/`BootErrorView`/`BootView`/`MainHubView`/`MainHubPresenter`
+registered); gdUnit4 **full suite 48/48 pass, 0 orphan** (`tests/ui/base` 3 + `tests/ui/boot` 5 + `parse_health` 2 +
+14/15/16 regression); headless smoke of the real main scene (server down → boot→health-fail→error, exit 0, no crash) +
+`main_hub.tscn` (exit 0); grep guard green (`HTTPRequest`/`core/net` absent from `src/ui` code; `NetworkClient` used only in
+the presenter `boot_controller.gd`). Canonical: `docs/godot/ui-architecture.md` §2.1/§4.1 +
+`docs/godot/scene-architecture.md` §4.2/§5; setup/run: root `setup-and-run.md`; decision log:
+`.memory/0015-client-boot-ui-standardized.md`.
+
+- Future agents **MUST reuse** `BaseView` + the boot flow for any new screen; **MUST NOT** let a **view** call the network
+  (`NetworkClient`/`HTTPRequest`/`core/net`) — data-in / intent-out only, the **presenter** does network/navigation; **MUST
+  NOT** make boot a self-freeing main scene (use the `AppRoot` → SceneRouter shell), **MUST NOT** add a per-UI-action
+  EventBus event (the catalogue is CLOSED), and **MUST NOT** put feature business logic in the hub (placeholder intents
+  only until the owning feature phase).
+- **Boot gating is binding:** `/health` is the **hard** reachability gate (fail → safe error + retry, **no stack/internal
+  leak** — client is not authority); config load is **best-effort** until the Config Service (phase 21) exists — never make
+  a missing config endpoint block boot, and never fabricate config/state on failure (ADR-005/007/011). Auth (guest login)
+  is injected into boot at **phase 20**, not here. `AudioManager` stays **deferred** (not in the Phase 17 contract).
+- New endpoint consumption = **add a parse func in `core/net/response_parser.gd`** + call `get_json`/`post_json` from a
+  **presenter** (never from a view); never hand-declare a client DTO or hand-edit `client/src/data/generated`.
+- When changing the boot/UI base, keep **`client/src/ui/*` + `client/tests/ui/*` (behavior contract) + `client/project.godot`
+  (`run/main_scene`) + `docs/godot/ui-architecture.md` §2.1/§4.1 + `docs/godot/scene-architecture.md` §4.2/§5 +
+  `docs/godot/state-and-signals.md` §4 + `.instructions/client.md` + `.claude/agents/godot-client.md` + root `setup-and-run.md`
+  in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

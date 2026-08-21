@@ -130,5 +130,24 @@ func test_post_does_not_retry() -> void:
 	assert_int(_fake.call_count).is_equal(1)  # POST KHÔNG tự retry (tránh double-effect)
 
 
+func test_get_health_parses_health_response() -> void:
+	# Boot phase 17 dùng /health làm cổng kết nối: 200 {"status":"ok"} → HealthResponse.
+	_fake.queue_ok(200, '{"status":"ok"}')
+	var result: NetResult = await _client.get_json("/health", NetworkResponseParser.parse_health)
+	assert_bool(result.ok).is_true()
+	var model := result.value as HealthResponse
+	assert_object(model).is_not_null()
+	assert_str(model.status).is_equal("ok")
+	assert_int(_network_errors.size()).is_equal(0)
+
+
+func test_parse_health_shape_validation() -> void:
+	# Thiếu `status` ⇒ null (NetworkClient dịch thành PARSE_ERROR — không bịa). Có `status` ⇒ model.
+	assert_object(NetworkResponseParser.parse_health({"x": 1})).is_null()
+	var degraded := NetworkResponseParser.parse_health({"status": "degraded"})
+	assert_object(degraded).is_not_null()
+	assert_str(degraded.status).is_equal("degraded")
+
+
 func test_networkclient_autoload_present() -> void:
 	assert_object(get_node_or_null(^"/root/NetworkClient")).is_not_null()

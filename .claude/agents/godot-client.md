@@ -52,6 +52,23 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   as truth. Authoritative mutation path: `Feature/UI → NetworkClient → Server → response → StateCache.apply_snapshot`; the
   client **never** computes currency/reward/battle-result. Canonical: `docs/godot/resources-and-assets.md` §1.1 +
   `docs/godot/state-and-signals.md` §1.1/§3.1; decision log `.memory/0014-client-configprovider-statecache-standardized.md`.
+- **Boot flow + UI base (Phase 17 — closes group 3).** All under `client/src/ui/` (a **scene**, not an autoload).
+  **App-shell:** `run/main_scene = res://src/ui/app_root.tscn` (empty `Control`) → `_ready` routes to boot via `SceneRouter`
+  ⇒ **SceneRouter owns every visible screen from frame one** (boot → hub, swap + `queue_free`). **Boot**
+  (`src/ui/boot/boot_controller.gd` = presenter): `NetworkClient.get_json("/health", parse_health)` = **hard reachability
+  gate** (fail → error + retry); `ConfigProvider.check_for_update()` = **best-effort** (Config Service = phase 21; missing
+  endpoint ⇒ keep cache, never blocks boot); then `SceneRouter.goto(main_hub)` + `clear_history()`. **UI base**
+  (`src/ui/base/base_view.gd`, `class_name BaseView extends Control`): **data-in** (`set_data`→`_render`) → **intent-out**
+  (`emit_intent`→signal `intent`) + `bind`/`unbind`. **A view MUST NOT reference `NetworkClient`/`HTTPRequest`/`core/net`**
+  (grep guard over `src/ui/**`); the **presenter** (BootController/`MainHubPresenter`) is the only touchpoint — reads
+  `StateCache`/`ConfigProvider` (display-only), calls `NetworkClient` via the gateway, navigates via `SceneRouter`, emits
+  EventBus **only** for genuine global events. **Intent = local signal + presenter** (no per-button EventBus event — the
+  catalogue stays CLOSED; **no new EventBus event in Phase 17**). Error screen shows a **safe** message (no stack/internal
+  leak) + retry (connected once → no duplicate listeners; `_running` guard → no duplicate navigation/requests).
+  **Reuse `BaseView`/boot — never let a view call the network, never make boot a self-freeing main scene, never add a
+  per-UI-action EventBus event.** `AudioManager` stays **deferred** (not in the Phase 17 contract). Canonical:
+  `docs/godot/ui-architecture.md` §2.1/§4.1 + `docs/godot/scene-architecture.md` §4.2/§5; decision log
+  `.memory/0015-client-boot-ui-standardized.md`. Setup/run: root `setup-and-run.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/main_hub/main_hub_view.gd" id="1_main_hub"]
+
+[node name="MainHub" type="Control"]
+script = ExtResource("1_main_hub")
