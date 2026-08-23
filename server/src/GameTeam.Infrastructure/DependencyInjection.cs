@@ -54,6 +54,9 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped(typeof(IRepository<,>), typeof(EfRepository<,>));
 
+        // Repository đặc thù feature: profile (Phase 19) — lookup theo account_id (unique).
+        services.AddScoped<IPlayerProfileRepository, PlayerProfileRepository>();
+
         // ── Cache phân tán: Redis (ADR-003/005, Phase 12) ────────────────────────────────────────
         // Connection LẤY TỪ CONFIG (env ConnectionStrings__Redis) — không hardcode host/port/password.
         string? redisConnectionString = configuration.GetConnectionString(RedisConnectionName);

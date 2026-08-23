@@ -58,6 +58,25 @@ minh primitive mới trùng chức năng.
 **Server-time rule:** mọi thời gian nghiệp vụ (AFK, energy, cooldown…) lấy qua `IClock.UtcNow`; **cấm** `DateTime.Now/UtcNow`,
 `DateTimeOffset.Now/UtcNow` trực tiếp trong Domain (Forbidden Pattern, `../ai/coding-rules.md` §3) — cho test tái lập & chống gian lận giờ.
 
+### PlayerProfile aggregate & schema versioning (Phase 19 — đã đóng)
+
+`GameTeam.Domain/Profiles/` chứa **`PlayerProfile : AggregateRoot<Guid>`** — **gốc save server-authoritative** (ADR-007):
+chân lý ở PostgreSQL, client chỉ cache đọc. Đây là "gốc" mà **mọi feature state về sau mở rộng** (currency 31, hero 27/35,
+inventory 32, progress 34 — thêm bảng/cột/tham chiếu + **tăng `SchemaVersion`** khi cấu trúc đổi). Phase 19 **không** chứa
+state nghiệp vụ cụ thể — chỉ khung nền (`DisplayName`/`Level` là field contract Phase 05, đặt mặc định).
+
+| Thành phần | Quy ước |
+|---|---|
+| Định danh | `Id` (Guid) riêng + `AccountId` (Guid, **1-1 với Account**, unique ở DB). `AccountId`/timestamp/`SchemaVersion` **server-controlled** — client không đặt. |
+| Factory | `CreateForAccount(id, accountId, nowUtc)` — id do caller sinh; đặt `SchemaVersion = CurrentSchemaVersion`; stamp `CreatedAt`/`UpdatedAt` từ `IClock`; raise **`PlayerProfileCreated`**. Guard chặn id rỗng. |
+| Rehydrate | `Restore(...)` dựng lại từ trạng thái đã lưu (bất kỳ version) — **không** raise event; dùng cho migration/test. |
+| Versioning | `const CurrentSchemaVersion = 1`; `SchemaVersion` là **phần của state đã persist** (ADR-007). |
+| Migration dữ liệu | `Upgrade(nowUtc)` nâng cấp theo chuỗi **`v(N) → v(N+1)`** (read-repair), trả `true` nếu có đổi; deterministic, không I/O. Mỗi lần bump schema thêm một bước `MigrateV{n}ToV{n+1}` (bảo toàn dữ liệu cũ — bước mẫu `MigrateV0ToV1` back-fill `DisplayName`, **giữ** `Level`). |
+
+> **Hai loại "migration" — không nhầm:** `Upgrade()` là migration **dữ liệu profile** (tiến hoá version trong Domain,
+> chạy lazily khi đọc). Việc tạo/đổi **bảng** là **EF Core DDL migration** (Infrastructure, `infrastructure.md` §5).
+> Khi đổi cấu trúc profile: **tăng `SchemaVersion` + thêm bước `Upgrade` + test preservation + EF migration + doc-sync** cùng một change.
+
 ---
 
 ## 2. Application Layer — CQRS + MediatR
@@ -107,6 +126,24 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 > **Vị trí port:** khai báo port ở tầng **cần** nó nhất. `IClock` thuộc **`GameTeam.Domain`** (`Common/IClock.cs`, Phase 09)
 > vì Domain cần server-time cho invariant/logic mà không được chạm wall-clock; Application/Infrastructure tái dùng cùng
 > interface đó. Các repository/UnitOfWork (I/O nghiệp vụ) khai báo ở **Application**. Infrastructure hiện thực tất cả.
+
+### Profile feature: ownership từ token (Phase 19 — đã đóng)
+
+`GameTeam.Application/Features/Profile/` điều phối đọc/khởi tạo hồ sơ người chơi:
+
+- **`GetOrCreateProfileCommand`** (`ITransactionalRequest`) — trả profile của **chính** người gọi, tạo nếu chưa có
+  (get-or-create), và **read-repair** migrate bản ghi cũ (`PlayerProfile.Upgrade`). Mọi ghi (tạo mới / migrate) atomic qua
+  `TransactionBehavior`. Là endpoint `GET /api/v1/profile`.
+- **`GetMyProfileQuery`** — đọc thuần profile của chính mình; trả `PROFILE_NOT_FOUND` nếu chưa có (không tạo).
+- **`ICurrentUser`** (`Abstractions/Security/ICurrentUser.cs`) — port cấp **định danh chủ sở hữu = token `sub`**. Adapter
+  (đọc claim từ `HttpContext`) nằm ở **tầng Api** (`GameTeam.Api/Auth/CurrentUser.cs`) — Application chỉ phụ thuộc port.
+- **Khởi tạo eager, atomic:** `CreateGuestAccountCommandHandler` tạo `PlayerProfile` **cùng transaction** với `Account`
+  ⇒ guest login lần đầu → profile được tạo; idempotency (một profile / account) do **unique index `account_id`** ở DB
+  (không phải check-then-insert).
+
+> **Ownership là ranh giới bảo mật (ADR-007/008):** chủ sở hữu profile **chỉ** lấy từ `ICurrentUser.AccountId` (token `sub`)
+> — **không bao giờ** từ body/route/query của client. Endpoint chỉ "profile của tôi" ⇒ không có route nhận id người khác
+> (chống IDOR theo cấu trúc). Mọi thay đổi profile qua command server (client không authority).
 
 ---
 

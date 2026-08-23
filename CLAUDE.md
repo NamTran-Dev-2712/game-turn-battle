@@ -576,6 +576,45 @@ secret scan clean. Canonical: `docs/backend/api-and-versioning.md` §4.5 + `docs
   `docs/mvp/10-open-questions.md` (BE3) + `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync
   matrix, §5); the auth tests are the behavior contract — update them.
 
+**Profile persistence is standardized (Phase 19 — closed & verified).** The **server-authoritative save root** (ADR-007) has ONE
+home: **`GameTeam.Domain/Profiles/`** — **`PlayerProfile : AggregateRoot<Guid>`** (own `Id` + `AccountId` **1-1 with `Account`**,
+`DisplayName`/`Level` = the Phase-05 `ProfileDto` contract fields defaulted, `SchemaVersion`, `CreatedAt`/`UpdatedAt` from `IClock`).
+It is the **root every future game-state feature extends** (currency 31, hero 27/35, inventory 32, progress 34 — add tables/refs +
+**bump `SchemaVersion`**); Phase 19 adds **no business state**. Factory **`CreateForAccount`** raises **`PlayerProfileCreated`**;
+**`Restore`** rehydrates any stored version without an event. **Schema versioning (ADR-007):** `const CurrentSchemaVersion = 1`;
+**`Upgrade(nowUtc)`** migrates persisted **data** `v(N)→v(N+1)` (read-repair, deterministic, sample `MigrateV0ToV1` back-fills
+`DisplayName` and **preserves `Level`**) — this is the profile **data** migration, distinct from EF Core DDL migrations. **Application**
+(`GameTeam.Application/Features/Profile/`): **`GetOrCreateProfileCommand`** (`ITransactionalRequest`, backs `GET /api/v1/profile` —
+get-or-create + read-repair `Upgrade`, atomic) + **`GetMyProfileQuery`** (pure read → `PROFILE_NOT_FOUND`); owner resolved ONLY from
+the token `sub` via the new port **`ICurrentUser`** (`Abstractions/Security/`; adapter **`GameTeam.Api/Auth/CurrentUser.cs`** over
+`IHttpContextAccessor`, registered in `AddApi` + `AddHttpContextAccessor`). **Repository** port **`IPlayerProfileRepository`**
+(`GetByAccountIdAsync`, no `IQueryable` leak) → EF **`PlayerProfileRepository`**. **Infrastructure:** table **`player_profiles`**
+(`snake_case`; **unique index `account_id`** + FK→`accounts` cascade = DB-level idempotency), migration **`AddPlayerProfiles`**,
+`DbSet` on `AppDbContext`. **Eager, atomic creation:** `CreateGuestAccountCommandHandler` now creates the `PlayerProfile` in the SAME
+transaction as the `Account` ⇒ guest login → profile. **Endpoint moved** from the Phase-05 literal-`/api/v1` 501 stub into the `apiV1`
+**version set** (`.MapToApiVersion(1)`, protected by the default policy — NO `.AllowAnonymous()`). Verified: `dotnet build` 0/0,
+Domain.Tests + Application.Tests (incl. architecture facts Application ⊥ Infra/EF/JWT) green; Testcontainers Postgres persist/read +
+**unique-constraint** + event dispatch + **migrate-v0→current preserving data**; Api.IntegrationTests (Testcontainers) login→`GET /profile`
+200 owner-correct + retry→1 row + cross-owner isolation + no-token 401; migration `has-pending-model-changes` clean; no `openapi.json`
+shape drift (path reorder only) / no `client/src/data/generated` drift. Canonical: `docs/backend/domain-and-application.md` (profile
+aggregate + versioning + ownership) + `docs/backend/infrastructure.md` §1.2; ADR-007 → Implementation; decision log:
+`.memory/0017-profile-persistence-standardized.md`.
+
+- Future agents **MUST reuse** `PlayerProfile`/`IPlayerProfileRepository`/`ICurrentUser`/`GetOrCreateProfileCommand` before adding any
+  player-state persistence; **MUST NOT** create a second save root, read the owner from a client-supplied id (body/route/query — IDOR),
+  build a client-authoritative profile, or add a second current-user/profile mechanism.
+- **Profile is the state root:** future feature state **extends** `PlayerProfile` (new table/ref) — never a parallel root. Any change to
+  the profile schema **MUST** bump `SchemaVersion` + add a `MigrateV{n}ToV{n+1}` step + a **data-preservation** migration test + an EF
+  migration + doc-sync, in the same change (never a bare version int without a migration).
+- **Idempotency is DB-level:** one profile per account is guaranteed by the **unique `account_id` index**, not a check-then-insert. All
+  profile mutation goes through a **server command** (server-authoritative — `schema_version`/`account_id`/owner/timestamps are
+  server-controlled). Provider linking, PUT/arbitrary update, and refresh-token rotation stay out of scope (Post-MVP / their phases).
+- When changing profile, keep **`GameTeam.Domain/Profiles/*` + `Features/Profile/*` + `ICurrentUser`/`IPlayerProfileRepository` +
+  `GameTeam.Api/Auth/CurrentUser.cs` + `PlayerProfileConfiguration`/migration + `AppDbContext` + `CreateGuestAccountCommandHandler` +
+  `Program.cs` (`/profile` in the version set) + the profile tests (Domain/Application/Infrastructure/Api — behavior contract) +
+  `docs/backend/domain-and-application.md` + `docs/backend/infrastructure.md` §1.2 + ADR-007 (Implementation) + `.instructions/backend.md`
+  + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the profile tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

@@ -6,6 +6,7 @@ using GameTeam.Application;
 using GameTeam.Application.Features.Auth.Commands;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
+using GameTeam.Application.Features.Profile.Commands;
 using GameTeam.Contracts.Auth;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
@@ -110,20 +111,25 @@ apiV1.MapPost("/auth/guest", (AuthGuestRequest request, ISender sender, HttpCont
     .Produces<AuthGuestResponse>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONTRACT SKELETON (Phase 05): khai báo HÌNH DẠNG endpoint nền cho OpenAPI — KHÔNG hiện thực
-// nghiệp vụ (handler thật ở phase sở hữu: config=21; profile=19). Trả 501 Not Implemented. Giữ trên
-// group LITERAL "/api/v1" (ApiVersions.V1Prefix) như Phase 05 — path contract KHÔNG đổi. (Xem lưu ý
-// deviation ở version set phía trên về xung đột param "{version}".) auth/guest đã reimplement ở trên.
-// Các stub này theo FallbackPolicy ⇒ mặc định yêu cầu token; phase sở hữu (19/21) quyết định public/authz.
-// ─────────────────────────────────────────────────────────────────────────────
-RouteGroupBuilder contractV1 = app.MapGroup(ApiVersions.V1Prefix);
-
-// TODO Phase 19+: real handler — trả hồ sơ người chơi hiện tại.
-contractV1.MapGet("/profile", () => Results.StatusCode(StatusCodes.Status501NotImplemented))
+// GET /api/v1/profile (Phase 19): hồ sơ người chơi của CHÍNH mình — chủ sở hữu lấy từ token sub
+// (GetOrCreateProfileCommand → ICurrentUser), KHÔNG nhận owner từ client ⇒ không thể đọc profile người
+// khác (chống IDOR). Protected mặc định (KHÔNG .AllowAnonymous). Chuyển từ stub 501 (Phase 05, group
+// literal) vào version set — path "/api/v1/profile" KHÔNG đổi.
+apiV1.MapGet("/profile", (ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new GetOrCreateProfileCommand()), httpContext))
     .WithName("GetProfile")
+    .MapToApiVersion(1)
     .Produces<ProfileDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTRACT SKELETON (Phase 05): khai báo HÌNH DẠNG endpoint nền cho OpenAPI — KHÔNG hiện thực
+// nghiệp vụ (handler thật ở phase sở hữu: config=21). Trả 501 Not Implemented. Giữ trên group LITERAL
+// "/api/v1" (ApiVersions.V1Prefix) như Phase 05 — path contract KHÔNG đổi. (Xem lưu ý deviation ở version
+// set phía trên về xung đột param "{version}".) auth/guest (18) + profile (19) đã reimplement vào version set.
+// Các stub này theo FallbackPolicy ⇒ mặc định yêu cầu token; phase sở hữu (21) quyết định public/authz.
+// ─────────────────────────────────────────────────────────────────────────────
+RouteGroupBuilder contractV1 = app.MapGroup(ApiVersions.V1Prefix);
 
 // TODO Phase 21: real handler — trả gói cấu hình theo version.
 contractV1.MapGet("/config/{version}", (string version) => Results.StatusCode(StatusCodes.Status501NotImplemented))
