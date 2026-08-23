@@ -1,8 +1,10 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Asp.Versioning;
+using GameTeam.Api.Auth;
 using GameTeam.Api.Http;
 using GameTeam.Api.OpenApi;
+using GameTeam.Application.Abstractions.Security;
 using GameTeam.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
@@ -102,6 +104,11 @@ public static class DependencyInjection
                 .RequireAuthenticatedUser()
                 .Build();
         });
+
+        // Current-user accessor (Phase 19): resolve the authenticated owner (JWT sub) from the request.
+        // HttpContext-based ⇒ lives in the Api layer; Application depends only on the ICurrentUser port.
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUser>();
 
         return services;
     }

@@ -14,5 +14,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.OpenApi.Readers" />
     <PackageReference Include="coverlet.collector" />
+    <!-- PostgreSQL thật cho profile end-to-end (login→profile persist→read); yêu cầu Docker (Phase 19). -->
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
 </Project>

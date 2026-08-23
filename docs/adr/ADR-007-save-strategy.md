@@ -31,3 +31,11 @@
 - Giao dịch tài nguyên atomic (`../gameplay/progression-and-economy.md`).
 - Client `StateCache` chỉ đọc/hiển thị (`../godot/state-and-signals.md`).
 - Backup/restore & versioning trong vận hành (`../deployment/`).
+
+## Implementation (Phase 19 — hiện thực nền save)
+Quyết định trên được hiện thực ở Phase 19 (`../roadmap/19-profile-persistence-versioning.md`): aggregate
+`PlayerProfile` (gốc save, 1-1 với `Account`) lưu ở bảng `player_profiles`; **version field = `schema_version`
+per-row** + cơ chế migrate dữ liệu `PlayerProfile.Upgrade()` (read-repair, `v(N)→v(N+1)`, có test preservation) —
+tách với EF Core DDL migration; **idempotency khởi tạo** bằng **unique index `account_id`** (không check-then-insert);
+ownership resolve từ token `sub` (`ICurrentUser`). Chi tiết: `../backend/domain-and-application.md`,
+`../backend/infrastructure.md` §1.2. State con (currency/hero/inventory…) **mở rộng** profile ở phase feature.

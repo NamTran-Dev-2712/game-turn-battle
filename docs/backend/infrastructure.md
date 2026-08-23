@@ -43,6 +43,25 @@ Nguồn hiện thực ở **`GameTeam.Infrastructure/Persistence/`** (EF Core CH
 transaction đang mở, event dispatch **sau persist, trước commit ⇒ cùng transaction**. Handler tái nhập / outbox
 bền vững nằm ngoài phạm vi (nợ kỹ thuật, xem §5).
 
+### 1.2 Profile persistence (Phase 19 — đóng & verify)
+
+Bảng nghiệp vụ đầu tiên: **`player_profiles`** — gốc save server-authoritative (ADR-007), gắn 1-1 với `accounts`.
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| EF config | `Persistence/Configurations/PlayerProfileConfiguration.cs` | `ToTable("player_profiles")`; cột `snake_case`: `id`(uuid PK, `ValueGeneratedNever`), `account_id`, `display_name`, `level`, `schema_version`, `created_at`, `updated_at`. **Unique index `ix_player_profiles_account_id`** + **FK → `accounts.id`** (cascade) ⇒ 1 profile / account. `Ignore(DomainEvents)`. |
+| Repository | `Persistence/Repositories/PlayerProfileRepository.cs` | Hiện thực `IPlayerProfileRepository` (`GetById`+`Add`+**`GetByAccountIdAsync`**); query giữ trong Infrastructure, **không** rò `IQueryable`/`DbContext`. |
+| Migration | `Persistence/Migrations/*_AddPlayerProfiles.cs` | Tạo bảng + PK + FK + unique index. `has-pending-model-changes` sạch. |
+| DI | `DependencyInjection.cs` | `AddInfrastructure` đăng ký `IPlayerProfileRepository → PlayerProfileRepository` (scoped). `DbSet<PlayerProfile>` thêm vào `AppDbContext`. |
+
+- **Idempotency ở tầng DB (bắt buộc):** unique index trên `account_id` là bảo đảm "một profile / account" — **không** dựa
+  vào `if(!exists) insert` đơn thuần. Guest login tạo `Account` + `PlayerProfile` **cùng transaction**; retry login = account
+  mới (không trùng). Get-or-create tuần tự tìm-rồi-tạo; concurrent double-create thua ở unique index (không sinh hàng thứ hai).
+- **Ownership (ADR-007/008):** chủ sở hữu lấy từ token `sub` qua `ICurrentUser` (adapter ở tầng Api) — không tin id client.
+- **Migration dữ liệu profile ≠ EF DDL migration:** `schema_version` per-row + `PlayerProfile.Upgrade()` (read-repair, chạy
+  trong transaction của `GetOrCreateProfileCommand`) là migration **dữ liệu** — xem `domain-and-application.md`. §5 dưới là
+  EF DDL migration (tạo/đổi bảng).
+
 ---
 
 ## 2. Caching — Redis
@@ -149,7 +168,7 @@ flowchart LR
 |---|---|
 | DB migration | EF Core Migrations; chạy có kiểm soát khi deploy (`../deployment/`) |
 | Backward-compat | Ưu tiên migration cộng thêm (additive) trước khi xoá (`../mvp/09` TE4) |
-| Profile version | Trường version + migration dữ liệu người chơi khi đổi cấu trúc (ADR-007) |
+| Profile version | `PlayerProfile.SchemaVersion` per-row + `Upgrade()` migrate dữ liệu (read-repair) khi đổi cấu trúc (ADR-007, Phase 19 — §1.2). Đổi cấu trúc profile ⇒ **bump `SchemaVersion` + bước `MigrateV{n}ToV{n+1}` + test preservation + EF migration** cùng change. |
 | Config schema version | `schema_version` + compat rule (ADR-005) |
 | Seed data | Script seed cho môi trường dev/test (`scripts/db`) |
 
@@ -177,8 +196,11 @@ dotnet ef database update 0 --project server/src/GameTeam.Infrastructure --start
 **Integration test** (`GameTeam.Infrastructure.Tests`): **Testcontainers PostgreSQL** (`postgres:16-alpine`) — DB
 thật cho hành vi SQL đúng. **Yêu cầu Docker runtime** (CI `ubuntu-latest` có sẵn; local chạy `scripts/dev/up`).
 Chạy: `dotnet test server/tests/GameTeam.Infrastructure.Tests/...`. Bao phủ: CRUD qua repo/UoW, **rollback thực**,
-**domain-event dispatch** sau SaveChanges, migration up/down. Entity mẫu sống trong assembly test
-(`TestDbContext : AppDbContext`) để **giữ schema production sạch** — không map bảng demo vào Infrastructure.
+**domain-event dispatch** sau SaveChanges, migration up/down; **profile (Phase 19)**: round-trip theo `account_id`,
+**unique index chặn profile thứ hai**, dispatch `PlayerProfileCreated`, **migrate v0→current giữ nguyên dữ liệu**. Entity mẫu
+sống trong assembly test (`TestDbContext : AppDbContext`) để **giữ schema production sạch** — không map bảng demo vào
+Infrastructure. Profile end-to-end (login→profile→`GET /profile`, authz chủ sở hữu) ở `GameTeam.Api.IntegrationTests`
+(Testcontainers Postgres).
 
 **Nợ kỹ thuật (ghi nhận, dùng sau):** bảng/khoá **idempotency** (chống double-grant, ADR-007) đặt nền ở phase này
 nhưng **dùng thật ở phase 31 (currency)/37 (AFK)**; **outbox bền vững / handler tái nhập** chưa làm (dispatch

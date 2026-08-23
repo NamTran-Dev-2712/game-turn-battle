@@ -1,6 +1,7 @@
 using System.Reflection;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Profiles;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameTeam.Infrastructure.Persistence;
@@ -41,6 +42,9 @@ public class AppDbContext : DbContext
 
     /// <summary>Tài khoản người chơi — ranh giới định danh state server-authoritative (Phase 18).</summary>
     public DbSet<Account> Accounts => Set<Account>();
+
+    /// <summary>Hồ sơ người chơi — gốc save server-authoritative, gắn 1-1 với Account (Phase 19, ADR-007).</summary>
+    public DbSet<PlayerProfile> PlayerProfiles => Set<PlayerProfile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

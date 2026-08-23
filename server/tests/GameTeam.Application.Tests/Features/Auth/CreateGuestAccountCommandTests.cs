@@ -9,6 +9,7 @@ using GameTeam.Application.Tests.TestSupport;
 using GameTeam.Contracts.Auth;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Profiles;
 using NSubstitute;
 using Xunit;
 
@@ -36,7 +37,13 @@ public sealed class CreateGuestAccountCommandTests
         repository.AddAsync(Arg.Do<Account>(a => added = a), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateGuestAccountCommandHandler(repository, tokenService, Clock);
+        // Phase 19: the guest-login command also creates the player profile in the same transaction.
+        var profiles = Substitute.For<IPlayerProfileRepository>();
+        PlayerProfile? addedProfile = null;
+        profiles.AddAsync(Arg.Do<PlayerProfile>(p => addedProfile = p), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var handler = new CreateGuestAccountCommandHandler(repository, profiles, tokenService, Clock);
 
         Result<AuthGuestResponse> result = await handler.Handle(
             new CreateGuestAccountCommand("device-1"), CancellationToken.None);
@@ -52,6 +59,12 @@ public sealed class CreateGuestAccountCommandTests
         added!.Type.Should().Be(AccountType.Guest);
         added.CreatedAt.Should().Be(Clock.UtcNow);
         tokenService.Received(1).CreateTokens(added.Id, AccountType.Guest);
+
+        // A profile was staged for the SAME account, at the current schema version.
+        await profiles.Received(1).AddAsync(Arg.Any<PlayerProfile>(), Arg.Any<CancellationToken>());
+        addedProfile.Should().NotBeNull();
+        addedProfile!.AccountId.Should().Be(added.Id);
+        addedProfile.SchemaVersion.Should().Be(PlayerProfile.CurrentSchemaVersion);
     }
 
     [Theory]
