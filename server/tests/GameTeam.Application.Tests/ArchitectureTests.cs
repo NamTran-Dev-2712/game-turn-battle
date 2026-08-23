@@ -81,6 +81,23 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void Application_should_not_depend_on_jwt_or_authentication_frameworks()
+    {
+        // Phase 18: JWT là chi tiết Infrastructure. Application chỉ khai báo port ITokenService — KHÔNG
+        // được phụ thuộc thư viện JWT/authentication (ADR-003/008). Gác cổng để handler auth luôn thin.
+        TestResult result = Types.InAssembly(typeof(GameTeam.Application.AssemblyMarker).Assembly)
+            .Should()
+            .NotHaveDependencyOnAny(
+                "System.IdentityModel.Tokens.Jwt",
+                "Microsoft.IdentityModel",
+                "Microsoft.AspNetCore.Authentication")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(
+            "Application chỉ khai báo ITokenService; JWT/authentication là chi tiết Infrastructure (ADR-003/008).");
+    }
+
+    [Fact]
     public void Contracts_should_not_depend_on_application_or_infrastructure()
     {
         // Hướng phụ thuộc hợp lệ: Contracts → Domain (enum/hằng) MÀ THÔI

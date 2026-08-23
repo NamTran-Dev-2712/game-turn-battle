@@ -1,9 +1,14 @@
+using System.Text;
 using System.Text.Json.Serialization;
 using Asp.Versioning;
 using GameTeam.Api.Http;
 using GameTeam.Api.OpenApi;
+using GameTeam.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace GameTeam.Api;
 
@@ -54,8 +59,50 @@ public static class DependencyInjection
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
-        // TODO (Phase 18): authentication/authorization THẬT (JWT bearer) — xem Program.cs pipeline
-        // hook. Phase 13 KHÔNG đăng ký scheme thật, KHÔNG fake user.
+        // ── Authentication / Authorization (Phase 18, ADR-008) ───────────────────────────────────
+        // JWT bearer: validate CHỮ KÝ + issuer + audience + lifetime. Khoá/issuer/audience lấy từ
+        // IOptions<JwtOptions> (Infrastructure đọc từ config/secret, fail-fast). 401/403 ghi ĐÚNG
+        // ErrorEnvelope (AuthProblem) — cùng contract lỗi với phần còn lại.
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer();
+
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<JwtOptions>>((bearer, jwt) =>
+            {
+                JwtOptions options = jwt.Value;
+                bearer.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = options.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = options.Audience,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey)),
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero,
+                };
+                bearer.Events = new JwtBearerEvents
+                {
+                    OnChallenge = async context =>
+                    {
+                        // Chặn body 401 rỗng mặc định — ghi ErrorEnvelope chuẩn.
+                        context.HandleResponse();
+                        await AuthProblem.WriteUnauthenticatedAsync(context.HttpContext);
+                    },
+                    OnForbidden = context => AuthProblem.WriteForbiddenAsync(context.HttpContext),
+                };
+            });
+
+        // Authorization MẶC ĐỊNH: mọi endpoint yêu cầu authenticated user trừ khi opt-out .AllowAnonymous().
+        // ⇒ API nghiệp vụ tạo về sau được bảo vệ mặc định (secure-by-default). Public whitelist khai báo
+        // tường minh ở Program.cs (health/auth/swagger/openapi).
+        services.AddAuthorization(options =>
+        {
+            options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+        });
+
         return services;
     }
 }

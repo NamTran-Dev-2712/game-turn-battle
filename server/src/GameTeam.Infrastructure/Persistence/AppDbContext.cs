@@ -1,4 +1,5 @@
 using System.Reflection;
+using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,6 +38,9 @@ public class AppDbContext : DbContext
 
     /// <summary>Neo schema version của persistence (ADR-007).</summary>
     public DbSet<SchemaMetadata> SchemaMetadata => Set<SchemaMetadata>();
+
+    /// <summary>Tài khoản người chơi — ranh giới định danh state server-authoritative (Phase 18).</summary>
+    public DbSet<Account> Accounts => Set<Account>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

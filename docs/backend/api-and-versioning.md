@@ -127,9 +127,10 @@ endpoint** về sau — không tự vẽ convention khác.
   resolve `/api/v1/...`). Endpoint mới map vào **version set**: `app.NewApiVersionSet().HasApiVersion(new
   ApiVersion(1))...Build()` + `app.MapGroup("/api/v{version:apiVersion}").WithApiVersionSet(set)` + endpoint
   `.MapToApiVersion(1)`. `GameTeam.Contracts.Common.ApiVersions` vẫn là nguồn hằng số version.
-  - *Lưu ý:* stub Phase 05 (`auth/guest`,`profile`,`config/{version}`) tạm giữ trên group **literal** `/api/v1`
-    vì `/config/{version}` có param `version` trùng `{version:apiVersion}` của version set prefix
-    (`RoutePatternFactory` từ chối trùng). Phase sở hữu (18/21) chuyển chúng vào version set khi reimplement.
+  - *Lưu ý:* `auth/guest` (Phase 18) đã chuyển vào **version set** (handler thật). `profile`/`config/{version}`
+    còn là stub Phase 05 trên group **literal** `/api/v1` (vì `/config/{version}` có param `version` trùng
+    `{version:apiVersion}` của version set prefix — `RoutePatternFactory` từ chối trùng); phase sở hữu (19/21)
+    chuyển nốt khi reimplement. Các stub này theo `FallbackPolicy` ⇒ mặc định yêu cầu token.
 - **Endpoint mỏng qua MediatR:** HTTP → `ISender.Send(command/query)` → Application handler → `Result` →
   `ApiResults` → HTTP. KHÔNG nhét nghiệp vụ vào endpoint. Mẫu: `GET /api/v1/ping` (`PingCommand`),
   `GET /api/v1/server-time` (`GetServerTimeQuery` + `IClock` — không gọi `DateTime.UtcNow` ở endpoint).
@@ -144,8 +145,18 @@ endpoint** về sau — không tự vẽ convention khác.
 - **Swagger:** UI (`Swashbuckle.AspNetCore.SwaggerUI`) **chỉ render** OpenAPI first-party `/openapi/v1.json`
   ở Development — **KHÔNG** dùng SwaggerGen (giữ single-source `shared/contracts/openapi.json` §4.4). Thêm/đổi
   endpoint ⇒ rebuild (regenerate openapi.json) + `bash shared/codegen/run.sh` + kiểm drift.
-- **Auth hook:** Phase 13 **chỉ chừa chỗ** (TODO Phase 18 trong pipeline + `AddApi`) — **KHÔNG** JWT thật,
-  **KHÔNG** fake user. `UseAuthentication/UseAuthorization` bật ở **Phase 18**.
+- **Auth (Phase 18 — đã bật, ADR-008):** `AddApi` đăng ký `AddAuthentication(JwtBearer).AddJwtBearer(...)`
+  (validate **chữ ký HS256 + issuer + audience + lifetime**, tham số từ `IOptions<JwtOptions>`) +
+  `AddAuthorization` với **`FallbackPolicy = RequireAuthenticatedUser`** ⇒ **mọi endpoint yêu cầu token mặc định**
+  (secure-by-default). `Program.cs` bật `UseAuthentication()/UseAuthorization()` (sau routing/swagger, trước map
+  endpoint). **Public whitelist tường minh** (`.AllowAnonymous`): `/health`, `POST /api/v1/auth/guest`,
+  `/openapi/*`, `/swagger`. Endpoint nghiệp vụ mới **mặc định được bảo vệ** — chỉ mở bằng `.AllowAnonymous` khi
+  thật sự công khai. Guest login: `POST /api/v1/auth/guest` (vào version set) → `CreateGuestAccountCommand` →
+  JWT (`sub`=account id, `type`=guest, `exp`) + refresh token đục (nền tảng) + `expiresInSeconds`. Lỗi auth trả
+  đúng **`ErrorEnvelope`** (401 `UNAUTHENTICATED` / 403 `FORBIDDEN`, qua `AuthProblem` + `ErrorHttpMapping`) —
+  KHÔNG body rỗng, KHÔNG shape khác. **Key JWT** từ secret/env `Jwt__SigningKey` (fail-fast, **không** hardcode/
+  commit/log; appsettings chỉ chứa issuer/audience/expiry). Provider linking (Google/Apple/email) & refresh nâng
+  cao = **Post-MVP**. Phase sau **tái dùng** hạ tầng auth này, không dựng cơ chế mới.
 - **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
   integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
   (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.

@@ -41,13 +41,13 @@ ADR-008: online-required, JWT auth, guest token → link sau. Mọi state server
 
 # Công việc cần thực hiện
 
-- [ ] Domain: `Account` aggregate (id, type=guest, created, chỗ cho provider links).
-- [ ] Application: `CreateGuestAccountCommand` + handler + validator; port `ITokenService`.
-- [ ] Infrastructure: hiện thực `ITokenService` (JWT ký bằng key từ secret), repo Account, migration.
-- [ ] Api: endpoint `POST /api/v1/auth/guest`; bật JWT authentication middleware; `[Authorize]` default; whitelist public (health/auth/swagger dev).
-- [ ] Cấu hình JWT issuer/audience/expiry; key từ secret (không hardcode, không commit).
-- [ ] Integration test: guest login trả token hợp lệ; endpoint bảo vệ 401 khi thiếu token, 200 khi có.
-- [ ] Cập nhật `../backend/api-and-versioning.md`; ghi chú BE3 (account type) vào `../mvp/10` nếu quyết định thêm.
+- [x] Domain: `Account` aggregate (id `Guid`, `AccountType` = Guest, `CreatedAt`, raise `AccountCreated`; chỗ cho provider links = bảng `account_providers` tương lai, không thêm cột nay) — `GameTeam.Domain/Accounts/`.
+- [x] Application: `CreateGuestAccountCommand` + handler (`ITransactionalRequest`) + validator; port `ITokenService` (`TokenBundle`) — `GameTeam.Application/Features/Auth/`, `Abstractions/Security/`.
+- [x] Infrastructure: `JwtTokenService : ITokenService` (HS256, key từ `JwtOptions`), `AccountConfiguration` (bảng `accounts` snake_case) + migration `AddAccounts` — `GameTeam.Infrastructure/Auth/`, `Persistence/`.
+- [x] Api: endpoint `POST /api/v1/auth/guest` (vào version set, `.AllowAnonymous`); bật `UseAuthentication/UseAuthorization`; authorization **mặc định** qua `FallbackPolicy=RequireAuthenticatedUser`; whitelist public (health/auth/openapi/swagger). `/ping` + `/server-time` nay bảo vệ.
+- [x] Cấu hình JWT issuer/audience/expiry qua `IOptions<JwtOptions>` (section `Jwt`); key từ env `Jwt__SigningKey` (fail-fast, không hardcode/commit; appsettings.json KHÔNG chứa key).
+- [x] Integration test: guest login trả token hợp lệ (verify chữ ký + claims sub/type/exp/iss/aud); protected 401 khi thiếu token, 200 khi có; tampered/expired → 401 (`AuthGuestEndpointTests`, 6 test).
+- [x] Cập nhật `../backend/api-and-versioning.md` (§3.1/§4.5 auth) + `../backend/infrastructure.md` (§ auth) + `../backend/cross-cutting.md` §1; ghi chú BE3 vào `../mvp/10-open-questions.md`.
 
 # Tiêu chí hoàn thành
 
@@ -82,7 +82,20 @@ Guest-first giảm ma sát onboarding (A20). Liên kết account & provider th�
 
 # Phase Review
 
-Đóng khi guest login + JWT + authz mặc định chạy, key an toàn, integration test 401/200 xanh.
+**Trạng thái: ĐÓNG (local PASS 2026-08-21).** Guest login + JWT + authorization mặc định chạy đúng, key an toàn, integration test 401/200 xanh — đủ điều kiện Strict Phase Gate (README §5).
+
+**Bằng chứng:**
+- **Build:** `dotnet build GameTeam.sln -c Release` → **0 warning / 0 error** (warnings-as-error).
+- **Test:** `dotnet test -c Release` → **167 pass / 0 fail** (Domain 38, Contracts 36, Application 31, Api.Integration 36, Infrastructure 26). Mới: `AuthGuestEndpointTests` (A guest→JWT+claims, B thiếu token→401 `UNAUTHENTICATED` envelope, C token hợp lệ→200, D tampered/expired→401), `CreateGuestAccountCommandTests`, `AccountTests`, `AccountPersistenceTests` (Testcontainers postgres:16-alpine: CRUD + `AccountCreated` dispatch), `JwtTokenServiceTests`, arch test `Application_should_not_depend_on_jwt_or_authentication_frameworks`.
+- **Migration:** `AddAccounts` tạo bảng `accounts` (`id uuid` PK, `type int`, `created_at timestamptz`); `has-pending-model-changes` sạch; `Initial`/`schema_metadata` không đụng; `dotnet ef database update` up xanh.
+- **Runtime thật:** API chạy (env `Jwt__SigningKey`) → `POST /api/v1/auth/guest` → JWT (sub=account id, type=guest, iss/aud/exp) + refresh + `expiresInSeconds=3600`; hàng `accounts` có `id` **khớp `sub`**, `type=1`; `GET /api/v1/server-time` với token → **200**; thiếu token → **401** `{code:UNAUTHENTICATED}`; tampered → 401; `/health`+`/openapi/v1.json` public → 200.
+- **Negative test:** tắt `FallbackPolicy` ⇒ Test B đỏ (server-time trả 200) ⇒ khôi phục ⇒ xanh (chứng minh authz mặc định do code này bảo vệ).
+- **Security:** không có signing key/token trong log runtime; không key thật trong source/appsettings commit; `.env`/`*.pem` đã git-ignore; secret test là placeholder rõ ràng.
+- **Contract:** `openapi.json` chỉ thay đổi thứ tự path (auth/guest vào version set) — không đổi hình dạng; không drift `client/src/data/generated`.
+
+**Deviation có chủ đích:** (1) `IOptions<JwtOptions>` đăng ký **lazy** (factory) để build-time OpenAPI gen không cần key; fail-fast chuyển sang lần resolve đầu (runtime) thay vì boot. (2) Test dùng clock ~now để mint token hợp lệ (FixedClock lịch sử của server-time làm token hết hạn khi validate theo wall-clock). (3) BE3 giữ 🟠 (guest-first hiện thực, provider login vẫn Post-MVP — không tự đóng).
+
+**CI-pending:** kết quả trên GitHub Actions (build/test/openapi-drift/codegen-check) — chờ Actions xác nhận theo §4.5.
 
 ---
 

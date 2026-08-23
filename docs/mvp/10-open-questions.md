@@ -58,6 +58,11 @@
 | BE4 | Quy mô người chơi dự kiến (ảnh hưởng hạ tầng)? | 🟢 |
 | BE5 | Hosting/hạ tầng dự kiến (cloud nào)? | 🟢 |
 
+> **BE3 — cập nhật Phase 18 (2026-08-21, chưa đóng hẳn 🟠):** MVP hiện thực **guest-first** — `POST /api/v1/auth/guest`
+> tạo `Account` (`AccountType.Guest`) + JWT. Schema account **chừa chỗ** liên kết provider (bảng `account_providers`
+> tương lai) nên thêm Google/Apple/email **không cần refactor** (ADR-006). Câu hỏi **có** đăng nhập provider ở MVP hay
+> không **vẫn mở** (Post-MVP theo hiện trạng) — chỉ đóng khi product chốt. Xem `docs/roadmap/18-auth-jwt-guest.md`.
+
 ---
 
 ## 5. UI

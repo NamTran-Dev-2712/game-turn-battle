@@ -538,6 +538,44 @@ the presenter `boot_controller.gd`). Canonical: `docs/godot/ui-architecture.md` 
   `docs/godot/state-and-signals.md` §4 + `.instructions/client.md` + `.claude/agents/godot-client.md` + root `setup-and-run.md`
   in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
 
+**Auth (guest JWT) is standardized (Phase 18 — closed & verified).** Guest authentication + **default authorization** is the
+security gate for every business API (ADR-008). Identity home: **`GameTeam.Domain/Accounts/`** — **`Account`**
+(`AggregateRoot<Guid>`, `AccountType` = `None=0`/`Guest=1` — a **Domain** enum, not a wire contract; `CreatedAt` from `IClock`;
+factory `CreateGuest` raises `AccountCreated`) is the **identity boundary** for server-authoritative state; provider linking
+(Google/Apple/email) is **Post-MVP** (a future `account_providers` table — never add provider columns now). **Guest login** =
+`POST /api/v1/auth/guest` (mapped into the **version set**, `.AllowAnonymous`) → **`CreateGuestAccountCommand`** (thin handler,
+`ITransactionalRequest`) → JWT via the Application port **`ITokenService`** (`TokenBundle`). **JWT lives ONLY in Infrastructure**
+(`GameTeam.Infrastructure/Auth/`: **`JwtTokenService`** HS256 — claims `sub`=account id/`type`=guest/`jti`/`iat`/`nbf`/`exp`/`iss`/
+`aud`, time from `IClock`; **`JwtOptions`** Options-pattern) — Application depends only on `ITokenService`, **never** a JWT
+framework (NetArchTest `Application_should_not_depend_on_jwt_or_authentication_frameworks` gates it). `Account` persists via the
+Phase-11 stack (`AccountConfiguration` → table **`accounts`** snake_case, migration **`AddAccounts`**; `AccountCreated` dispatch at
+`SaveChanges`). **API:** `AddApi` registers `AddAuthentication(JwtBearer).AddJwtBearer(...)` (validate signature+issuer+audience+
+lifetime from `IOptions<JwtOptions>`) + `AddAuthorization` with **`FallbackPolicy = RequireAuthenticatedUser`** ⇒ **business
+endpoints are authenticated by default**; `Program.cs` turns on `UseAuthentication()/UseAuthorization()`. **Public endpoints are
+explicitly whitelisted** with `.AllowAnonymous()`: `/health`, `POST /api/v1/auth/guest`, `/openapi/*`, `/swagger` (`/ping`+
+`/server-time` are now protected). Auth failures return the standard **`ErrorEnvelope`** (401 `UNAUTHENTICATED` / 403 `FORBIDDEN`
+via `AuthProblem` + `ErrorHttpMapping`). **Signing key** comes from secret/env **`Jwt__SigningKey`** (fail-fast; appsettings holds
+only issuer/audience/expiry) — **never hardcode/commit/log** it. Verified: build Release 0/0, `dotnet test` **167 pass**
+(Api.Integration 36 incl. `AuthGuestEndpointTests` A–D; Infrastructure 26 incl. Testcontainers `AccountPersistenceTests`), migration
+up/down, real-runtime guest-login→JWT (`sub`==DB row)→protected 200 / no-token 401 / tampered 401, negative-authz test red→revert,
+secret scan clean. Canonical: `docs/backend/api-and-versioning.md` §4.5 + `docs/backend/infrastructure.md` §2.5 +
+`docs/backend/cross-cutting.md` §1; decision log: `.memory/0016-auth-jwt-guest-standardized.md`.
+
+- Future agents **MUST reuse** this auth infra: new business endpoints inherit the default-auth policy (add `.AllowAnonymous()`
+  only for genuinely public endpoints); guest login / `Account` / `ITokenService` / `JwtTokenService` / `JwtOptions` are the ONE
+  auth mechanism. **MUST NOT** build a second auth/token mechanism, add a JWT/authentication framework to Application/Domain, fake
+  a user, bypass authorization for convenience, or implement real provider login before its Post-MVP phase.
+- **Secret handling is binding:** the JWT signing key is read from `Jwt__SigningKey` (secret/env) via `IOptions<JwtOptions>` and is
+  **never** hardcoded, committed (no key in `appsettings*.json`), or logged. Test/dev keys are obvious non-production placeholders.
+- **Authority is binding (ADR-007/011):** `Account`/`sub` is the identity for server-authoritative state; resource-ownership checks
+  live in feature handlers (phase 19+). Provider linking, refresh-token rotation/revocation, and rate-limiting are **Post-MVP** —
+  the refresh token issued today is an opaque **foundation** value only.
+- When changing auth, keep **`GameTeam.Domain/Accounts/*` + `ITokenService` + `Features/Auth/*` + `GameTeam.Infrastructure/Auth/*`
+  + `AccountConfiguration`/migration + `AddApi`/`Program.cs`/`AuthProblem` + the auth tests (behavior contract, incl. the arch fact)
+  + `docs/backend/api-and-versioning.md` §4.5 + `docs/backend/infrastructure.md` §2.5 + `docs/backend/cross-cutting.md` §1 +
+  `docs/mvp/10-open-questions.md` (BE3) + `.instructions/backend.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync
+  matrix, §5); the auth tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

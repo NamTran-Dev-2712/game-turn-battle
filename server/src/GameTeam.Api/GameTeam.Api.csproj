@@ -27,5 +27,8 @@
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
     <!-- Swagger UI (dev-only, UI middleware) over first-party /openapi/v1.json. -->
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+    <!-- Auth (Phase 18): JWT bearer scheme + default authorization. Token creation/config sống ở
+         Infrastructure; tầng Web bật scheme validate (issuer/audience/lifetime/signature). -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
   </ItemGroup>
 </Project>
