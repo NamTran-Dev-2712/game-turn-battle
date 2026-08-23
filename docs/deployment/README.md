@@ -103,6 +103,16 @@ Sửa trong `.env` (compose đọc mặc định nếu thiếu):
 Ví dụ tránh xung đột: `POSTGRES_PORT=55432` → Postgres lắng nghe `localhost:55432`. Cổng nội bộ giữa các
 container không đổi (api gọi `postgres:5432`, `redis:6379` qua mạng `game-team-dev`).
 
+### 8) JWT signing key (Phase 18 — bắt buộc khi chạy API)
+API cần khoá ký JWT lấy từ **secret/biến môi trường** — **không** commit, **không** để trong `appsettings.json`.
+
+- Đặt trong `.env` (git-ignored): **`JWT_SIGNING_KEY=<chuỗi ≥ 32 byte / 256-bit>`** — compose `api` profile inject
+  thành `Jwt__SigningKey`. Sinh nhanh: `openssl rand -base64 48`.
+- Chạy API cục bộ (không qua compose): set biến môi trường `Jwt__SigningKey` trước `dotnet run`.
+- Thiếu key ⇒ request đầu tiên trả **500** (fail-fast, log rõ "Thiếu Jwt:SigningKey"). `Jwt:Issuer`/`Audience`/
+  `AccessTokenMinutes` là giá trị **không bí mật** ở `appsettings.json`. Chi tiết: `docs/backend/infrastructure.md` §2.5.
+- **`.env.example`**: thêm dòng `JWT_SIGNING_KEY=` (placeholder rỗng) để tài liệu hoá biến này.
+
 ### 8) Troubleshooting
 
 | Triệu chứng | Nguyên nhân | Cách xử lý |

@@ -9,6 +9,8 @@ namespace GameTeam.Api.IntegrationTests;
 /// Phase 13 — the versioned sample endpoint proves HTTP → MediatR (PingCommand) → Result → HTTP.
 /// Also proves the centralized Result-failure → ErrorEnvelope mapping (empty message ⇒ validation
 /// failure ⇒ 400) and that versioned routing under <c>/api/v1</c> is actually in effect.
+/// Phase 18 — <c>/ping</c> is now protected by the default authorization policy, so these tests
+/// authenticate with a valid guest bearer token (missing-token behavior is covered by the auth tests).
 /// </summary>
 public class PingEndpointTests : IClassFixture<ApiTestFactory>
 {
@@ -19,7 +21,7 @@ public class PingEndpointTests : IClassFixture<ApiTestFactory>
     [Fact]
     public async Task Ping_on_versioned_route_returns_ok()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/api/v1/ping");
 
@@ -29,7 +31,7 @@ public class PingEndpointTests : IClassFixture<ApiTestFactory>
     [Fact]
     public async Task Ping_with_empty_message_returns_validation_error_envelope()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
 
         // Present-but-empty query value ⇒ PingCommand("") ⇒ NotEmpty validator fails ⇒ VALIDATION_FAILED.
         HttpResponseMessage response = await client.GetAsync("/api/v1/ping?message=");

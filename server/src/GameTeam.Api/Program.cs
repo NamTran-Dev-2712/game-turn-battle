@@ -3,6 +3,7 @@ using Asp.Versioning.Builder;
 using GameTeam.Api;
 using GameTeam.Api.Http;
 using GameTeam.Application;
+using GameTeam.Application.Features.Auth.Commands;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
 using GameTeam.Contracts.Auth;
@@ -28,7 +29,8 @@ WebApplication app = builder.Build();
 app.UseExceptionHandler();
 
 // OpenAPI (nguồn shared/contracts): phục vụ /openapi/v1.json và là nguồn xuất spec (ADR-008).
-app.MapOpenApi();
+// PUBLIC: spec phải đọc được không cần token (client codegen + Swagger UI + drift guard).
+app.MapOpenApi().AllowAnonymous();
 
 // Swagger UI CHỈ ở Development: render tài liệu OpenAPI first-party ở trên (KHÔNG dùng SwaggerGen —
 // giữ single-source shared/contracts/openapi.json). Prod không expose UI.
@@ -38,21 +40,22 @@ if (app.Environment.IsDevelopment())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTHENTICATION / AUTHORIZATION HOOK — Phase 18 (JWT bearer).
-// Phase 13 CHỪA CHỖ, KHÔNG bật auth thật, KHÔNG fake user. Khi Phase 18 tới, bật đúng vị trí này
-// (sau routing, trước khi map endpoint) + AddAuthentication/AddAuthorization trong AddApi:
-//   TODO Phase 18: app.UseAuthentication();
-//   TODO Phase 18: app.UseAuthorization();
+// AUTHENTICATION / AUTHORIZATION (Phase 18 — JWT bearer, ADR-008). Scheme + authz mặc định đăng ký
+// ở AddApi. Bật middleware ở ĐÂY (sau routing/swagger, trước khi map endpoint). Authorization MẶC ĐỊNH
+// (FallbackPolicy) ⇒ mọi endpoint yêu cầu token trừ khi opt-out .AllowAnonymous() — public whitelist
+// khai báo tường minh bên dưới (health + auth/guest; openapi/swagger đã anonymous ở trên).
 // ─────────────────────────────────────────────────────────────────────────────
+app.UseAuthentication();
+app.UseAuthorization();
 
-// Health endpoint hạ tầng (KHÔNG phải API game, KHÔNG versioned). Ping Redis (Phase 12): "ok" khi
-// Redis truy cập được, "degraded" khi không — vẫn HTTP 200 (giữ liveness semantics; full health
-// checks vẫn ngoài scope). Kiểu hoá bằng HealthResponse để mô tả trong OpenAPI; { "status": "..." }.
+// Health endpoint hạ tầng (KHÔNG phải API game, KHÔNG versioned). PUBLIC (liveness). Ping Redis
+// (Phase 12): "ok" khi Redis truy cập được, "degraded" khi không — vẫn HTTP 200 (giữ liveness
+// semantics; full health checks vẫn ngoài scope). Kiểu hoá bằng HealthResponse; { "status": "..." }.
 app.MapGet("/health", async (IConnectionMultiplexer redis) =>
 {
     string status = await RedisIsReachableAsync(redis) ? "ok" : "degraded";
     return TypedResults.Ok(new HealthResponse(status));
-}).WithName("Health");
+}).WithName("Health").AllowAnonymous();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API v1 (Phase 13): versioning qua URL segment "/api/v{version:apiVersion}", default v1
@@ -92,20 +95,29 @@ apiV1.MapGet("/server-time", (ISender sender, HttpContext httpContext) =>
     .WithName("ServerTime")
     .MapToApiVersion(1)
     .Produces<ServerTimeResponse>(StatusCodes.Status200OK);
+// LƯU Ý: /ping và /server-time KHÔNG .AllowAnonymous() ⇒ theo FallbackPolicy chúng YÊU CẦU token
+// (secure-by-default). Đây là các endpoint "nghiệp vụ" mẫu để chứng minh bảo vệ mặc định (Phase 18).
+
+// POST /api/v1/auth/guest (Phase 18): tạo tài khoản khách + cấp JWT. PUBLIC (.AllowAnonymous) — đây là
+// điểm vào xác thực, chưa thể có token. HTTP → CreateGuestAccountCommand → Result<AuthGuestResponse>.
+// Chuyển từ stub 501 (Phase 05, group literal) vào version set — giải quyết ngay tại đây, path KHÔNG đổi.
+apiV1.MapPost("/auth/guest", (AuthGuestRequest request, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(
+            sender.Send(new CreateGuestAccountCommand(request.DeviceId)), httpContext))
+    .WithName("AuthGuest")
+    .MapToApiVersion(1)
+    .AllowAnonymous()
+    .Produces<AuthGuestResponse>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTRACT SKELETON (Phase 05): khai báo HÌNH DẠNG endpoint nền cho OpenAPI — KHÔNG hiện thực
-// nghiệp vụ (handler thật ở phase sở hữu: auth=18, config=21). Trả 501 Not Implemented. Giữ trên
+// nghiệp vụ (handler thật ở phase sở hữu: config=21; profile=19). Trả 501 Not Implemented. Giữ trên
 // group LITERAL "/api/v1" (ApiVersions.V1Prefix) như Phase 05 — path contract KHÔNG đổi. (Xem lưu ý
-// deviation ở version set phía trên về xung đột param "{version}".)
+// deviation ở version set phía trên về xung đột param "{version}".) auth/guest đã reimplement ở trên.
+// Các stub này theo FallbackPolicy ⇒ mặc định yêu cầu token; phase sở hữu (19/21) quyết định public/authz.
 // ─────────────────────────────────────────────────────────────────────────────
 RouteGroupBuilder contractV1 = app.MapGroup(ApiVersions.V1Prefix);
-
-// TODO Phase 18: real handler — cấp JWT guest.
-contractV1.MapPost("/auth/guest", (AuthGuestRequest request) => Results.StatusCode(StatusCodes.Status501NotImplemented))
-    .WithName("AuthGuest")
-    .Produces<AuthGuestResponse>(StatusCodes.Status200OK)
-    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest);
 
 // TODO Phase 19+: real handler — trả hồ sơ người chơi hiện tại.
 contractV1.MapGet("/profile", () => Results.StatusCode(StatusCodes.Status501NotImplemented))

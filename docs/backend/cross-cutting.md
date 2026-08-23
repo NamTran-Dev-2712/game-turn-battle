@@ -6,12 +6,15 @@
 
 ## 1. Authentication & Authorization
 
+> **Phase 18 — đã bật (đóng & verify).** Guest login + JWT + authorization mặc định chạy; chi tiết hiện thực:
+> `api-and-versioning.md` §4.5 (scheme/whitelist) + `infrastructure.md` §2.5 (token service/`JwtOptions`/Account).
+
 | Chủ đề | Thiết kế |
 |---|---|
-| Cơ chế | **JWT** bearer token (ADR-008) |
-| Guest-first | Tạo tài khoản guest → token; link account (Google/Apple/email) Post-MVP (`../mvp/10` BE3) |
-| Authorization | Policy-based; kiểm quyền ở Api + kiểm sở hữu tài nguyên ở handler (vd hero thuộc người chơi) |
-| Token | Access token ngắn hạn + refresh; lưu phụ trợ ở Redis nếu cần thu hồi |
+| Cơ chế | **JWT** bearer token, HS256 (ADR-008) — **đã hiện thực (Phase 18)** |
+| Guest-first | `POST /api/v1/auth/guest` tạo `Account` guest → JWT (`sub`/`type`/`exp`) + refresh (nền tảng). Link account (Google/Apple/email) Post-MVP (`../mvp/10` BE3) |
+| Authorization | **Mặc định** = `FallbackPolicy` `RequireAuthenticatedUser` ⇒ mọi endpoint yêu cầu token trừ public whitelist (`.AllowAnonymous`: health/auth/openapi/swagger). Kiểm sở hữu tài nguyên ở handler (vd hero thuộc người chơi) = phase feature |
+| Token | Access token ngắn hạn (`AccessTokenMinutes`) + refresh (đục, nền tảng — rotation/thu hồi Post-MVP); key từ secret/env, **không** commit/log |
 | Server-authoritative | Mọi hành động nhạy cảm kiểm quyền + kiểm nghiệp vụ server-side (ADR-007/011) |
 
 ---

@@ -19,7 +19,8 @@ public class ErrorEnvelopeTests : IClassFixture<ApiTestFactory>
     [Fact]
     public async Task Error_body_is_exactly_the_error_envelope_contract()
     {
-        HttpClient client = _factory.CreateClient();
+        // /ping is protected (Phase 18) — authenticate so the request reaches validation (the 400 path).
+        HttpClient client = _factory.CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/api/v1/ping?message=");
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);

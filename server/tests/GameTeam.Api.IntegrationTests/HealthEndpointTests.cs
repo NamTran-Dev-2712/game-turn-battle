@@ -10,11 +10,11 @@ namespace GameTeam.Api.IntegrationTests;
 /// Integration test bootstrap — xác nhận host API khởi động & health endpoint trả OK.
 /// Test API nghiệp vụ thêm ở phase Core Framework trở đi.
 /// </summary>
-public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests : IClassFixture<ApiTestFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly ApiTestFactory _factory;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    public HealthEndpointTests(ApiTestFactory factory) => _factory = factory;
 
     [Fact]
     public async Task Health_endpoint_returns_ok()

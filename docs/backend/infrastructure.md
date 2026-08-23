@@ -95,6 +95,29 @@ phụ thuộc thứ tự chạy.
 
 ---
 
+## 2.5 Auth: JWT token service (Phase 18 — đóng & verify)
+
+Nền auth guest sống ở **`GameTeam.Infrastructure/Auth/`** (thư viện JWT **chỉ** ở Infrastructure — Application chỉ
+phụ thuộc port `ITokenService`; NetArchTest `Application_should_not_depend_on_jwt_or_authentication_frameworks` gác).
+
+- **`JwtTokenService : ITokenService`** phát access token **HS256** (khoá đối xứng) với claims `sub` = account id,
+  `type` = `guest`, cùng `jti`/`iat`/`nbf`/`exp`/`iss`/`aud`. Thời gian lấy từ **`IClock`** (server-time boundary —
+  không wall-clock). **Refresh token** = chuỗi 256-bit ngẫu nhiên (base64url) — **nền tảng**; validation/rotation/
+  persistence refresh là phase sau (không làm ở đây). **Không log** khoá/token.
+- **`JwtOptions`** (Options pattern, section `Jwt`): `Issuer`/`Audience`/`AccessTokenMinutes` (không bí mật, ở
+  appsettings) + **`SigningKey`** lấy từ secret/env **`Jwt__SigningKey`** — **không hardcode/commit**. `AddInfrastructure`
+  đăng ký `IOptions<JwtOptions>` **lazy** (factory) rồi **fail-fast** khi resolve nếu thiếu key/issuer/audience hoặc
+  key < 256-bit (đăng ký lazy để build-time OpenAPI gen không cần key). Đây là **Options pattern đầu tiên** của repo —
+  các phase sau gom cấu hình nhóm nên theo mẫu này thay vì đọc rời rạc.
+- **Account persistence:** `Account` là aggregate nghiệp vụ (Domain) — bảng **`accounts`** (`AccountConfiguration`,
+  snake_case: `id uuid` PK, `type int`, `created_at timestamptz`), migration **`AddAccounts`**. `AccountCreated` dispatch
+  tại `SaveChanges` (Phase 11). Bảng liên kết provider (`account_providers`) là **tương lai/Post-MVP** — chưa tạo.
+- **Bật scheme + authorization mặc định** nằm ở **`AddApi`** (tầng Web) — xem `api-and-versioning.md` §4.5.
+- **Test:** `JwtTokenServiceTests` (claims/lifetime/refresh duy nhất) + `AccountPersistenceTests` (Testcontainers
+  `postgres:16-alpine`: CRUD + `AccountCreated` dispatch). Auth HTTP end-to-end ở `Api.IntegrationTests`.
+
+---
+
 ## 3. Configuration Service (ADR-005)
 
 ```mermaid

@@ -13,11 +13,11 @@ namespace GameTeam.Api.IntegrationTests;
 /// (không lỗi diagnostic của trình đọc OpenAPI) và mô tả đúng bề mặt contract nền + enum dùng chung.
 /// Đây là "linter OpenAPI" chạy trong .NET toolchain (không cần Node).
 /// </summary>
-public class OpenApiContractTests : IClassFixture<WebApplicationFactory<Program>>
+public class OpenApiContractTests : IClassFixture<ApiTestFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly ApiTestFactory _factory;
 
-    public OpenApiContractTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    public OpenApiContractTests(ApiTestFactory factory) => _factory = factory;
 
     private async Task<(OpenApiDocument Doc, OpenApiDiagnostic Diagnostic)> ReadDocumentAsync()
     {

@@ -1,7 +1,10 @@
+using System.Text;
 using GameTeam.Application.Abstractions.Caching;
 using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
+using GameTeam.Application.Abstractions.Security;
 using GameTeam.Domain.Common;
+using GameTeam.Infrastructure.Auth;
 using GameTeam.Infrastructure.Caching;
 using GameTeam.Infrastructure.Configuration;
 using GameTeam.Infrastructure.Persistence;
@@ -11,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace GameTeam.Infrastructure;
@@ -81,6 +85,64 @@ public static class DependencyInjection
         // (Config Service) THAY THẾ bằng bundle loading/publishing thật. Không đọc balance ở đây.
         services.AddSingleton<IConfigProvider, DefaultConfigProvider>();
 
+        // ── Auth: JWT token service (Phase 18, ADR-008) ──────────────────────────────────────────
+        // JwtOptions đọc từ section "Jwt". SigningKey LẤY TỪ SECRET/env (Jwt__SigningKey) — không
+        // hardcode/commit. Fail-fast khi thiếu/khoá quá ngắn (giống ConnectionStrings). Đăng ký LAZY
+        // (factory) ⇒ không đọc/validate lúc sinh OpenAPI build-time (chưa có key) — chỉ khi resolve
+        // thật (token service / JWT scheme). Việc bật scheme JwtBearer + authorization mặc định nằm ở
+        // AddApi (tầng Web) — xem docs/backend/api-and-versioning.md.
+        services.AddSingleton<IOptions<JwtOptions>>(_ => BuildJwtOptions(configuration));
+        services.AddScoped<ITokenService, JwtTokenService>();
+
         return services;
+    }
+
+    /// <summary>
+    /// Đọc + kiểm tra cấu hình JWT (fail-fast) rồi gói vào <see cref="IOptions{TOptions}"/>. Đọc tường minh
+    /// qua <see cref="IConfiguration"/> (không cần gói Binder trong classlib), giữ đúng convention fail-fast
+    /// của tầng Infrastructure.
+    /// </summary>
+    private static IOptions<JwtOptions> BuildJwtOptions(IConfiguration configuration)
+    {
+        IConfigurationSection section = configuration.GetSection(JwtOptions.SectionName);
+
+        string issuer = section["Issuer"] ?? string.Empty;
+        string audience = section["Audience"] ?? string.Empty;
+        string signingKey = section["SigningKey"] ?? string.Empty;
+        string accessTokenMinutesRaw = section["AccessTokenMinutes"] ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(issuer) || string.IsNullOrWhiteSpace(audience))
+        {
+            throw new InvalidOperationException(
+                $"Thiếu cấu hình '{JwtOptions.SectionName}:Issuer'/'{JwtOptions.SectionName}:Audience'. " +
+                "Cấu hình qua appsettings/biến môi trường.");
+        }
+
+        if (string.IsNullOrWhiteSpace(signingKey))
+        {
+            throw new InvalidOperationException(
+                $"Thiếu '{JwtOptions.SectionName}:SigningKey' (env {JwtOptions.SectionName}__SigningKey). " +
+                "Khoá ký JWT phải lấy từ secret/biến môi trường — KHÔNG hardcode/commit.");
+        }
+
+        if (Encoding.UTF8.GetByteCount(signingKey) < JwtOptions.MinSigningKeyLength)
+        {
+            throw new InvalidOperationException(
+                $"'{JwtOptions.SectionName}:SigningKey' quá ngắn: cần tối thiểu {JwtOptions.MinSigningKeyLength} byte (256-bit) cho HS256.");
+        }
+
+        if (!int.TryParse(accessTokenMinutesRaw, out int accessTokenMinutes) || accessTokenMinutes <= 0)
+        {
+            throw new InvalidOperationException(
+                $"'{JwtOptions.SectionName}:AccessTokenMinutes' phải là số nguyên dương.");
+        }
+
+        return Options.Create(new JwtOptions
+        {
+            Issuer = issuer,
+            Audience = audience,
+            SigningKey = signingKey,
+            AccessTokenMinutes = accessTokenMinutes,
+        });
     }
 }

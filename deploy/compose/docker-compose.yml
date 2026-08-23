@@ -44,6 +44,9 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-gameteam};Username=${POSTGRES_USER:-gameteam};Password=${POSTGRES_PASSWORD:-devpassword}"
       ConnectionStrings__Redis: "redis:6379"
+      # JWT signing key (Phase 18) — LẤY TỪ .env (JWT_SIGNING_KEY), KHÔNG commit. ≥ 32 byte (256-bit).
+      # Thiếu ⇒ API trả 500 ở request đầu (fail-fast). Xem docs/backend/infrastructure.md §2.5.
+      Jwt__SigningKey: "${JWT_SIGNING_KEY}"
     ports:
       - "${API_PORT:-8080}:8080"
     networks:

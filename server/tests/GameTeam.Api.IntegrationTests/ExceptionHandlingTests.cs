@@ -39,6 +39,11 @@ public class ExceptionHandlingTests : IClassFixture<ApiTestFactory>
             AllowAutoRedirect = false,
         });
 
+        // /server-time is protected (Phase 18) — attach a valid token so the request reaches the
+        // (throwing) handler and exercises the 500 path, not the 401 auth path.
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ApiTestFactory.CreateGuestBearerToken());
+
         HttpResponseMessage response = await client.GetAsync("/api/v1/server-time");
 
         response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
