@@ -95,6 +95,11 @@ Client **không** tự cộng/trừ currency, **không** tự tính reward/kết
 > `state_refreshed` (producer = `StateCache`). Event nghiệp vụ (vd `battle_finished`, `currency_changed`)
 > do **phase sở hữu feature** thêm về sau. Mọi thất bại mạng đi qua **một kênh** `network_error`; 401
 > phát **thêm** `unauthorized` để lớp auth phản ứng riêng.
+>
+> **Phase 20 (auth + profile) KHÔNG thêm event mới** — danh mục giữ nguyên 5 event. Luồng auth **tái dùng**
+> `unauthorized` (401 → boot/AuthProfileFlow re-login) và `state_refreshed` (profile về StateCache →
+> `MainHubPresenter` refresh hiển thị). Consumer của `unauthorized` giờ là **AuthProfileFlow** (§4.1);
+> consumer của `state_refreshed` gồm **hub** (hiển thị profile server-authoritative + nhãn offline).
 
 **Thêm event mới (quy trình bắt buộc):**
 1. Đặt tên `snake_case`, **thể quá khứ/sự kiện** (không mệnh lệnh) — `../conventions/naming.md` §6.
@@ -109,7 +114,8 @@ Client **không** tự cộng/trừ currency, **không** tự tính reward/kết
 > (§ `ui-architecture.md` §1). Autoload bỏ `class_name` (trùng tên singleton) — truy cập qua global
 > `NetworkClient`. Các lớp phụ trợ (không autoload) có `class_name`: `HttpTransport`/`GodotHttpTransport`
 > (seam vận chuyển — nơi DUY NHẤT chạm `HTTPRequest`), `TokenStore` (kho JWT tối giản), `NetResult`
-> (kết quả chuẩn hoá), `NetworkResponseParser` (JSON → model generated).
+> (kết quả chuẩn hoá), `NetworkResponseParser` (JSON → model generated), `TokenStore` (kho JWT **persist
+> mã hoá** — phase 20).
 
 | Trách nhiệm | Chi tiết |
 |---|---|
@@ -120,10 +126,29 @@ Client **không** tự cộng/trừ currency, **không** tự tính reward/kết
 | Timeout + retry | Timeout mỗi request (`request_timeout_seconds`, mặc định 10s). Retry **chỉ GET/idempotent-safe** trên lỗi vận chuyển tạm thời (timeout/mất kết nối), tối đa `MAX_GET_RETRIES`. **POST không bao giờ tự retry** (tránh double-effect; `Idempotency-Key` cho command nhạy cảm = server phase 31). |
 | Không quyết nghiệp vụ | Chỉ truyền tải; mất mạng → **báo lỗi, KHÔNG bịa kết quả/phần thưởng** (ADR-008/011). |
 
-> **Ngoài phạm vi phase 15 (nợ có chủ đích):** đăng nhập/lấy token thật + refresh (phase 18/20),
-> lưu token bền, offline queue nâng cao (phase 20/48), `Idempotency-Key` POST (server phase 31),
-> SignalR realtime (Post-MVP). Config bundle caching = **phase 16** (§1.1 `StateCache` +
-> `resources-and-assets.md` §1.1 `ConfigProvider`, đã chốt).
+> **Ngoài phạm vi phase 15 (nợ có chủ đích):** đăng nhập/lấy token thật + lưu token bền = **phase 20**
+> (§4.1, đã chốt); refresh-token rotation nâng cao + offline queue nâng cao (Post-MVP/48),
+> `Idempotency-Key` POST (server phase 31), SignalR realtime (Post-MVP). Config bundle caching = **phase 16**
+> (§1.1 `StateCache` + `resources-and-assets.md` §1.1 `ConfigProvider`, đã chốt).
+
+### 4.1 Auth + Profile integration (Phase 20 — đã chốt)
+
+> Nguồn: `client/src/core/net/token_store.gd` (`TokenStore`), `client/src/ui/boot/auth_profile_flow.gd`
+> (`AuthProfileFlow`), tích hợp trong `boot_controller.gd` + `main_hub_presenter.gd`. Đóng vòng
+> **guest login → JWT → GET /profile → StateCache → hub** (ADR-007/008). Client **chỉ hiển thị**; mọi
+> thay đổi state đi qua server.
+
+| Trách nhiệm | Chi tiết |
+|---|---|
+| Vòng đời auth TẬP TRUNG | **Boot + `AuthProfileFlow`** (RefCounted, KHÔNG autoload) sở hữu login/lưu token/re-login. `NetworkClient` **chỉ** gắn token + phát `unauthorized`; UI **không** chứa auth logic. |
+| Token store an toàn | `TokenStore` persist access/refresh + hạn dùng vào `user://auth/token.dat` qua `FileAccess.open_encrypted_with_pass` (khoá = salt app + `OS.get_unique_id()`, ràng thiết bị). **KHÔNG plaintext, KHÔNG log token, KHÔNG commit** (đĩa `user://` git-ignored). *Giới hạn:* không phải keychain OS (Godot thuần không có — cần native plugin, ngoài phạm vi). |
+| Boot flow | `health` (cổng kết nối) → `AuthProfileFlow.run()` (dùng token còn hạn / guest login → `GET /profile` → `StateCache.apply_snapshot`) → config (best-effort) → hub. Lần đầu: login; lần sau: dùng token lưu (không login lại trừ khi hết hạn/401). |
+| 401 → re-login (có giới hạn) | `AuthProfileFlow` đọc `NetResult.kind == UNAUTHORIZED` → clear token → guest login lại **tối đa `MAX_RELOGIN=1`** → thử lại profile. **CHỐNG vòng lặp vô hạn** (401 dai dẳng ⇒ dừng + báo lỗi). `unauthorized` vẫn phát toàn cục cho hệ thống khác quan sát. |
+| Profile → hiển thị | `GET /profile` → `ProfileDto` (`parse_profile`) → `StateCache.apply_snapshot({"profile": {...}})`; `MainHubPresenter` đọc `StateCache.get_profile()` hiển thị **tên · level**. Currency = **placeholder** (`ProfileDto` chưa mang currency — feature phase 31). |
+| Offline (mất mạng) | Health/auth thất bại NHƯNG có **profile cache cũ** (StateCache boot `source="cache"`) ⇒ boot vào hub **chế độ offline** (nhãn `[offline]`), KHÔNG bịa dữ liệu. Không có cache ⇒ màn lỗi + retry. |
+
+> **Ngoài phạm vi phase 20:** link account provider (Post-MVP), refresh-token endpoint thật (refresh token
+> lưu nhưng chưa đổi — chưa có endpoint), config bundle content (phase 21/22), currency/wallet (phase 31).
 
 ## 5. Combat state (đặc thù)
 - Client chạy sim **để hiển thị** dựa trên `seed` server trả; state kết quả/thưởng lấy từ server response.

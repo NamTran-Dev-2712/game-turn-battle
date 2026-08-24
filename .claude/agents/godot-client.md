@@ -69,6 +69,20 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   per-UI-action EventBus event.** `AudioManager` stays **deferred** (not in the Phase 17 contract). Canonical:
   `docs/godot/ui-architecture.md` §2.1/§4.1 + `docs/godot/scene-architecture.md` §4.2/§5; decision log
   `.memory/0015-client-boot-ui-standardized.md`. Setup/run: root `setup-and-run.md`.
+- **Auth + Profile integration (Phase 20).** Client auth/save loop: **guest login → JWT → GET /profile → StateCache →
+  hub**. **Auth lifecycle is CENTRALIZED in boot + `AuthProfileFlow`** (`src/ui/boot/auth_profile_flow.gd`, RefCounted,
+  **not** an autoload); `NetworkClient` only attaches the token + emits `unauthorized`; **UI/views never hold auth logic**.
+  **`TokenStore`** (`src/core/net/token_store.gd`) persists access+refresh+expiry **encrypted**
+  (`FileAccess.open_encrypted_with_pass` → `user://auth/token.dat`, device-bound key) — **never plaintext, never log the
+  token/passphrase, never commit**. Boot (`State.AUTHENTICATING`): health → `AuthProfileFlow.run()` (reuse valid token
+  else `POST /api/v1/auth/guest`; then `GET /api/v1/profile` → `StateCache.apply_snapshot`) → config → hub. **401/expiry →
+  bounded re-login** (`MAX_RELOGIN=1`) — **no infinite loop**. **Offline** (fail + cached profile) ⇒ hub offline mode
+  (`[offline]` label), **never fabricate**. New parsers → existing generated `AuthGuestResponse`/`ProfileDto` (no
+  contract change). Hub shows **name·level** (currency placeholder → phase 31). **No new EventBus event** — reuse
+  `unauthorized` + `state_refreshed`. **Reuse `AuthProfileFlow`/`TokenStore`/`NetworkClient`/`StateCache`/`ProfileDto` —
+  never add a second auth/token/HTTP/profile abstraction, never put auth in a view, never bypass StateCache, never add a
+  refresh-token architecture beyond scope.** Canonical: `docs/godot/state-and-signals.md` §4.1/§3.1 +
+  `docs/godot/ui-architecture.md` §4.1; decision log `.memory/0018-client-auth-profile-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

@@ -35,6 +35,8 @@ func _ready() -> void:
 	base_url = _resolve_base_url()
 	if token_store == null:
 		token_store = TokenStore.new()
+		# Nạp token đã lưu (đăng nhập lại tự động — phase 20). Thiếu/hỏng ⇒ rỗng, không crash.
+		token_store.load()
 	if _transport == null:
 		_transport = GodotHttpTransport.new(self)
 

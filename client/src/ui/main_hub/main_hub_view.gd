@@ -12,6 +12,8 @@ const FEATURES: Array[Dictionary] = [
 	{"id": &"shop", "label": "Cửa hàng"},
 ]
 
+var _profile: Label = null
+var _currency: Label = null
 var _status: Label = null
 var _presenter: MainHubPresenter = null
 
@@ -30,6 +32,11 @@ func _build() -> void:
 	var title := Label.new()
 	title.text = "game team — Sảnh chính"
 	box.add_child(title)
+	# Profile server-authoritative (tên · level) + currency placeholder (phase 20).
+	_profile = Label.new()
+	box.add_child(_profile)
+	_currency = Label.new()
+	box.add_child(_currency)
 	_status = Label.new()
 	box.add_child(_status)
 	var buttons := HBoxContainer.new()
@@ -44,5 +51,17 @@ func _build() -> void:
 
 
 func _render(data: Dictionary) -> void:
+	if _profile != null and data.has("profile_text"):
+		var offline := bool(data.get("offline", false))
+		# Nhãn offline/cached rõ ràng — người dùng KHÔNG hiểu nhầm cache là dữ liệu server tươi.
+		_profile.text = ("[offline] " if offline else "") + str(data["profile_text"])
+	if _currency != null and data.has("currency_text"):
+		_currency.text = "Currency: " + str(data["currency_text"])
 	if _status != null and data.has("status_text"):
 		_status.text = str(data["status_text"])
+
+
+# Huỷ đăng ký EventBus của presenter khi view rời cây (đối xứng vòng đời — tránh Callable treo).
+func unbind() -> void:
+	if _presenter != null:
+		_presenter.dispose()

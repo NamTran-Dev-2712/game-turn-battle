@@ -75,11 +75,19 @@ thật (không thêm event/nút — danh mục EventBus ĐÓNG, `state-and-signa
 ### 4.1 Boot / loading + màn lỗi (Phase 17 — đã chốt)
 
 - **Boot splash** (`BootView`): view tối giản hiển thị trạng thái kết nối; không block (boot chạy async trong
-  `BootController`). Luồng: health → config → hub (`scene-architecture.md` §4.2).
-- **Màn lỗi boot** (`BootErrorView`): khi health fail/mất mạng → hiển thị **thông báo AN TOÀN** (KHÔNG lộ
-  stack/chi tiết nội bộ — không client-authority) + nút **retry**. Nút nối MỘT LẦN (không nối lại mỗi lần lỗi ⇒
-  không trùng listener); presenter chạy lại flow sạch với khoá chống tái nhập (không điều hướng/replay request
-  trùng). Transition/animation nâng cao = phase 52.
+  `BootController`). Luồng (Phase 17 + auth/profile Phase 20): **health → auth/profile → config → hub**
+  (`scene-architecture.md` §4.2, `state-and-signals.md` §4.1).
+- **Auth + profile trong boot (Phase 20):** sau cổng `health`, `BootController` gọi `AuthProfileFlow.run()`
+  (guest login/dùng token lưu → `GET /profile` → `StateCache`); vòng đời auth TẬP TRUNG ở boot/AuthProfileFlow,
+  **view/hub KHÔNG chứa auth logic**. Hub (`MainHubPresenter`) đọc `StateCache.get_profile()` hiển thị tên·level
+  (currency = placeholder tới phase 31).
+- **Màn lỗi boot** (`BootErrorView`): khi health/auth fail/mất mạng **và KHÔNG có cache** → hiển thị **thông báo
+  AN TOÀN** (KHÔNG lộ stack/chi tiết nội bộ — không client-authority) + nút **retry**. Nút nối MỘT LẦN (không nối
+  lại mỗi lần lỗi ⇒ không trùng listener); presenter chạy lại flow sạch với khoá chống tái nhập. Transition/animation
+  nâng cao = phase 52.
+- **Offline-fallback (Phase 20):** nếu mất kết nối NHƯNG có **profile cache cũ** (StateCache `source="cache"`),
+  boot **vào hub chế độ offline** (nhãn `[offline]`) thay vì màn lỗi — hiển thị cache có nhãn, KHÔNG bịa dữ liệu
+  (ADR-007/011). Chỉ hiện màn lỗi khi không có cache dùng được.
 
 ## 5. Accessibility & localization
 - Text qua khoá i18n (`resources-and-assets.md`); tránh chữ nhúng trong ảnh.
