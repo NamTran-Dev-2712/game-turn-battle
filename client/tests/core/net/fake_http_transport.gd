@@ -7,6 +7,8 @@ extends HttpTransport
 
 ## Số lần `send` được gọi (kiểm retry GET / không-retry POST).
 var call_count: int = 0
+## Ghi lại từng request đã gửi (url/method/headers/body) — kiểm auth header / endpoint được gọi (phase 20).
+var requests: Array = []
 
 var _responses: Array = []
 
@@ -23,6 +25,7 @@ func queue_transport(result: int) -> void:
 
 func send(_req: Dictionary) -> Dictionary:
 	call_count += 1
+	requests.append(_req)
 	await Engine.get_main_loop().process_frame
 	# Còn nhiều → tiến tới cái kế; còn một → giữ nguyên (lặp phản hồi cuối).
 	if _responses.size() > 1:

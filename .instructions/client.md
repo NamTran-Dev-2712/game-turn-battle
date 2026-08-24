@@ -73,3 +73,22 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   stays **deferred** (not in the Phase 17 contract). Canonical: `docs/godot/ui-architecture.md` §2.1/§4.1 +
   `docs/godot/scene-architecture.md` §4.2/§5; decision log `.memory/0015-client-boot-ui-standardized.md`. Setup/run:
   root `setup-and-run.md`.
+- **Auth + Profile integration is standardized (Phase 20 — closed & verified).** Closes the client auth/save loop:
+  **guest login → JWT → GET /profile → StateCache → hub** (ADR-007/008). **Auth lifecycle is CENTRALIZED in boot +
+  `AuthProfileFlow`** (`src/ui/boot/auth_profile_flow.gd`, RefCounted — **not** an autoload); `NetworkClient` only
+  attaches the token + emits `unauthorized`; **UI/views never contain auth logic**. **`TokenStore`**
+  (`src/core/net/token_store.gd`, extended) persists access+refresh+expiry **encrypted** (`FileAccess.open_encrypted_with_pass`
+  → `user://auth/token.dat`, device-bound key) — **never plaintext, never log the token/passphrase, never commit**;
+  `NetworkClient._ready()` calls `token_store.load()`. **Boot** (`boot_controller.gd`, `State.AUTHENTICATING`):
+  health → `AuthProfileFlow.run()` (reuse token if present+not-expired else `POST /api/v1/auth/guest`; then
+  `GET /api/v1/profile` → `StateCache.apply_snapshot`) → config → hub. **401/expiry → bounded re-login** (`MAX_RELOGIN=1`,
+  reads `NetResult.kind==UNAUTHORIZED`) — **no infinite loop**. **Offline** (health/auth fail + cached profile) ⇒ hub in
+  **offline mode** (`[offline]` label), **never fabricate**; error screen only when no cache. New parsers
+  `parse_auth_guest_response`/`parse_profile` → existing generated `AuthGuestResponse`/`ProfileDto` (**no contract change,
+  no generated drift**). Hub shows server **name·level** (currency = **placeholder** until phase 31) + offline label,
+  refreshing on `state_refreshed`. **No new EventBus event** — reuse `unauthorized` + `state_refreshed` (catalogue stays
+  CLOSED at 5). **Reuse `AuthProfileFlow`/`TokenStore`/`NetworkClient`/`StateCache`/`ProfileDto` — never add a second
+  auth/token/HTTP/profile abstraction, never put auth in a view, never bypass StateCache, never add refresh-token
+  architecture beyond scope.** Out of scope: provider linking (Post-MVP), refresh endpoint, currency (phase 31), config
+  bundle (phase 22). Canonical: `docs/godot/state-and-signals.md` §4.1/§3.1 + `docs/godot/ui-architecture.md` §4.1;
+  decision log `.memory/0018-client-auth-profile-standardized.md`.

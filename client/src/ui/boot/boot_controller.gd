@@ -1,8 +1,10 @@
-# BootController — presenter/điều phối boot (Phase 17). Root script của boot.tscn.
-# Luồng: splash → NetworkClient.get(/health) [CỔNG kết nối bắt buộc] → ConfigProvider.check_for_update()
-#   [BEST-EFFORT: Config Service = phase 21, endpoint vắng ⇒ giữ cache, KHÔNG chặn boot] →
-#   SceneRouter.goto(main_hub) + clear_history().
-# Thất bại health/mất mạng → BootErrorView (thông báo AN TOÀN, không lộ nội bộ) + nút retry → chạy lại.
+# BootController — presenter/điều phối boot (Phase 17 + auth/profile phase 20). Root script của boot.tscn.
+# Luồng: splash → NetworkClient.get(/health) [CỔNG kết nối] → AuthProfileFlow.run() [guest login/dùng token
+#   → GET /profile → StateCache] → ConfigProvider.check_for_update() [BEST-EFFORT: Config Service = phase 21,
+#   endpoint vắng ⇒ giữ cache, KHÔNG chặn boot] → SceneRouter.goto(main_hub) + clear_history().
+# OFFLINE (phase 20): health/auth thất bại NHƯNG có profile cache cũ ⇒ vào hub chế độ offline (nhãn từ
+#   StateCache), KHÔNG bịa dữ liệu; chỉ hiện màn lỗi khi KHÔNG có cache dùng được.
+# Thất bại không cache → BootErrorView (thông báo AN TOÀN, không lộ nội bộ) + nút retry → chạy lại.
 # Là PRESENTER: chứa toàn bộ logic + gọi network; hai view (BootView/BootErrorView) thuần hiển thị.
 # Deps inject được cho test (mặc định = autoload). Chi tiết: docs/godot/scene-architecture.md §4.2.
 class_name BootController
@@ -16,7 +18,7 @@ const DEFAULT_MAIN_HUB_PATH: String = "res://src/ui/main_hub/main_hub.tscn"
 const SAFE_ERROR_MESSAGE: String = "Không kết nối được máy chủ. Vui lòng kiểm tra kết nối và thử lại."
 
 ## Trạng thái boot (kiểm thử/gỡ lỗi).
-enum State { IDLE, CHECKING_HEALTH, LOADING_CONFIG, DONE, FAILED }
+enum State { IDLE, CHECKING_HEALTH, AUTHENTICATING, LOADING_CONFIG, DONE, FAILED }
 
 ## Kênh mạng (seam — mặc định autoload NetworkClient; inject giả/thật cho test).
 var network_client: Node = null
@@ -24,6 +26,10 @@ var network_client: Node = null
 var config_provider: Node = null
 ## Điều hướng scene (mặc định autoload SceneRouter; inject stub cho test).
 var scene_router: Node = null
+## Read-cache trạng thái (mặc định autoload StateCache; inject cho test) — dùng cho offline-fallback.
+var state_cache: Node = null
+## Điều phối auth+profile (phase 20; mặc định AuthProfileFlow; inject stub cho test).
+var auth_flow: RefCounted = null
 ## Scene main hub đích.
 var main_hub_path: String = DEFAULT_MAIN_HUB_PATH
 ## Tự chạy boot khi _ready (test đặt false để tự điều khiển).
@@ -51,6 +57,8 @@ func _ready() -> void:
 		config_provider = get_node_or_null(^"/root/ConfigProvider")
 	if scene_router == null:
 		scene_router = get_node_or_null(^"/root/SceneRouter")
+	if state_cache == null:
+		state_cache = get_node_or_null(^"/root/StateCache")
 	_build_views()
 	if auto_start:
 		start()
@@ -75,17 +83,29 @@ func start() -> void:
 	_running = true
 	_show_boot()
 
-	# 1) Health = cổng kết nối bắt buộc. Mất mạng/non-2xx ⇒ màn lỗi + retry.
+	# 1) Health = cổng kết nối. Mất mạng/non-2xx ⇒ nếu có profile cache cũ ⇒ hub offline; không thì màn lỗi.
 	_set_state(State.CHECKING_HEALTH)
 	if network_client == null:
 		_fail()
 		return
 	var health: NetResult = await network_client.get_json(HEALTH_PATH, NetworkResponseParser.parse_health)
 	if not health.ok:
-		_fail()
+		_finish_or_fail()
 		return
 
-	# 2) Config = best-effort: server báo version mới thì tải; endpoint vắng/lỗi ⇒ giữ cache, KHÔNG chặn boot.
+	# 2) Auth + profile (phase 20): dùng token lưu hoặc guest login → GET /profile → StateCache.
+	#    Thất bại (401 hết lượt / mất mạng) ⇒ hub offline nếu có cache, ngược lại màn lỗi. KHÔNG bịa dữ liệu.
+	_set_state(State.AUTHENTICATING)
+	if _boot_view != null:
+		_boot_view.set_data({"status": "Đang đăng nhập..."})
+	if auth_flow == null:
+		auth_flow = AuthProfileFlow.new(network_client, state_cache)
+	var auth_result: Dictionary = await auth_flow.run()
+	if not bool(auth_result.get("ok", false)):
+		_finish_or_fail()
+		return
+
+	# 3) Config = best-effort: server báo version mới thì tải; endpoint vắng/lỗi ⇒ giữ cache, KHÔNG chặn boot.
 	#    (Config Service thật = phase 21; siết cổng config khi phase 21/22 hoàn thiện.)
 	_set_state(State.LOADING_CONFIG)
 	if _boot_view != null:
@@ -93,12 +113,10 @@ func start() -> void:
 	if config_provider != null:
 		await config_provider.check_for_update()
 
-	# 3) Vào main hub qua SceneRouter (router giải phóng scene boot). clear_history: không quay lại boot.
+	# 4) Vào main hub qua SceneRouter (router giải phóng scene boot). clear_history: không quay lại boot.
 	_set_state(State.DONE)
 	_running = false
-	if scene_router != null:
-		scene_router.goto_scene(main_hub_path)
-		scene_router.clear_history()
+	_goto_hub()
 	boot_succeeded.emit()
 
 
@@ -111,6 +129,28 @@ func retry() -> void:
 func _on_error_view_intent(intent_name: StringName, _payload: Dictionary) -> void:
 	if intent_name == BootErrorView.INTENT_RETRY:
 		retry()
+
+
+# Mất kết nối server: nếu có profile cache cũ ⇒ vào hub chế độ offline (StateCache gắn nhãn source=cache),
+# ngược lại hiện màn lỗi + retry. KHÔNG bịa dữ liệu (ADR-007/011).
+func _finish_or_fail() -> void:
+	if _has_cached_profile():
+		_set_state(State.DONE)
+		_running = false
+		_goto_hub()
+		boot_succeeded.emit()
+		return
+	_fail()
+
+
+func _goto_hub() -> void:
+	if scene_router != null:
+		scene_router.goto_scene(main_hub_path)
+		scene_router.clear_history()
+
+
+func _has_cached_profile() -> bool:
+	return state_cache != null and not state_cache.get_profile().is_empty()
 
 
 func _fail() -> void:

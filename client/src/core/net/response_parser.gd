@@ -42,6 +42,30 @@ static func parse_health(data: Dictionary) -> HealthResponse:
 	return model
 
 
+## Parse `POST /api/v1/auth/guest` → AuthGuestResponse (phase 20). `null` nếu thiếu `accessToken`.
+## refreshToken/expiresInSeconds tuỳ chọn (mặc định ""/0). TUYỆT ĐỐI không log các giá trị này.
+static func parse_auth_guest_response(data: Dictionary) -> AuthGuestResponse:
+	if not data.has("accessToken"):
+		return null
+	var model := AuthGuestResponse.new()
+	model.access_token = str(data["accessToken"])
+	model.refresh_token = str(data.get("refreshToken", ""))
+	model.expires_in_seconds = int(data.get("expiresInSeconds", 0))
+	return model
+
+
+## Parse `GET /api/v1/profile` → ProfileDto (phase 20). `null` nếu thiếu `playerId`.
+static func parse_profile(data: Dictionary) -> ProfileDto:
+	if not data.has("playerId"):
+		return null
+	var model := ProfileDto.new()
+	model.player_id = str(data["playerId"])
+	model.display_name = str(data.get("displayName", ""))
+	model.level = int(data.get("level", 0))
+	model.schema_version = int(data.get("schemaVersion", 0))
+	return model
+
+
 ## Parse metadata bundle `{ "version": { "bundle": int, "schema": int } }` → ConfigBundleDto.
 ## Dùng cho ConfigProvider so version (phase 16). `null` nếu thiếu `version`/`bundle`.
 static func parse_config_bundle(data: Dictionary) -> ConfigBundleDto:

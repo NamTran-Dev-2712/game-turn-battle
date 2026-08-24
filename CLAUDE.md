@@ -615,6 +615,49 @@ aggregate + versioning + ownership) + `docs/backend/infrastructure.md` §1.2; AD
   `docs/backend/domain-and-application.md` + `docs/backend/infrastructure.md` §1.2 + ADR-007 (Implementation) + `.instructions/backend.md`
   + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the profile tests are the behavior contract — update them.
 
+**Client auth+profile integration is standardized (Phase 20 — closed & verified). CLOSES the client side of the
+auth/save loop.** The client identity+profile flow has ONE home: **`client/src/ui/boot/auth_profile_flow.gd`**
+(`AuthProfileFlow`, RefCounted — **NOT** an autoload, no God manager) orchestrating **guest login → JWT → GET
+/profile → StateCache → hub** (ADR-007/008/011). The **auth lifecycle is CENTRALIZED in boot + AuthProfileFlow**;
+`NetworkClient` only attaches the token + emits `unauthorized`; **UI/views never contain auth logic**. Token
+persistence lives in the extended **`client/src/core/net/token_store.gd`** (`TokenStore`): stores access+refresh
+token + expiry, persisted **encrypted** via `FileAccess.open_encrypted_with_pass` to **`user://auth/token.dat`**
+(key = app salt + `OS.get_unique_id()`, device-bound) — **never plaintext, never logged, never committed**
+(`user://` is git-ignored); `NetworkClient._ready()` calls `token_store.load()`. Not OS-keychain-grade (vanilla
+Godot has none — needs a native plugin, out of scope). **Boot flow** (`boot_controller.gd`, new `State.AUTHENTICATING`):
+`health` → `AuthProfileFlow.run()` (reuse token if present+not-expired, else `POST /api/v1/auth/guest`; then
+`GET /api/v1/profile` → `StateCache.apply_snapshot`) → config (best-effort) → hub. **401/expiry → bounded re-login**
+(`MAX_RELOGIN=1`, inspects `NetResult.kind == UNAUTHORIZED` inline) — **no infinite loop**; the global `unauthorized`
+EventBus event still fires. **Offline** = health/auth fail **but** a cached profile exists (`StateCache` boots
+`source="cache"`) ⇒ boot enters the hub in **offline mode** (`[offline]` label), **never fabricating data**; error
+screen only when no usable cache. Two new parsers (`parse_auth_guest_response`/`parse_profile`) map to the existing
+generated `AuthGuestResponse`/`ProfileDto` (**no contract change → no `client/src/data/generated` drift**). Hub
+(`main_hub_presenter.gd`/`main_hub_view.gd`) displays server profile **name·level** (currency = **placeholder** —
+`ProfileDto` carries no currency until phase 31) + offline label; refreshes on `state_refreshed`. **No new EventBus
+event** — the catalogue stays CLOSED (5), reusing `unauthorized` + `state_refreshed`. Verified (Godot 4.7.1-stable
+local): `--headless --import` exit 0 (0 error/0 warning); gdUnit4 **65/65 pass, 0 orphan** (new: `token_store_test`
+4 + `auth_profile_flow_test` 6 + `main_hub_presenter_test` 3 + boot +5; 14–17 regression green); grep guard clean
+(`HTTPRequest` only in `core/net/`, no token/passphrase logging, no authority math). Canonical:
+`docs/godot/state-and-signals.md` §4.1/§3.1 + `docs/godot/ui-architecture.md` §4.1; decision log:
+`.memory/0018-client-auth-profile-standardized.md`.
+
+- Future agents **MUST reuse** `AuthProfileFlow` (boot auth orchestration), `TokenStore` (secure token store),
+  `NetworkClient` (token attach + `unauthorized`), `StateCache` (read-cache), and the generated `ProfileDto`/
+  `AuthGuestResponse` before adding any auth/profile plumbing. **MUST NOT** create a second AuthManager/ProfileManager/
+  token store/HTTP client/profile DTO, put auth logic in UI/views, call an auth endpoint from a view, bypass
+  `StateCache`, add a refresh-token architecture beyond scope, or add a per-action EventBus event.
+- **Security is binding:** token persisted **encrypted only** (never plaintext), **never logged** (no token/
+  Authorization/passphrase in `print`/`push_*`), **never hardcoded/committed**; tests use `fake-*` values only.
+- **Authority is binding (ADR-007/011):** client is display-only; profile/currency/state come from the server via
+  `StateCache.apply_snapshot`; offline shows **cached data with an explicit label** — never fabricated as fresh.
+  **401 re-login is bounded** (no infinite loop); on unrecoverable failure report an error, don't fake a profile.
+- **Out of scope (do not pull in):** refresh-token rotation endpoint (refresh token stored but not yet exchanged),
+  account/provider linking (Post-MVP), currency/wallet (phase 31), config bundle e2e (phase 22), OS keychain.
+- When changing client auth/profile, keep **`client/src/core/net/token_store.gd` + `client/src/ui/boot/auth_profile_flow.gd`
+  + `boot_controller.gd` + `main_hub_{presenter,view}.gd` + `response_parser.gd` + the gdUnit4 tests (behavior contract) +
+  `docs/godot/state-and-signals.md` §4.1/§3.1 + `docs/godot/ui-architecture.md` §4.1 + `.instructions/client.md` +
+  `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

@@ -36,7 +36,9 @@ func _bundle(version: int) -> Dictionary:
 	return {"config_version": "config@v%d" % version, "schema_version": 1, "data": {}}
 
 
-# Wire NetworkClient thật (fake transport) + ConfigProvider (cache tạm) + stub router + controller.
+# Wire NetworkClient thật (fake transport) + ConfigProvider (cache tạm) + stub router/state/auth + controller.
+# auth_flow = stub (mặc định ok) ⇒ cô lập boot khỏi chi tiết auth (auth có test riêng); state_cache = stub
+# (profile rỗng mặc định) ⇒ tất định cho nhánh offline-fallback.
 func _build(fake: FakeHttpTransport) -> Dictionary:
 	var net: Node = _NETWORK_CLIENT.new()
 	add_child(net)
@@ -50,15 +52,21 @@ func _build(fake: FakeHttpTransport) -> Dictionary:
 	var stub := _StubRouter.new()
 	add_child(stub)
 	auto_free(stub)
+	var sc := _StubStateCache.new()
+	add_child(sc)
+	auto_free(sc)
+	var auth := _StubAuthFlow.new()
 	var controller := BootController.new()
 	controller.auto_start = false
 	controller.network_client = net
 	controller.config_provider = provider
 	controller.scene_router = stub
+	controller.state_cache = sc
+	controller.auth_flow = auth
 	controller.main_hub_path = _MAIN_HUB_PATH
 	add_child(controller)
 	auto_free(controller)
-	return {"net": net, "provider": provider, "stub": stub, "controller": controller}
+	return {"net": net, "provider": provider, "stub": stub, "sc": sc, "auth": auth, "controller": controller}
 
 
 func _remove_dir_recursive(path: String) -> void:
@@ -156,6 +164,59 @@ func test_retry_after_failure_reaches_hub_without_duplicate_navigation() -> void
 	assert_str(stub.last_goto).is_equal(_MAIN_HUB_PATH)
 
 
+func test_auth_flow_runs_after_health_ok() -> void:
+	var fake := FakeHttpTransport.new()
+	fake.queue_ok(200, '{"status":"ok"}')  # /health
+	fake.queue_ok(200, '{"version":{"bundle":1,"schema":1}}')  # config version
+	fake.queue_ok(200, JSON.stringify(_bundle(1)))  # config bundle
+	var ctx := _build(fake)
+	await ctx["controller"].start()
+	assert_int(ctx["auth"].run_count).is_equal(1)  # auth chạy sau health
+	assert_str(ctx["stub"].last_goto).is_equal(_MAIN_HUB_PATH)
+
+
+func test_auth_failure_without_cache_shows_error() -> void:
+	var fake := FakeHttpTransport.new()
+	fake.queue_ok(200, '{"status":"ok"}')  # health ok
+	var ctx := _build(fake)
+	ctx["auth"].result = {"ok": false, "offline": false, "code": "X"}  # auth fail, không cache
+	var controller: BootController = ctx["controller"]
+	var failed: Array = []
+	controller.boot_failed.connect(func(_m) -> void: failed.append(true))
+	await controller.start()
+	assert_int(failed.size()).is_equal(1)
+	assert_int(controller.state).is_equal(BootController.State.FAILED)
+	assert_int(ctx["stub"].goto_count).is_equal(0)
+
+
+func test_auth_failure_with_cache_enters_hub_offline() -> void:
+	var fake := FakeHttpTransport.new()
+	fake.queue_ok(200, '{"status":"ok"}')  # health ok
+	var ctx := _build(fake)
+	ctx["sc"].profile = {"displayName": "Cached", "level": 3}  # có profile cache cũ
+	ctx["auth"].result = {"ok": false, "offline": false, "code": "X"}
+	var controller: BootController = ctx["controller"]
+	var succeeded: Array = []
+	controller.boot_succeeded.connect(func() -> void: succeeded.append(true))
+	await controller.start()
+	assert_int(succeeded.size()).is_equal(1)  # vào hub offline (không màn lỗi)
+	assert_int(ctx["stub"].goto_count).is_equal(1)
+
+
+func test_health_failure_with_cache_enters_hub_offline() -> void:
+	var fake := FakeHttpTransport.new()
+	fake.queue_transport(HTTPRequest.RESULT_CANT_CONNECT)  # /health mất mạng
+	var ctx := _build(fake)
+	ctx["sc"].profile = {"displayName": "Cached", "level": 3}
+	var controller: BootController = ctx["controller"]
+	var succeeded: Array = []
+	controller.boot_succeeded.connect(func() -> void: succeeded.append(true))
+	await controller.start()
+	assert_int(succeeded.size()).is_equal(1)
+	assert_int(ctx["stub"].goto_count).is_equal(1)
+	assert_int(ctx["auth"].run_count).is_equal(0)  # health lỗi trước ⇒ KHÔNG chạy auth
+
+
 func test_boot_scenes_exist() -> void:
 	# Scene boot/app_root/main_hub tồn tại (điều hướng thật không vỡ path).
 	assert_bool(ResourceLoader.exists("res://src/ui/app_root.tscn")).is_true()
@@ -176,3 +237,21 @@ class _StubRouter extends Node:
 
 	func clear_history() -> void:
 		clear_count += 1
+
+
+# AuthProfileFlow giả: trả kết quả cấu hình được + đếm số lần chạy (cô lập boot khỏi chi tiết auth).
+class _StubAuthFlow extends RefCounted:
+	var result: Dictionary = {"ok": true, "offline": false, "code": ""}
+	var run_count: int = 0
+
+	func run() -> Dictionary:
+		run_count += 1
+		return result
+
+
+# StateCache giả: chỉ cung cấp get_profile cho nhánh offline-fallback (tất định, không đụng đĩa thật).
+class _StubStateCache extends Node:
+	var profile: Dictionary = {}
+
+	func get_profile() -> Dictionary:
+		return profile
