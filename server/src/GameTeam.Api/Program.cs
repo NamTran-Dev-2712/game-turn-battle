@@ -3,6 +3,7 @@ using Asp.Versioning.Builder;
 using GameTeam.Api;
 using GameTeam.Api.Http;
 using GameTeam.Application;
+using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Features.Auth.Commands;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
@@ -11,7 +12,9 @@ using GameTeam.Contracts.Auth;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
 using GameTeam.Contracts.Profile;
+using GameTeam.Domain.Common;
 using GameTeam.Infrastructure;
+using GameTeam.Infrastructure.Configuration;
 using MediatR;
 using StackExchange.Redis;
 
@@ -62,12 +65,8 @@ app.MapGet("/health", async (IConnectionMultiplexer redis) =>
 // API v1 (Phase 13): versioning qua URL segment "/api/v{version:apiVersion}", default v1
 // (Asp.Versioning). Đây là convention cho mọi feature endpoint về sau — endpoint nghiệp vụ mới
 // (auth Phase 18, config Phase 21…) phải map vào version set này, KHÔNG tự tạo convention khác.
-//
-// LƯU Ý (deviation có chủ đích): các stub Phase 05 giữ nguyên trên group literal "/api/v1" bên dưới,
-// KHÔNG chuyển vào version set — vì "/config/{version}" có route param tên "version" TRÙNG với param
-// "{version:apiVersion}" của prefix version set (RoutePatternFactory từ chối trùng tên ⇒ vỡ sinh
-// OpenAPI). Đổi tên param sẽ phá path contract "/api/v1/config/{version}" (Phase 05). Khi các phase
-// sở hữu reimplement (18/21), chúng map vào version set và giải quyết trùng tên tại chỗ.
+// Toàn bộ stub Phase 05 đã được các phase sở hữu reimplement vào version set (auth 18, profile 19,
+// config 21) — không còn group literal "/api/v1".
 // ─────────────────────────────────────────────────────────────────────────────
 ApiVersionSet versionSet = app.NewApiVersionSet()
     .HasApiVersion(new ApiVersion(1))
@@ -123,17 +122,47 @@ apiV1.MapGet("/profile", (ISender sender, HttpContext httpContext) =>
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTRACT SKELETON (Phase 05): khai báo HÌNH DẠNG endpoint nền cho OpenAPI — KHÔNG hiện thực
-// nghiệp vụ (handler thật ở phase sở hữu: config=21). Trả 501 Not Implemented. Giữ trên group LITERAL
-// "/api/v1" (ApiVersions.V1Prefix) như Phase 05 — path contract KHÔNG đổi. (Xem lưu ý deviation ở version
-// set phía trên về xung đột param "{version}".) auth/guest (18) + profile (19) đã reimplement vào version set.
-// Các stub này theo FallbackPolicy ⇒ mặc định yêu cầu token; phase sở hữu (21) quyết định public/authz.
+// CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC
+// (.AllowAnonymous) — bundle là nội dung chung, không nhạy cảm, client cache theo version; tách khỏi
+// token. Reimplement stub Phase 05 "/config/{version}" thành hai endpoint theo roadmap: bundle theo
+// query param + endpoint current riêng.
+//
+// LƯU Ý: query param đặt tên "bundleVersion" (KHÔNG "version") — tên "version" TRÙNG token
+// "{version:apiVersion}" của version set ⇒ ApiExplorer KHÔNG thay thế được, path spec kẹt ở
+// "/api/v{version}/...". Đây chính là xung đột Phase 05 đã cảnh báo; đổi tên param giải quyết tại chỗ,
+// path sạch "/api/v1/config/bundle".
 // ─────────────────────────────────────────────────────────────────────────────
-RouteGroupBuilder contractV1 = app.MapGroup(ApiVersions.V1Prefix);
 
-// TODO Phase 21: real handler — trả gói cấu hình theo version.
-contractV1.MapGet("/config/{version}", (string version) => Results.StatusCode(StatusCodes.Status501NotImplemented))
+// GET /api/v1/config/current — version config hiện hành (con trỏ "current"). ConfigBundleDto mang
+// ConfigVersion (bundle + schema) — giữ contract Phase 05 (KHÔNG đổi ⇒ không drift codegen).
+apiV1.MapGet("/config/current", (IConfigProvider configProvider) =>
+        Results.Ok(new ConfigBundleDto(configProvider.CurrentVersion)))
+    .WithName("GetConfigCurrent")
+    .MapToApiVersion(1)
+    .AllowAnonymous()
+    .Produces<ConfigBundleDto>(StatusCodes.Status200OK);
+
+// GET /api/v1/config/bundle?bundleVersion=N — trả bundle bất biến theo version (thiếu ⇒ current),
+// phục vụ NGUYÊN VĂN tài liệu bundle (checksum còn hiệu lực). Không tồn tại ⇒ 404 ErrorEnvelope.
+apiV1.MapGet("/config/bundle", async (
+        int? bundleVersion,
+        IConfigProvider configProvider,
+        ConfigBundleStore bundleStore,
+        HttpContext httpContext,
+        CancellationToken cancellationToken) =>
+    {
+        int requested = bundleVersion ?? configProvider.CurrentVersion.Bundle;
+        StoredBundle? bundle = await bundleStore.GetByVersionAsync(requested, cancellationToken);
+
+        return bundle is null
+            ? ApiResults.Problem(
+                new Error("CONFIG_BUNDLE_NOT_FOUND", $"Config bundle version {requested} not found."),
+                httpContext)
+            : Results.Content(bundle.Payload, "application/json");
+    })
     .WithName("GetConfigBundle")
+    .MapToApiVersion(1)
+    .AllowAnonymous()
     .Produces<ConfigBundleDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
 

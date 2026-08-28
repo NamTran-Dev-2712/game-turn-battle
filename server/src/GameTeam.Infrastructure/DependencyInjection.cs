@@ -83,10 +83,22 @@ public static class DependencyInjection
         // ── Server-time boundary (Domain port IClock) ────────────────────────────────────────────
         services.AddSingleton<IClock, SystemClock>();
 
-        // ── Config version provider (port IConfigProvider) ───────────────────────────────────────
-        // Placeholder tối thiểu (config@v1) để composition root ĐỦ cho CachingBehavior — Phase 21
-        // (Config Service) THAY THẾ bằng bundle loading/publishing thật. Không đọc balance ở đây.
-        services.AddSingleton<IConfigProvider, DefaultConfigProvider>();
+        // ── Configuration Service (port IConfigProvider, Phase 21, ADR-005) ──────────────────────
+        // RuntimeConfigProvider giữ snapshot bundle hiện hành trong bộ nhớ (swap nguyên tử khi publish);
+        // đăng ký singleton + expose cùng instance qua port. Store (DB+Redis) + publisher scoped (dùng
+        // DbContext theo scope). ConfigServiceOptions từ section "ConfigService" (mặc định repo-relative,
+        // resolve ra tuyệt đối lúc publish). Publish khi deploy: hosted service chạy MỘT LẦN lúc boot —
+        // best-effort, KHÔNG làm sập host nếu DB chưa migrate (graceful degradation).
+        services.AddSingleton<RuntimeConfigProvider>();
+        services.AddSingleton<IConfigProvider>(sp => sp.GetRequiredService<RuntimeConfigProvider>());
+        services.AddScoped<ConfigBundleStore>();
+        services.AddScoped<ConfigBundlePublisher>();
+        services.AddSingleton<IOptions<ConfigServiceOptions>>(_ => Options.Create(new ConfigServiceOptions
+        {
+            ConfigRoot = configuration.GetSection(ConfigServiceOptions.SectionName)["ConfigRoot"] ?? "config",
+            SchemaRoot = configuration.GetSection(ConfigServiceOptions.SectionName)["SchemaRoot"] ?? "shared/config-schema",
+        }));
+        services.AddHostedService<ConfigPublishHostedService>();
 
         // ── Auth: JWT token service (Phase 18, ADR-008) ──────────────────────────────────────────
         // JwtOptions đọc từ section "Jwt". SigningKey LẤY TỪ SECRET/env (Jwt__SigningKey) — không

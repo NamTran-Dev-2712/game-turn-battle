@@ -4,6 +4,10 @@
   <ItemGroup>
     <ProjectReference Include="..\GameTeam.Application\GameTeam.Application.csproj" />
     <ProjectReference Include="..\GameTeam.Domain\GameTeam.Domain.csproj" />
+    <!-- Reuse the Phase-07 config validator core lib for the Configuration Service (Phase 21) — one
+         validation source of truth (ConfigValidationRunner/ConfigLoader). Pure net9.0 lib (no Console);
+         it resolves its own packages via tools/config-validator/Directory.Packages.props. -->
+    <ProjectReference Include="..\..\..\tools\config-validator\GameTeam.ConfigValidator\GameTeam.ConfigValidator.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -16,6 +20,8 @@
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <!-- IHostedService + AddHostedService for the deploy-time config publish (Phase 21). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
     <!-- ILogger<T> cho RedisCacheService (graceful-degradation warning). -->
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <!-- Dispatch domain event tại SaveChanges qua MediatR IPublisher (Phase 11). -->

@@ -23,7 +23,7 @@
 |---|---|---|
 | Auth | `POST /api/v1/auth/guest`, `/auth/refresh` | command |
 | Profile | `GET /api/v1/profile` | query |
-| Config | `GET /api/v1/config/{version}` | query (cache) |
+| Config | `GET /api/v1/config/current`, `GET /api/v1/config/bundle?bundleVersion=N` | query (public, cache) |
 | Heroes | `GET /api/v1/heroes` | query |
 | Formation | `PUT /api/v1/teams/{id}` | command |
 | Battle | `POST /api/v1/battles` | command (re-sim) |
@@ -127,10 +127,10 @@ endpoint** về sau — không tự vẽ convention khác.
   resolve `/api/v1/...`). Endpoint mới map vào **version set**: `app.NewApiVersionSet().HasApiVersion(new
   ApiVersion(1))...Build()` + `app.MapGroup("/api/v{version:apiVersion}").WithApiVersionSet(set)` + endpoint
   `.MapToApiVersion(1)`. `GameTeam.Contracts.Common.ApiVersions` vẫn là nguồn hằng số version.
-  - *Lưu ý:* `auth/guest` (Phase 18) đã chuyển vào **version set** (handler thật). `profile`/`config/{version}`
-    còn là stub Phase 05 trên group **literal** `/api/v1` (vì `/config/{version}` có param `version` trùng
-    `{version:apiVersion}` của version set prefix — `RoutePatternFactory` từ chối trùng); phase sở hữu (19/21)
-    chuyển nốt khi reimplement. Các stub này theo `FallbackPolicy` ⇒ mặc định yêu cầu token.
+  - *Lưu ý:* mọi stub Phase 05 đã được reimplement vào **version set** (auth/guest 18, profile 19, config 21) —
+    **không còn** group literal `/api/v1`. Config: stub `/config/{version}` (param `version` **trùng** token
+    `{version:apiVersion}` ⇒ ApiExplorer không substitute được) được **thay** ở Phase 21 bằng hai endpoint dùng query
+    param đặt tên `bundleVersion` (không `version`) — xung đột giải quyết tại chỗ, path spec sạch `/api/v1/config/...`.
 - **Endpoint mỏng qua MediatR:** HTTP → `ISender.Send(command/query)` → Application handler → `Result` →
   `ApiResults` → HTTP. KHÔNG nhét nghiệp vụ vào endpoint. Mẫu: `GET /api/v1/ping` (`PingCommand`),
   `GET /api/v1/server-time` (`GetServerTimeQuery` + `IClock` — không gọi `DateTime.UtcNow` ở endpoint).
@@ -140,8 +140,8 @@ endpoint** về sau — không tự vẽ convention khác.
 - **Composition root** (`Program.cs`): `AddApplication().AddInfrastructure(config).AddApi()`;
   `UseExceptionHandler()` sớm; `MapOpenApi()`; Swagger UI **dev-only**; `/health` giữ nguyên (không versioned).
   `public partial class Program` cho `WebApplicationFactory<Program>`.
-  - `IConfigProvider` có placeholder tối thiểu `DefaultConfigProvider` (Infra, config@v1) để đủ cho
-    `CachingBehavior` — **Phase 21** thay bằng Config Service thật.
+  - `IConfigProvider` được **Phase 21** hiện thực thật (`RuntimeConfigProvider`, thay placeholder `DefaultConfigProvider`):
+    phục vụ bundle config bất biến hiện hành; xem `infrastructure.md §3.1`.
 - **Swagger:** UI (`Swashbuckle.AspNetCore.SwaggerUI`) **chỉ render** OpenAPI first-party `/openapi/v1.json`
   ở Development — **KHÔNG** dùng SwaggerGen (giữ single-source `shared/contracts/openapi.json` §4.4). Thêm/đổi
   endpoint ⇒ rebuild (regenerate openapi.json) + `bash shared/codegen/run.sh` + kiểm drift.
@@ -150,8 +150,9 @@ endpoint** về sau — không tự vẽ convention khác.
   `AddAuthorization` với **`FallbackPolicy = RequireAuthenticatedUser`** ⇒ **mọi endpoint yêu cầu token mặc định**
   (secure-by-default). `Program.cs` bật `UseAuthentication()/UseAuthorization()` (sau routing/swagger, trước map
   endpoint). **Public whitelist tường minh** (`.AllowAnonymous`): `/health`, `POST /api/v1/auth/guest`,
-  `/openapi/*`, `/swagger`. Endpoint nghiệp vụ mới **mặc định được bảo vệ** — chỉ mở bằng `.AllowAnonymous` khi
-  thật sự công khai. Guest login: `POST /api/v1/auth/guest` (vào version set) → `CreateGuestAccountCommand` →
+  `/openapi/*`, `/swagger`, và **config** `GET /api/v1/config/current` + `GET /api/v1/config/bundle` (Phase 21 —
+  bundle là nội dung chung, không nhạy cảm, client cache theo version; tách khỏi token). Endpoint nghiệp vụ mới
+  **mặc định được bảo vệ** — chỉ mở bằng `.AllowAnonymous` khi thật sự công khai. Guest login: `POST /api/v1/auth/guest` (vào version set) → `CreateGuestAccountCommand` →
   JWT (`sub`=account id, `type`=guest, `exp`) + refresh token đục (nền tảng) + `expiresInSeconds`. Lỗi auth trả
   đúng **`ErrorEnvelope`** (401 `UNAUTHENTICATED` / 403 `FORBIDDEN`, qua `AuthProblem` + `ErrorHttpMapping`) —
   KHÔNG body rỗng, KHÔNG shape khác. **Key JWT** từ secret/env `Jwt__SigningKey` (fail-fast, **không** hardcode/

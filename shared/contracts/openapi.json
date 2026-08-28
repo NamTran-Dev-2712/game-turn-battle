@@ -127,19 +127,19 @@
         }
       }
     },
-    "/health": {
+    "/api/v1/config/current": {
       "get": {
         "tags": [
           "GameTeam.Api"
         ],
-        "operationId": "Health",
+        "operationId": "GetConfigCurrent",
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
+                  "$ref": "#/components/schemas/ConfigBundleDto"
                 }
               }
             }
@@ -147,7 +147,7 @@
         }
       }
     },
-    "/api/v1/config/{version}": {
+    "/api/v1/config/bundle": {
       "get": {
         "tags": [
           "GameTeam.Api"
@@ -155,11 +155,11 @@
         "operationId": "GetConfigBundle",
         "parameters": [
           {
-            "name": "version",
-            "in": "path",
-            "required": true,
+            "name": "bundleVersion",
+            "in": "query",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -180,6 +180,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "Health",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
