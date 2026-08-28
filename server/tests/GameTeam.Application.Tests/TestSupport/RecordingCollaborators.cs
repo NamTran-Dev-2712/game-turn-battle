@@ -52,10 +52,15 @@ public sealed class RecordingCacheService(ExecutionRecorder recorder) : ICacheSe
     }
 }
 
-/// <summary>Config provider returning a fixed version (Config Service is Phase 21).</summary>
+/// <summary>Config provider returning a fixed version; no entries (only the version is exercised here).</summary>
 public sealed class FixedConfigProvider(ConfigVersion version) : IConfigProvider
 {
     public ConfigVersion CurrentVersion { get; } = version;
+
+    public T? Get<T>(string type, string id)
+        where T : class => null;
+
+    public IReadOnlyList<string> GetIds(string type) => [];
 }
 
 /// <summary>Deterministic clock for tests (no wall-clock).</summary>

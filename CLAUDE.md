@@ -658,6 +658,53 @@ local): `--headless --import` exit 0 (0 error/0 warning); gdUnit4 **65/65 pass, 
   `docs/godot/state-and-signals.md` §4.1/§3.1 + `docs/godot/ui-architecture.md` §4.1 + `.instructions/client.md` +
   `.claude/agents/godot-client.md` in sync** (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
 
+**Configuration Service is standardized (Phase 21 — closed & verified). CLOSES Core Framework (P1).** The backend runtime
+**SSOT for config** lives in **`GameTeam.Infrastructure/Configuration/`** (ADR-004/005). Pipeline:
+`config/ → validate → build immutable bundle (config@vN) → persist (DB) + cache (Redis) → flip "current" atomically →
+serve via IConfigProvider`. Domain/Application read config **ONLY** through the `IConfigProvider` port — **never the
+filesystem** (grep guard: no `File.`/`Directory.`/`Path.` in Domain/Application). Components: **`RuntimeConfigProvider`**
+(replaces the Phase-13 `DefaultConfigProvider`; holds an immutable in-memory `ConfigSnapshot` swapped atomically —
+`CurrentVersion` + `Get<T>(type,id)` + `GetIds(type)`, synchronous/no-I/O); **`ConfigBundleBuilder`** (groups config into
+`data{type:{id}}`, **deterministic SHA-256 checksum** over canonical `{schema_version,data}` — order-independent, excludes
+`generated_at`); **`ConfigBundlePublisher`** (validate via the **reused Phase-07 `ConfigValidationRunner`/`ConfigLoader`**
+core lib — one validation source, ProjectReference; fail ⇒ NO publish, current unchanged; **checksum dedup** ⇒ identical
+config never bumps; new version = current+1); **`ConfigBundleStore`** (DB `config_bundles` + singleton pointer
+`config_current`; `SaveAndPublishAsync` inserts bundle + flips pointer in **one transaction**, warms Redis after commit;
+`GetByVersionAsync` Redis→DB fallback; reuses the Phase-12 `ICacheService`, key `config-bundle:config@vN`, long TTL);
+**`ConfigPublishHostedService`** (`IHostedService` = **deploy-time publish MVP**, runs once at boot, **best-effort/graceful
+degradation** — never crashes the host). Persistence: tables **`config_bundles`** (immutable rows: `version` PK,
+`config_version` unique, `schema_version`, `checksum`, `generated_at`, `payload` = verbatim envelope) + **`config_current`**
+(singleton pointer, no seed), migration `AddConfigBundles`. **Endpoints** (version set, `.AllowAnonymous` — bundle is
+non-sensitive shared content): `GET /api/v1/config/current` (→ `ConfigBundleDto`) + `GET /api/v1/config/bundle?bundleVersion=N`
+(verbatim payload; missing ⇒ current; unknown ⇒ 404 `ErrorEnvelope` `CONFIG_BUNDLE_NOT_FOUND`; query param is
+`bundleVersion` — NOT `version` — to avoid the `{version:apiVersion}` token collision). Verified (Docker Desktop 28.5.1):
+build Release 0/0, `dotnet test` **203 pass** (Infrastructure.Tests 41 incl. 5 Testcontainers Config Service integration +
+6 checksum unit; Api.IntegrationTests 45 incl. 4 config endpoint), `has-pending-model-changes` clean, migration up/down
+green, config-validator exit 0, no `openapi.json` shape drift beyond the new paths, no generated-client drift. Canonical:
+`docs/backend/infrastructure.md` §3.1 + `docs/backend/api-and-versioning.md` §4.5 + `docs/liveops/remote-config.md` §4.1 +
+`docs/gameplay/configuration-and-data.md` §5; decision log: `.memory/0019-config-service-standardized.md`.
+
+- Future agents **MUST reuse** `IConfigProvider`/`RuntimeConfigProvider`/`ConfigBundlePublisher`/`ConfigBundleStore`/
+  `ConfigBundleBuilder` before adding any config read/publish; **MUST NOT** create a second config provider/publisher/bundle
+  store, read config from the filesystem in Domain/Application, bypass the port, or **fork a second validator** (the Config
+  Service reuses the Phase-07 core lib — validate is one source of truth).
+- **Immutability & atomicity are binding (ADR-005):** a bundle version is **never mutated** (a config change publishes a NEW
+  version); the "current" pointer flips **last**, inside the persist transaction, so it only ever names a fully-built bundle.
+  Each `config@vN` is cached under its **own immutable Redis key** (never overwritten). Keep old versions (rollback foundation).
+- **Validator-fail MUST block publish** (current unchanged; invalid bundle never persisted/cached/served). **Config change ⇒
+  new version served with NO client rebuild.** Dedup by checksum (unchanged config = no version bump; idempotent redeploy).
+- **Out of scope (leave as placeholders):** client bundle e2e/caching = **phase 22** (client `ConfigProvider` already exists,
+  phase 16); typed gameplay config POCOs (hero/skill) = **phases 27+** (provider stays generic `Get<T>`); live bundle swap
+  without deploy = **Post-MVP**; feature flags / A-B = **phase 49**; admin publish/authz, signed bundles, delta download,
+  rollback workflow = **Post-MVP**.
+- When changing the Config Service, keep **`GameTeam.Infrastructure/Configuration/*` + `Persistence/ConfigBundleRecord`/
+  `ConfigCurrentPointer` + configs + migration + `IConfigProvider` (port) + `AddInfrastructure` + `Program.cs` (config
+  endpoints in the version set) + the tests (`ConfigBundleBuilderTests`, `ConfigServiceIntegrationTests`, `ConfigEndpointTests`
+  — behavior contract) + regenerated `openapi.json` + `docs/backend/infrastructure.md` §3.1 + `docs/backend/api-and-versioning.md`
+  + `docs/liveops/remote-config.md` §4.1 + `docs/gameplay/configuration-and-data.md` §5 + `.instructions/backend.md` +
+  `.instructions/config.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the integration tests are the
+  behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

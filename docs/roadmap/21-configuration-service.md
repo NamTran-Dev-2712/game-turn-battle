@@ -41,14 +41,14 @@ ADR-005: config là dữ liệu runtime versioned; đổi config **không rebuil
 
 # Công việc cần thực hiện
 
-- [ ] Pipeline nạp `config/` → chạy validate (tái dùng validator/lib phase 07) → fail thì không publish.
-- [ ] Đóng gói bundle immutable: gộp config theo type, gắn `config_version` (`config@vN`) + `schema_version` + checksum.
-- [ ] Lưu bundle (DB/artifact) + cache Redis key theo version.
-- [ ] Hiện thực `IConfigProvider` (Infrastructure): load bundle hiện hành, truy vấn `get<T>(id)` cho Application/Domain (qua port).
-- [ ] Endpoint `GET /config/bundle?version=` (trả bundle) + `GET /config/current` (version hiện hành).
-- [ ] Cơ chế publish khi deploy (MVP): version tăng, immutable; ghi nền cho rollback (giữ version cũ).
-- [ ] Integration test: publish → provider đọc; sửa giá trị config → version bump → bundle mới phục vụ.
-- [ ] Cập nhật [`../liveops/remote-config.md`](../liveops/remote-config.md) + [`../gameplay/configuration-and-data.md`](../gameplay/configuration-and-data.md).
+- [x] Pipeline nạp `config/` → chạy validate (tái dùng `ConfigValidationRunner`/`ConfigLoader` phase 07 qua ProjectReference) → fail thì không publish. *(`ConfigBundlePublisher.PublishAsync`; test `Invalid_config_does_not_publish_and_leaves_current_unchanged` xanh.)*
+- [x] Đóng gói bundle immutable: gộp config theo type → `data{type:{id:node}}`, gắn `config_version` (`config@vN`) + `schema_version` + **checksum SHA-256 xác định** (canonical, độc lập thứ tự key/file, loại `generated_at`). *(`ConfigBundleBuilder`; 6 unit test checksum xanh.)*
+- [x] Lưu bundle (DB `config_bundles` + con trỏ `config_current`) + cache Redis key bất biến theo version (`config-bundle:config@vN`, tái dùng `ICacheService`). *(migration `AddConfigBundles`; test `Each_version_is_cached_under_its_own_immutable_redis_key` xanh.)*
+- [x] Hiện thực `IConfigProvider` (Infrastructure `RuntimeConfigProvider`): snapshot bundle hiện hành trong bộ nhớ (swap nguyên tử), truy vấn `Get<T>(type,id)`/`GetIds` cho Application/Domain (qua port; thay `DefaultConfigProvider`). *(test `Publish_makes_the_provider_serve_config_by_id` xanh.)*
+- [x] Endpoint `GET /api/v1/config/bundle?bundleVersion=` (trả bundle nguyên văn; thiếu ⇒ current; không tồn tại ⇒ 404 `ErrorEnvelope`) + `GET /api/v1/config/current` (version hiện hành). Cả hai `.AllowAnonymous`. *(param đổi tên `bundleVersion` để tránh trùng token `{version:apiVersion}`; `ConfigEndpointTests` 4/4 xanh.)*
+- [x] Cơ chế publish khi deploy (MVP): `ConfigPublishHostedService` (`IHostedService`) chạy MỘT LẦN lúc boot — version tăng, immutable, dedup theo checksum (config không đổi ⇒ không bump); best-effort (không sập host nếu DB chưa migrate). Giữ version cũ = nền rollback. *(test `Changing_a_value_publishes_a_new_version_and_keeps_the_old_one` + `Republishing_identical_config_does_not_bump_the_version` xanh.)*
+- [x] Integration test (Testcontainers Postgres+Redis): publish → provider đọc; sửa giá trị config → version bump → bundle mới phục vụ + bundle cũ vẫn phục vụ (immutable); validator-fail chặn publish; redeploy trùng ⇒ không bump; endpoint anonymous + 404. *(9 integration + 6 unit; `dotnet test` toàn bộ 203 pass.)*
+- [x] Cập nhật [`../liveops/remote-config.md`](../liveops/remote-config.md) + [`../gameplay/configuration-and-data.md`](../gameplay/configuration-and-data.md) (+ `../backend/infrastructure.md §3`, `../backend/api-and-versioning.md`).
 
 # Tiêu chí hoàn thành
 
@@ -83,7 +83,20 @@ Bundle **immutable** cho phép cache mạnh + rollback (giữ version cũ). Live
 
 # Phase Review
 
-Đóng khi Service publish bundle versioned + provider phục vụ + đổi config không rebuild + validator-fail chặn publish, integration test xanh. **Kết thúc Core Framework (P1).**
+**ĐÓNG & verify cục bộ (2026-08-26, Docker Desktop 28.5.1).** Configuration Service publish bundle versioned bất
+biến + `RuntimeConfigProvider` phục vụ qua `IConfigProvider` + đổi config → version mới phục vụ trên **cùng API build
+(không rebuild client)** + validator-fail chặn publish (current giữ nguyên) + bundle cũ immutable (nền rollback).
+Pipeline `config/ → ConfigLoader/ConfigValidationRunner (tái dùng phase 07) → ConfigBundleBuilder (checksum SHA-256 xác
+định, dedup) → config_bundles + config_current (flip nguyên tử trong 1 transaction) → cache Redis theo version →
+RuntimeConfigProvider`. Publish khi deploy qua `ConfigPublishHostedService` (best-effort, graceful degradation).
+Domain/Application **không** đọc file config (grep guard sạch; đọc qua port). **Build Release 0/0; `dotnet test` 203 pass**
+(Infrastructure 41 gồm 5 integration Config Service + 6 unit checksum; Api.Integration 45 gồm 4 config endpoint;
+`has-pending-model-changes` sạch; migration up/down xanh); config-validator exit 0; codegen no drift. Đủ điều kiện đóng.
+**Kết thúc Core Framework (P1).**
+
+> Ngoài phạm vi (đặt nền, không làm): client bundle e2e/caching = phase 22; live swap không cần deploy = Post-MVP;
+> feature flags/A-B = phase 49; typed config POCO (hero/skill) = phase 27+ (provider giữ `Get<T>` generic).
+> Nợ ghi nhận: admin publish/authz, signed bundle, delta download, rollback workflow (Post-MVP).
 
 ---
 

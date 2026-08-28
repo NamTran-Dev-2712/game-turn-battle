@@ -46,6 +46,12 @@ public class AppDbContext : DbContext
     /// <summary>Hồ sơ người chơi — gốc save server-authoritative, gắn 1-1 với Account (Phase 19, ADR-007).</summary>
     public DbSet<PlayerProfile> PlayerProfiles => Set<PlayerProfile>();
 
+    /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
+    public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();
+
+    /// <summary>Con trỏ "current" tới version config đang phục vụ — flip nguyên tử khi publish (Phase 21).</summary>
+    public DbSet<ConfigCurrentPointer> ConfigCurrent => Set<ConfigCurrentPointer>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

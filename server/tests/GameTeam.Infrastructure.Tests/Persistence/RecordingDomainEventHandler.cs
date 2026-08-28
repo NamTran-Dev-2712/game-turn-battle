@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Profiles;
 using GameTeam.Infrastructure.Persistence;
 using MediatR;
 
@@ -46,6 +47,25 @@ public sealed class RecordingAccountCreatedHandler
     public RecordingAccountCreatedHandler(DispatchedEventsCollector collector) => _collector = collector;
 
     public Task Handle(DomainEventNotification<AccountCreated> notification, CancellationToken cancellationToken)
+    {
+        _collector.Add(notification.DomainEvent);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Handler cho <see cref="DomainEventNotification{TDomainEvent}"/> của <see cref="PlayerProfileCreated"/> (Phase 19) —
+/// để <see cref="PlayerProfilePersistenceTests.Saving_new_profile_dispatches_PlayerProfileCreated"/> ghi nhận được
+/// event khi dispatch qua đúng kiểu cụ thể sau SaveChanges (không có handler này thì collector rỗng).
+/// </summary>
+public sealed class RecordingPlayerProfileCreatedHandler
+    : INotificationHandler<DomainEventNotification<PlayerProfileCreated>>
+{
+    private readonly DispatchedEventsCollector _collector;
+
+    public RecordingPlayerProfileCreatedHandler(DispatchedEventsCollector collector) => _collector = collector;
+
+    public Task Handle(DomainEventNotification<PlayerProfileCreated> notification, CancellationToken cancellationToken)
     {
         _collector.Add(notification.DomainEvent);
         return Task.CompletedTask;

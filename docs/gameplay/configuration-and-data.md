@@ -64,12 +64,17 @@ flowchart LR
 ## 5. Ranh giới với backend
 - Domain/Application đọc config qua `IConfigProvider` (port), **không** đọc file trực tiếp (`../backend/`).
 - Combat sim đọc chỉ số từ config version cụ thể (đảm bảo re-sim tất định — ADR-011).
+- **Configuration Service (Phase 21 — đã hiện thực):** `IConfigProvider` = `RuntimeConfigProvider` (Infrastructure) phục
+  vụ **bundle bất biến hiện hành** (`config@vN`) từ snapshot bộ nhớ — `Get<T>(type,id)`/`GetIds(type)`/`CurrentVersion`.
+  Backend nạp/validate (tái dùng validator phase 07)/version/publish bundle; đổi giá trị config → **version mới, không
+  rebuild**. Chi tiết: `../backend/infrastructure.md §3.1`; endpoint & boundary: `../liveops/remote-config.md §4.1`.
 
 ## 6. Tooling
 - `tools/config-validator` (Phase 07 — **GATE CI bắt buộc**, .NET 9): validate schema (draft 2020-12) +
   referential integrity + `schema_version` cho `config/**`. Chạy: `bash tools/config-validator/run.sh config
   shared/config-schema`. Report `file:jsonpath:CODE`; mã lỗi (`JSON001`/`MAP001`/`SCH001`/`VER001`/`VER002`/`REF001`/`REF002`)
-  ở `../../tools/config-validator/README.md`. Core lib tái dùng cho Config Service (Phase 21).
+  ở `../../tools/config-validator/README.md`. Core lib **được Config Service (Phase 21) tái dùng** qua ProjectReference
+  (`ConfigValidationRunner.Run` + `ConfigLoader.Load`) — một nguồn validate, không fork validator thứ 2.
 - `tools/content-importer` (Post-MVP): import bảng (csv/xlsx) → config json.
 
 ## 7. Liên kết

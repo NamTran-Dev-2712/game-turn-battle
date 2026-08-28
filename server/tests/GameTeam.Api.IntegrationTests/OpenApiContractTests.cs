@@ -42,7 +42,8 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("/health")]
     [InlineData("/api/v1/auth/guest")]
     [InlineData("/api/v1/profile")]
-    [InlineData("/api/v1/config/{version}")]
+    [InlineData("/api/v1/config/current")] // Phase 21: reimplemented the Phase-05 "/config/{version}" stub
+    [InlineData("/api/v1/config/bundle")]  //           as current-version + versioned-bundle endpoints
     public async Task OpenApi_document_exposes_foundation_paths(string path)
     {
         (OpenApiDocument doc, _) = await ReadDocumentAsync();

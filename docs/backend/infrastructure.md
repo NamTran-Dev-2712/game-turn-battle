@@ -153,6 +153,31 @@ flowchart LR
 - Bundle **bất biến, versioned**; đổi giá trị = publish version mới.
 - Nền cho feature flags/schedule (ADR-006, `../liveops/`).
 
+### 3.1 Nền Configuration Service đã chốt (Phase 21 — đóng & verify)
+
+Nguồn hiện thực ở **`GameTeam.Infrastructure/Configuration/`** — SSOT **runtime** cho config (ADR-005). Pipeline:
+`config/ → validate → build bundle bất biến (config@vN) → persist (DB) + cache (Redis) → flip "current" nguyên tử →
+IConfigProvider`. Domain/Application đọc config **CHỈ** qua port `IConfigProvider` (không chạm filesystem — grep guard).
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| `RuntimeConfigProvider` | `Configuration/RuntimeConfigProvider.cs` | Hiện thực `IConfigProvider` (thay `DefaultConfigProvider`). Giữ **snapshot bất biến trong bộ nhớ** (`ConfigSnapshot`, swap qua field `volatile`); `CurrentVersion` + `Get<T>(type,id)` (deserialize entry JSON→T, snake_case) + `GetIds(type)` — **đồng bộ, không I/O** (an toàn hot path; `CachingBehavior` đọc `CurrentVersion.Bundle` đồng bộ). Singleton; publisher gọi `Apply(snapshot)`. |
+| `ConfigBundleBuilder` | `Configuration/ConfigBundleBuilder.cs` | Gộp entity → `data{type:{id:node}}` (đủ 8 type key, sort). **Checksum SHA-256 xác định** trên canonical `{schema_version,data}` (sort key đệ quy ⇒ độc lập thứ tự file/JSON; **loại `generated_at`** ⇒ redeploy trùng không đổi checksum). `ComposeBundleJson` ⇒ tài liệu envelope canonical phục vụ **nguyên văn**. |
+| `ConfigBundlePublisher` | `Configuration/ConfigBundlePublisher.cs` | Điều phối: `ConfigValidationRunner.Run` (**tái dùng core lib phase 07** qua ProjectReference — một nguồn validate) → fail ⇒ **không publish** (current giữ nguyên, nạp lại last-good) → build + checksum → **dedup** (checksum trùng current ⇒ không bump) → `newVersion=current+1` → `SaveAndPublishAsync` → `provider.Apply`. |
+| `ConfigBundleStore` | `Configuration/ConfigBundleStore.cs` | DB (`AppDbContext`) + cache. `GetByVersionAsync` (Redis→DB fallback→re-warm), `GetCurrentAsync` (theo con trỏ). `SaveAndPublishAsync`: insert bundle + flip con trỏ `config_current` **trong 1 transaction** (persist+flip nguyên tử), warm cache **sau commit**. Cache tái dùng `ICacheService` (Phase 12), key `config-bundle:config@vN`, TTL dài (immutable). |
+| `ConfigPublishHostedService` | `Configuration/ConfigPublishHostedService.cs` | **Publish khi deploy (MVP)**: `IHostedService` chạy `PublishAsync` MỘT LẦN lúc boot. **Best-effort/graceful degradation** — mọi lỗi boot (DB chưa migrate…) log Warning + nuốt, KHÔNG sập host; provider phục vụ bundle đã publish trước đó nếu có. |
+| `ConfigServiceOptions` + `ConfigPathResolver` | `Configuration/*` | Options section `ConfigService` (`ConfigRoot`/`SchemaRoot`, mặc định repo-relative). Resolver tìm repo root (ancestor chứa `config/` + `shared/config-schema/`) ⇒ chạy đúng bất kể working dir; test truyền path tuyệt đối. |
+| Persistence | `Persistence/ConfigBundleRecord.cs` (bảng `config_bundles`) + `ConfigCurrentPointer.cs` (bảng `config_current`) + `Configurations/*` + migration `AddConfigBundles` | `config_bundles`: `version`(PK int), `config_version`(text, unique index), `schema_version`, `checksum`, `generated_at`, `payload`(text — envelope nguyên văn). **Immutable** (một row/version, không sửa). `config_current`: singleton (`id`,`current_version`) — con trỏ "current", **không seed** (rỗng = chưa publish). |
+
+- **Bundle envelope** (payload phục vụ): `{ schema_version, config_version:"config@vN", checksum, generated_at, data:{type:{id:entry}} }` — khớp `shared/config-schema/config-bundle.schema.json` (client parse ở phase 22). `schema_version` = `VersionValidator.SupportedSchemaVersion` (=1).
+- **Atomic publish (rủi ro nửa chừng):** con trỏ `current` chỉ flip **sau** khi validate + build + checksum + persist xong, **trong** transaction cùng insert bundle. Publish lỗi giữa chừng ⇒ rollback ⇒ current vẫn trỏ version cũ; bundle chưa hoàn tất KHÔNG bao giờ là "current".
+- **Immutable cache theo version:** mỗi `config@vN` một key Redis riêng (không overwrite); ADR-005 ⇒ an toàn cache dài. Bump `CurrentVersion.Bundle` tự vô hiệu cache query (`CachingBehavior`, §2.1).
+- **Endpoint** (tầng Api, version set, `.AllowAnonymous` — bundle là nội dung chung): `GET /api/v1/config/current` (→ `ConfigBundleDto`) + `GET /api/v1/config/bundle?bundleVersion=N` (payload nguyên văn; thiếu ⇒ current; không có ⇒ 404 `ErrorEnvelope` `CONFIG_BUNDLE_NOT_FOUND`). Param `bundleVersion` (KHÔNG `version`) để tránh trùng token `{version:apiVersion}` — xem `api-and-versioning.md`.
+- **Test:** unit `ConfigBundleBuilderTests` (6 — checksum xác định/độc lập thứ tự/đổi giá trị) + integration Testcontainers `postgres:16-alpine`+`redis:7-alpine` `ConfigServiceIntegrationTests` (5 — publish→provider, version bump + giữ bản cũ, validator-fail chặn, redeploy trùng không bump, immutable Redis key) + `Api.IntegrationTests/ConfigEndpointTests` (4 — current/bundle anonymous + 404). Yêu cầu Docker.
+- **Tái dùng, KHÔNG reinvent:** validate = core lib phase 07 (không fork validator thứ 2); cache = `ICacheService` phase 12; persist = `AppDbContext`/migration phase 11; endpoint = version set + `ApiResults`/`ErrorEnvelope` phase 13. Typed config POCO (hero/skill) = phase 27+; client bundle e2e/caching = phase 22; live swap/feature flags = Post-MVP/phase 49.
+
+Decision log: `.memory/0019-config-service-standardized.md`.
+
 ---
 
 ## 4. Deterministic Combat Simulator (server)

@@ -42,3 +42,21 @@ The contract lives in `shared/config-schema/` (JSON Schema draft 2020-12). Reuse
   `file:jsonpath:CODE message`: see `tools/config-validator/README.md`.
 - **Boundaries:** validator tool + CI gate = phase 07 (done); runtime Configuration Service = phase 21 (reuses the
   validator core via `ConfigValidationRunner.Run(...)`); real balance = feature/tuning phases.
+
+## Configuration Service (phase 21 — closed & verified)
+
+Runtime SSOT for config lives in `server/src/GameTeam.Infrastructure/Configuration/` (ADR-005). Reuse it — do NOT reinvent:
+
+- **Pipeline:** `config/ → validate (reuse the phase-07 `ConfigValidationRunner`/`ConfigLoader`, ProjectReference — one
+  validation source, never a second validator) → build immutable bundle `config@vN` (deterministic SHA-256 checksum over
+  `{schema_version,data}`) → persist DB (`config_bundles`) + cache Redis (`config-bundle:config@vN`, immutable) → flip
+  `config_current` pointer atomically → serve via `IConfigProvider``.
+- **Read path:** Domain/Application read config **only** through `IConfigProvider` (`RuntimeConfigProvider`,
+  `Get<T>(type,id)`/`GetIds`/`CurrentVersion`) — **never** the filesystem (grep guard: no `File.`/`Directory.`/`Path.`).
+- **Publish** runs at deploy time (`ConfigPublishHostedService`, best-effort). **Validator-fail ⇒ no publish** (current
+  unchanged, invalid never served). **Checksum dedup** ⇒ unchanged config never bumps the version; a config change ⇒ a
+  NEW version served with **no client rebuild**. Old versions are kept immutably (rollback foundation).
+- **Endpoints** (public): `GET /api/v1/config/current`, `GET /api/v1/config/bundle?bundleVersion=N` (verbatim payload;
+  unknown ⇒ 404 `CONFIG_BUNDLE_NOT_FOUND`).
+- **Out of scope:** client bundle caching/e2e = phase 22 (client `ConfigProvider` = phase 16); typed gameplay POCOs =
+  phases 27+; live swap without deploy = Post-MVP; feature flags / A-B = phase 49. Canonical: `docs/backend/infrastructure.md` §3.1.
