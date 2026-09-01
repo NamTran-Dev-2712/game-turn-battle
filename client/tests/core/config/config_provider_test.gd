@@ -63,6 +63,43 @@ func _bundle(version: int, hero_rarity: int, hero_hp: int) -> Dictionary:
 	}
 
 
+# Bundle hình MAP như Configuration Service THẬT phát: data = { type: { id: entry } } (không phải Array).
+func _bundle_map(version: int, hero_rarity: int, hero_hp: int) -> Dictionary:
+	return {
+		"config_version": "config@v%d" % version,
+		"schema_version": 1,
+		"checksum": "deadbeef",
+		"data": {
+			"hero": {
+				"hero_sample": {
+					"schema_version": 1,
+					"id": "hero_sample",
+					"faction": "none",
+					"class": "warrior",
+					"element": "fire",
+					"role": "tank",
+					"rarity": hero_rarity,
+					"base_stats": {"hp": hero_hp, "atk": 0, "def": 0, "spd": 0},
+					"skills": ["skill_sample_basic"],
+				},
+			},
+			"skill": {},
+		},
+	}
+
+
+# NetworkClient thật + transport giả nạp sẵn các body JSON (theo thứ tự). add_child + auto_free.
+func _make_net_with(bodies: Array) -> Node:
+	var net: Node = _NETWORK_CLIENT.new()
+	add_child(net)
+	auto_free(net)
+	var fake := FakeHttpTransport.new()
+	for body in bodies:
+		fake.queue_ok(200, str(body))
+	net.set_transport(fake)
+	return net
+
+
 func _remove_dir_recursive(path: String) -> void:
 	var dir := DirAccess.open(path)
 	if dir == null:
@@ -93,6 +130,15 @@ func test_apply_bundle_then_query_by_id_returns_data() -> void:
 	# get_entry theo type cũng trả đúng.
 	assert_bool(_provider.has_entry(&"hero", "hero_sample")).is_true()
 	assert_int(_provider.get_all(&"hero").size()).is_equal(1)
+
+
+func test_apply_map_shaped_bundle_indexes_by_id() -> void:
+	# apply_bundle chấp nhận cả hình MAP (server) lẫn Array (fixture cũ) — index đúng theo id.
+	_provider = _make_provider()
+	assert_bool(_provider.apply_bundle(_bundle_map(1, 4, 55))).is_true()
+	assert_bool(_provider.has_entry(&"hero", "hero_sample")).is_true()
+	assert_int(int(_provider.get_hero("hero_sample")["rarity"])).is_equal(4)
+	assert_int(int(_provider.get_hero("hero_sample")["base_stats"]["hp"])).is_equal(55)
 
 
 func test_reads_return_copies_not_cache_reference() -> void:
@@ -187,19 +233,99 @@ func test_invalid_bundle_is_rejected() -> void:
 func test_check_for_update_pulls_new_version_from_server() -> void:
 	_provider = _make_provider()
 	_provider.apply_bundle(_bundle(1, 3, 100))
-	# NetworkClient thật + transport giả: lần 1 trả version metadata (v2), lần 2 trả bundle v2.
+	# NetworkClient thật + transport giả: lần 1 trả /config/current (v2), lần 2 trả bundle v2 (hình MAP như server).
+	var net: Node = _make_net_with([
+		JSON.stringify({"version": {"bundle": 2, "schema": 1}}),
+		JSON.stringify(_bundle_map(2, 5, 250)),
+	])
+	_provider.network_client = net
+	var status: Dictionary = await _provider.check_for_update()
+	assert_bool(bool(status["updated"])).is_true()
+	assert_bool(bool(status["used_fallback"])).is_false()
+	assert_int(_provider.current_version()).is_equal(2)
+	assert_int(int(_provider.get_hero("hero_sample")["rarity"])).is_equal(5)
+	assert_bool(_provider.is_stale()).is_false()
+
+
+func test_check_for_update_calls_real_config_endpoints() -> void:
+	# Chứng minh wire ĐÚNG hợp đồng server phase 21: /config/current rồi /config/bundle?bundleVersion=N.
+	_provider = _make_provider()
+	_provider.apply_bundle(_bundle(1, 3, 100))
+	var net: Node = _make_net_with([
+		JSON.stringify({"version": {"bundle": 2, "schema": 1}}),
+		JSON.stringify(_bundle_map(2, 5, 250)),
+	])
+	_provider.network_client = net
+	await _provider.check_for_update()
+	var fake: FakeHttpTransport = net._transport
+	assert_int(fake.requests.size()).is_equal(2)
+	assert_str(str(fake.requests[0]["url"])).ends_with("/api/v1/config/current")
+	assert_str(str(fake.requests[1]["url"])).contains("/api/v1/config/bundle?bundleVersion=2")
+
+
+func test_check_for_update_indexes_map_shaped_server_bundle() -> void:
+	# Bundle server phát data theo MAP { type: { id: entry } } — provider phải index đúng theo id.
+	_provider = _make_provider()
+	var net: Node = _make_net_with([
+		JSON.stringify({"version": {"bundle": 1, "schema": 1}}),
+		JSON.stringify(_bundle_map(1, 4, 77)),
+	])
+	_provider.network_client = net
+	var status: Dictionary = await _provider.check_for_update()
+	assert_bool(bool(status["updated"])).is_true()
+	assert_bool(_provider.has_entry(&"hero", "hero_sample")).is_true()
+	assert_int(_provider.get_all(&"hero").size()).is_equal(1)
+	assert_int(int(_provider.get_hero("hero_sample")["base_stats"]["hp"])).is_equal(77)
+
+
+func test_check_for_update_bundle_download_fails_keeps_old_cache_and_marks_stale() -> void:
+	# Case B: có version mới (v2) nhưng tải bundle LỖI ⇒ giữ cache v1, đánh dấu stale (fallback KHÔNG im lặng).
+	_provider = _make_provider()
+	_provider.apply_bundle(_bundle(1, 3, 100))
 	var net: Node = _NETWORK_CLIENT.new()
 	add_child(net)
 	auto_free(net)
 	var fake := FakeHttpTransport.new()
 	fake.queue_ok(200, JSON.stringify({"version": {"bundle": 2, "schema": 1}}))
-	fake.queue_ok(200, JSON.stringify(_bundle(2, 5, 250)))
+	fake.queue_ok(500, "")  # tải bundle v2 lỗi
 	net.set_transport(fake)
 	_provider.network_client = net
-	var updated: bool = await _provider.check_for_update()
-	assert_bool(updated).is_true()
-	assert_int(_provider.current_version()).is_equal(2)
-	assert_int(int(_provider.get_hero("hero_sample")["rarity"])).is_equal(5)
+	var status: Dictionary = await _provider.check_for_update()
+	assert_bool(bool(status["updated"])).is_false()
+	assert_bool(bool(status["used_fallback"])).is_true()
+	assert_bool(_provider.is_stale()).is_true()
+	assert_str(_provider.last_error_code()).is_not_empty()
+	# Cache CŨ v1 vẫn dùng được (KHÔNG bịa dữ liệu).
+	assert_int(_provider.current_version()).is_equal(1)
+	assert_int(int(_provider.get_hero("hero_sample")["rarity"])).is_equal(3)
+
+
+func test_check_for_update_no_new_version_clears_stale() -> void:
+	# Server báo version = cache hiện tại ⇒ không cập nhật, không fallback, xoá cờ stale.
+	_provider = _make_provider()
+	_provider.apply_bundle(_bundle(1, 3, 100))
+	var net: Node = _make_net_with([JSON.stringify({"version": {"bundle": 1, "schema": 1}})])
+	_provider.network_client = net
+	var status: Dictionary = await _provider.check_for_update()
+	assert_bool(bool(status["updated"])).is_false()
+	assert_bool(bool(status["used_fallback"])).is_false()
+	assert_bool(_provider.is_stale()).is_false()
+
+
+func test_check_for_update_no_cache_and_failure_leaves_no_config() -> void:
+	# Case C: không có cache + hỏi version LỖI ⇒ vẫn không có config (màn feature hiện empty + retry).
+	_provider = _make_provider()
+	var net: Node = _NETWORK_CLIENT.new()
+	add_child(net)
+	auto_free(net)
+	var fake := FakeHttpTransport.new()
+	fake.queue_ok(503, "")  # /config/current lỗi
+	net.set_transport(fake)
+	_provider.network_client = net
+	var status: Dictionary = await _provider.check_for_update()
+	assert_bool(bool(status["updated"])).is_false()
+	assert_bool(bool(status["has_config"])).is_false()
+	assert_bool(_provider.has_config()).is_false()
 
 
 func test_configprovider_autoload_present() -> void:

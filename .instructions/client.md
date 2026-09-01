@@ -42,9 +42,15 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   is the **single config read gate** — `apply_bundle(bundle)` caches a versioned envelope **immutably** to disk
   (`user://config_cache/config@vN.json`, **write-once — never overwrite an old version**; ADR-005), loads on boot
   (offline-view), and serves **data-driven** queries `get_entry(type,id)`/`get_hero(id)`/`current_version()` (reads by
-  schema, **no hardcoded numbers**, return deep copies). `check_for_update()` pulls a newer version via `NetworkClient`
-  (placeholder `/api/v1/config/...`; Config Service = phase 21, e2e = phase 22) and emits **`config_updated`** on a version
-  change (re-applying the active version = no-op). **`StateCache`** (`src/core/state/state_cache.gd`) is a **read-only,
+  schema, **no hardcoded numbers**, return deep copies). `check_for_update()` (e2e **phase 22**) does
+  `GET /api/v1/config/current` → compare → `GET /api/v1/config/bundle?bundleVersion=N` → `apply_bundle`, returning a
+  **status dict** `{updated, used_fallback, error_code, has_config}` and emitting **`config_updated`** on a version change
+  (re-applying the active version = no-op). **Real server contract:** param is **`bundleVersion`** (never `version`),
+  endpoints are **public** (`.AllowAnonymous`); the server serves `data` as a **map by id** (`data.{type}.{id}=entry`) —
+  `_build_index` handles both map (server) and array (old fixtures). **Fallback is NOT silent** (Rule E): a failed bundle
+  download keeps the old cache + sets `is_stale()`/`last_error_code()` + `push_warning`; no cache ⇒ the feature screen shows
+  empty + Retry. The sample **`HeroListView`/`HeroListPresenter`** (`src/ui/hero_list/`) reads `get_all(&"hero")` to prove
+  the loop (server config change → new version → client displays it **without a rebuild**). **`StateCache`** (`src/core/state/state_cache.gd`) is a **read-only,
   display-only** player-state cache (`IS_DISPLAY_ONLY = true`) — the **only** write path is `apply_snapshot(snapshot)` from a
   **server response** (no authoritative mutator: no `add_currency`/`spend_currency`/`set_progress`); reads return deep
   copies; `source()`/`is_offline()` label cached-vs-server; persists last snapshot for offline-view; emits

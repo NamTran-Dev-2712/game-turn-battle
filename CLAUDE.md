@@ -705,6 +705,50 @@ green, config-validator exit 0, no `openapi.json` shape drift beyond the new pat
   `.instructions/config.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the integration tests are the
   behavior contract — update them.
 
+**Client config bundle e2e is standardized (Phase 22 — closed & verified). CLOSES P1 (data-driven end-to-end).** The
+data-driven loop now runs from the Phase-21 Configuration Service to config-driven client UI. Home: the existing Phase-16
+autoload **`ConfigProvider`** (`client/src/core/config/config_provider.gd`) — extended, not replaced — plus a sample screen
+**`client/src/ui/hero_list/`**. **Boot config check (`check_for_update()`):** `GET /api/v1/config/current` (ConfigBundleDto
+→ server version N) → compare with the immutable disk cache → if newer, `GET /api/v1/config/bundle?bundleVersion=N` →
+`apply_bundle` (validate envelope + write-once `config@vN` disk cache + emit `config_updated`) → features query via
+`ConfigProvider.get_all(&"hero")`. It returns a **status dict** `{updated, used_fallback, error_code, has_config}`.
+**Two integration fixes were required (the real Phase-22 work):** (1) the server serves bundle `data` as a **map by id**
+(`data.{type}.{id}=entry`), not an array — `_build_index` now accepts **both** map (server) and array (old fixtures),
+indexing by `entry.id`; (2) the real endpoints/param are `/config/current` + `?bundleVersion=N` (param is **`bundleVersion`**,
+never `version`; endpoints are **public/`.AllowAnonymous`**). **Fallback is NOT silent (Rule E):** a failed bundle download
+keeps the old cache + sets `is_stale()`/`last_error_code()` + `push_warning` (boot logs "using stale cache"); the sample
+screen shows a **stale banner + Retry**; **no cache** ⇒ **empty state + Retry** (retry re-runs `check_for_update()` via
+`NetworkClient` — no infinite loop). **Sample UI** `HeroListView` (BaseView, **network-free**) + `HeroListPresenter`
+(reads `ConfigProvider`, navigated from the hub `heroes` intent via `SceneRouter`) proves the loop: **server config change →
+new version → client displays it with NO client rebuild**. **No new EventBus event** (catalogue stays CLOSED — consistent
+with Phases 17 & 20; reuse `config_updated`). Minimal placeholder config seeded (`config/heroes/hero_sample.json` +
+`config/skills/skill_sample_basic.json`, **zero stats — no balance**) so a real server serves a non-empty hero map for demo.
+**User decisions:** dedicated hero screen (not a hub section); no new EventBus event; seed real config. Verified (Godot
+4.7.1-stable local): config-validator exit 0 (2 files, hero→skill integrity); `--headless --import` exit 0 (0/0); gdUnit4
+**76/76 pass, 0 orphan** (config_provider +7: map-shape/real-endpoints/fallback-stale/no-cache; hero_list_presenter 5:
+receive→query→display/version-bump/error→fallback/no-cache→retry/back); grep guard clean; no generated/openapi drift.
+Canonical: `docs/gameplay/configuration-and-data.md` §4.1–4.3 + `docs/godot/resources-and-assets.md` §1.1; decision log
+`.memory/0020-client-config-bundle-e2e-standardized.md`.
+
+- Future agents **MUST reuse** `ConfigProvider` (single config read gate) + the real endpoints/param + both data shapes +
+  the sample presenter pattern before adding any config-read UI; **MUST NOT** create a second config provider, read a raw
+  bundle/cache/file in a feature, hardcode gameplay/config values in a scene, hand-decide a config version (always ask
+  `/config/current`), or use `version` instead of `bundleVersion`.
+- **Fallback MUST stay non-silent (Rule E):** using an old cache because a new bundle failed must **log + expose** (`is_stale()`
+  + a visible label) + keep **Retry**; **never** fabricate config/state on failure (ADR-005/007/011). Boot stays best-effort
+  on config (never blocks); the feature screen is where stale/retry is surfaced to the user.
+- **Config change ⇒ new version served with NO client rebuild** (ADR-004/005): change a value in `config/**` → server
+  republishes a new `config@vN` → client `check_for_update` pulls & displays it. Never edit client code/scene to change a
+  config value. `config@vN` disk cache is immutable/write-once.
+- **Out of scope (leave as debt):** signed/secure bundle + cryptographic verify + advanced LiveOps + live swap = **Post-MVP**;
+  real Hero System/combat/skill logic = phase 27+/group 5 (the hero screen is a config-read **sample** only).
+- When changing this loop, keep **`client/src/core/config/config_provider.gd` + `client/src/ui/hero_list/*` +
+  `client/src/ui/boot/boot_controller.gd` + `client/src/ui/main_hub/main_hub_presenter.gd` + the gdUnit4 tests
+  (`tests/core/config/config_provider_test.gd`, `tests/ui/hero_list/hero_list_presenter_test.gd` — behavior contract) +
+  seeded `config/heroes|skills/*` (validator-passing) + `docs/gameplay/configuration-and-data.md` §4.1–4.3 +
+  `docs/godot/resources-and-assets.md` §1.1 + `.instructions/client.md` + `.claude/agents/godot-client.md` in sync**
+  (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

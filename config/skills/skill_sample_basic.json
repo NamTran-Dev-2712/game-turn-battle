@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "skill_sample_basic",
+  "target": "single_enemy",
+  "trigger": { "type": "cooldown", "value": 0 },
+  "effects": [ { "effect_type": "damage", "params": {} } ]
+}

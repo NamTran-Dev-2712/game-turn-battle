@@ -105,13 +105,18 @@ func start() -> void:
 		_finish_or_fail()
 		return
 
-	# 3) Config = best-effort: server báo version mới thì tải; endpoint vắng/lỗi ⇒ giữ cache, KHÔNG chặn boot.
-	#    (Config Service thật = phase 21; siết cổng config khi phase 21/22 hoàn thiện.)
+	# 3) Config e2e (phase 22): so version với Configuration Service → tải bundle mới nếu cần.
+	#    BEST-EFFORT — endpoint lỗi/mất mạng ⇒ giữ cache, KHÔNG chặn boot (offline-view phase 20 giữ nguyên).
+	#    Fallback KHÔNG im lặng: dùng cache cũ (stale) ⇒ ghi nhật ký cảnh báo rõ ràng (Rule E). Màn hero
+	#    (feature) mới là nơi hiển thị nhãn stale + nút retry cho người dùng.
 	_set_state(State.LOADING_CONFIG)
 	if _boot_view != null:
 		_boot_view.set_data({"status": "Đang tải cấu hình..."})
 	if config_provider != null:
-		await config_provider.check_for_update()
+		var config_status: Dictionary = await config_provider.check_for_update()
+		if bool(config_status.get("used_fallback", false)):
+			push_warning("Boot: config cập nhật thất bại (%s) — dùng cache cũ %s." % [
+				str(config_status.get("error_code", "")), config_provider.config_label()])
 
 	# 4) Vào main hub qua SceneRouter (router giải phóng scene boot). clear_history: không quay lại boot.
 	_set_state(State.DONE)

@@ -43,8 +43,14 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   **`ConfigProvider`** (`src/core/config/config_provider.gd`) is the **single config read gate**: `apply_bundle(bundle)`
   caches a versioned envelope **immutably** to disk (`user://config_cache/config@vN.json`, **write-once**; ADR-005), loads
   on boot (offline-view), serves **data-driven** `get_entry(type,id)`/`get_hero(id)`/`current_version()` (deep copies, **no
-  hardcoded numbers**); `check_for_update()` pulls a newer version via `NetworkClient` (placeholder `/api/v1/config/...`;
-  Config Service = phase 21, e2e = phase 22) and emits **`config_updated`** on a version change. **`StateCache`**
+  hardcoded numbers**); `check_for_update()` (e2e **phase 22**) does `GET /api/v1/config/current` → compare →
+  `GET /api/v1/config/bundle?bundleVersion=N` → `apply_bundle`, returns a **status dict**
+  `{updated, used_fallback, error_code, has_config}`, emits **`config_updated`** on a version change. **Real contract:**
+  param **`bundleVersion`** (never `version`), endpoints **public**; server `data` is a **map by id**
+  (`data.{type}.{id}=entry`) — `_build_index` handles map + array. **Fallback NOT silent** (Rule E): failed download keeps
+  old cache + `is_stale()`/`last_error_code()` + `push_warning`; no cache ⇒ feature empty + Retry. Sample
+  `HeroListView`/`HeroListPresenter` (`src/ui/hero_list/`) reads `get_all(&"hero")` — config change → new version, **no
+  client rebuild**. **`StateCache`**
   (`src/core/state/state_cache.gd`) is a **read-only/display-only** state cache (`IS_DISPLAY_ONLY = true`): only
   `apply_snapshot(snapshot)` writes (from a server response; **no authoritative mutator**), reads return deep copies,
   `source()`/`is_offline()` label cached-vs-server, persists last snapshot for offline-view, emits **`state_refreshed`**.

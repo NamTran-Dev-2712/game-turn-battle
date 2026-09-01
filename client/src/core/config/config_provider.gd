@@ -14,10 +14,14 @@ const ACTIVE_POINTER_FILE: String = "active.json"
 # Tiền tố nhãn bundle bất biến (khớp config-bundle.schema.json: ^config@v[0-9]+$).
 const VERSION_PREFIX: String = "config@v"
 
-# Đường dẫn API (placeholder phase 16 — Config Service = phase 21, bundle e2e = phase 22 hoàn thiện).
-# Wire path qua NetworkClient để sẵn sàng nối; endpoint thật chốt ở phase sau.
-const CONFIG_VERSION_PATH: String = "/api/v1/config/version"
+# Đường dẫn API config THẬT (Config Service phase 21; e2e phase 22). Public (.AllowAnonymous).
+#   - /config/current : version hiện hành (con trỏ "current") → ConfigBundleDto.
+#   - /config/bundle?bundleVersion=N : bundle bất biến NGUYÊN VĂN theo version.
+# LƯU Ý: query param tên "bundleVersion" (KHÔNG "version") — trùng token {version:apiVersion} của
+# version set phía server (xem server/Program.cs). Sai tên ⇒ server hiểu là bản current.
+const CONFIG_CURRENT_PATH: String = "/api/v1/config/current"
 const CONFIG_BUNDLE_PATH: String = "/api/v1/config/bundle"
+const CONFIG_BUNDLE_VERSION_PARAM: String = "bundleVersion"
 
 # Sự kiện phát khi active config version đổi thành công (khớp EventBus.EVENTS).
 const _EVENT_CONFIG_UPDATED: StringName = &"config_updated"
@@ -33,6 +37,11 @@ var _active_bundle: Dictionary = {}
 var _index: Dictionary = {}
 # Version số đang kích hoạt (N trong config@vN). 0 = chưa có config.
 var _active_version: int = 0
+# True nếu lần check_for_update gần nhất thấy version mới NHƯNG tải/áp bundle thất bại ⇒ đang dùng
+# cache cũ (stale). Fallback KHÔNG im lặng (ADR-005/Rule E): trạng thái lộ ra + có nhật ký cảnh báo.
+var _stale: bool = false
+# Mã lỗi của lần cập nhật thất bại gần nhất ("" nếu không có). Phục vụ hiển thị/nhật ký, KHÔNG bịa.
+var _last_error_code: String = ""
 
 
 func _ready() -> void:
@@ -57,6 +66,16 @@ func config_label() -> String:
 ## True nếu đã nạp một bundle hợp lệ.
 func has_config() -> bool:
 	return _active_version > 0
+
+
+## True nếu đang dùng cache CŨ vì lần cập nhật gần nhất thất bại (fallback không im lặng — Rule E).
+func is_stale() -> bool:
+	return _stale
+
+
+## Mã lỗi của lần cập nhật thất bại gần nhất ("" nếu không có). Chỉ để hiển thị/nhật ký.
+func last_error_code() -> String:
+	return _last_error_code
 
 
 ## True nếu tồn tại entry `id` trong `type`.
@@ -97,11 +116,13 @@ func apply_bundle(bundle: Dictionary) -> bool:
 		return false
 	# config@vN là BẤT BIẾN: áp lại đúng version đang kích hoạt = no-op (không ghi đè, không phát event).
 	if version == _active_version:
+		_clear_stale()
 		return true
 	# Cache đĩa BẤT BIẾN: chỉ ghi nếu file version chưa tồn tại (không bao giờ ghi đè version cũ).
 	_persist_bundle_if_absent(version, bundle)
 	_write_active_pointer(version)
 	_activate(bundle, version)
+	_clear_stale()
 	EventBus.emit(_EVENT_CONFIG_UPDATED, {
 		"version": version,
 		"config_version": VERSION_PREFIX + str(version),
@@ -109,21 +130,67 @@ func apply_bundle(bundle: Dictionary) -> bool:
 	return true
 
 
-## So version với server: nếu server báo version mới hơn → tải bundle mới → apply. Trả true nếu đã cập nhật.
-## Placeholder phase 16 (endpoint hoàn thiện phase 21/22). Mất mạng/lỗi → giữ cache hiện tại, trả false.
-func check_for_update() -> bool:
+## Kiểm tra & cập nhật config từ Configuration Service (e2e phase 22). Luồng:
+##   GET /config/current → so version với cache → nếu mới hơn → GET /config/bundle?bundleVersion=N →
+##   apply_bundle (validate + cache đĩa bất biến config@vN + phát config_updated).
+## Trả STATUS Dictionary { updated, used_fallback, error_code, has_config }:
+##   - updated=true                → đã tải & kích hoạt version mới.
+##   - used_fallback=true          → server có version mới NHƯNG tải/áp thất bại ⇒ GIỮ cache cũ (stale),
+##                                    có nhật ký cảnh báo (KHÔNG im lặng — Rule E). error_code = lý do.
+##   - updated=false,fallback=false → không có version mới (đã mới nhất) hoặc không hỏi được version.
+## Mất mạng/lỗi ⇒ KHÔNG bịa dữ liệu: giữ cache hiện tại. (Endpoint public — không cần token.)
+func check_for_update() -> Dictionary:
 	if network_client == null:
-		return false
-	var version_result: NetResult = await network_client.get_json(CONFIG_VERSION_PATH, NetworkResponseParser.parse_config_bundle)
+		return _update_status(false, false, "NO_NETWORK_CLIENT")
+
+	var version_result: NetResult = await network_client.get_json(
+		CONFIG_CURRENT_PATH, NetworkResponseParser.parse_config_bundle)
 	if not version_result.ok:
-		return false
+		# Không hỏi được version hiện hành: giữ cache. Nếu ĐÃ có config thì đây là suy giảm nhẹ
+		# (offline-view), không đánh dấu stale (ta chưa biết có version mới hay không).
+		return _update_status(false, false, _code_of(version_result))
+
 	var server_version := _version_from_dto(version_result.value)
 	if server_version <= 0 or server_version <= _active_version:
-		return false
-	var bundle_result: NetResult = await network_client.get_json(CONFIG_BUNDLE_PATH + "?version=" + str(server_version))
+		# Không có gì mới → xoá cờ stale (đang ở version mới nhất server biết).
+		_clear_stale()
+		return _update_status(false, false, "")
+
+	# Có version mới hơn → tải bundle bất biến theo version.
+	var bundle_path := "%s?%s=%d" % [CONFIG_BUNDLE_PATH, CONFIG_BUNDLE_VERSION_PARAM, server_version]
+	var bundle_result: NetResult = await network_client.get_json(bundle_path)
 	if not bundle_result.ok or not (bundle_result.value is Dictionary):
-		return false
-	return apply_bundle(bundle_result.value)
+		return _mark_stale(server_version, _code_of(bundle_result))
+	if not apply_bundle(bundle_result.value):
+		return _mark_stale(server_version, "INVALID_BUNDLE")
+	return _update_status(true, false, "")
+
+
+# Ghi nhận fallback KHÔNG im lặng: đánh dấu stale + nhật ký cảnh báo rõ ràng (dùng cache cũ).
+func _mark_stale(server_version: int, error_code: String) -> Dictionary:
+	_stale = true
+	_last_error_code = error_code
+	push_warning("ConfigProvider: không tải được config@v%d (%s) — đang dùng cache cũ %s." % [
+		server_version, error_code, config_label() if has_config() else "(không có)"])
+	return _update_status(false, true, error_code)
+
+
+func _clear_stale() -> void:
+	_stale = false
+	_last_error_code = ""
+
+
+func _update_status(updated: bool, used_fallback: bool, error_code: String) -> Dictionary:
+	return {
+		"updated": updated,
+		"used_fallback": used_fallback,
+		"error_code": error_code,
+		"has_config": has_config(),
+	}
+
+
+func _code_of(res: NetResult) -> String:
+	return res.error.code if res != null and res.error != null else ""
 
 
 # ── Nội bộ ──────────────────────────────────────────────────────────────────────────────────────
@@ -153,7 +220,11 @@ func _activate(bundle: Dictionary, version: int) -> void:
 	_index = _build_index(bundle)
 
 
-# Dựng { type: { id: entry } } từ bundle["data"] = { type: [ entry... ] }.
+# Dựng chỉ mục { type: { id: entry } } từ bundle["data"].
+# Chấp nhận HAI hình dạng của `data[type]` để khớp mọi nguồn bundle:
+#   - Dictionary map { id: entry }   → hình dạng Configuration Service THẬT phát (server phase 21).
+#   - Array [ entry, ... ]           → hình dạng bundle rời (fixture/test cũ phase 16).
+# Với map: khoá index theo `entry.id` (fallback về khoá map nếu entry thiếu `id`).
 func _build_index(bundle: Dictionary) -> Dictionary:
 	var index: Dictionary = {}
 	var data: Variant = bundle.get("data", {})
@@ -161,12 +232,17 @@ func _build_index(bundle: Dictionary) -> Dictionary:
 		return index
 	for type in (data as Dictionary):
 		var entries: Variant = data[type]
-		if not (entries is Array):
-			continue
 		var by_id: Dictionary = {}
-		for entry in (entries as Array):
-			if entry is Dictionary and entry.has("id"):
-				by_id[str(entry["id"])] = entry
+		if entries is Dictionary:
+			for key in (entries as Dictionary):
+				var entry: Variant = entries[key]
+				if entry is Dictionary:
+					var id := str(entry.get("id", key))
+					by_id[id] = entry
+		elif entries is Array:
+			for entry in (entries as Array):
+				if entry is Dictionary and entry.has("id"):
+					by_id[str(entry["id"])] = entry
 		index[StringName(type)] = by_id
 	return index
 
