@@ -41,13 +41,27 @@ Client boot: hỏi version hiện hành → nếu khác cache → tải bundle t
 
 # Công việc cần thực hiện
 
-- [ ] Boot: gọi `GET /config/current` → so với cache; khác → `GET /config/bundle?version=`.
-- [ ] ConfigProvider (phase 16) lưu bundle đĩa theo version; load khi boot.
-- [ ] Dựng màn mẫu đọc từ config (danh sách hero placeholder từ `hero.schema`) để xác nhận query.
-- [ ] Fallback: bundle tải lỗi → dùng cache cũ + báo; không có cache → màn lỗi + retry.
-- [ ] Kịch bản chứng minh: đổi giá trị config server → publish → client reload version mới không build lại.
-- [ ] Test gdUnit4 mock: nhận→query→hiển thị; version bump; lỗi→fallback.
-- [ ] Cập nhật `../gameplay/configuration-and-data.md` (ghi rõ luồng e2e + chứng minh).
+- [x] Boot: gọi `GET /config/current` → so với cache; khác → `GET /config/bundle?bundleVersion=`.
+  *(param thật = `bundleVersion`, KHÔNG `version` — trùng token `{version:apiVersion}` server. `config_provider.gd`
+  `check_for_update()`; boot bắt status + log stale. Test `test_check_for_update_calls_real_config_endpoints`.)*
+- [x] ConfigProvider (phase 16) lưu bundle đĩa theo version; load khi boot.
+  *(Đã có Phase 16 — cache `config@vN` ghi-một-lần + boot reload. Phase 22 sửa `_build_index` nhận hình MAP server thật
+  `data.{type}.{id}=entry` + mảng cũ. Test `test_apply_map_shaped_bundle_indexes_by_id`, `..._indexes_map_shaped_server_bundle`.)*
+- [x] Dựng màn mẫu đọc từ config (danh sách hero placeholder từ `hero.schema`) để xác nhận query.
+  *(`src/ui/hero_list/` — `HeroListView`(BaseView, network-free) + `HeroListPresenter` đọc `ConfigProvider.get_all(&"hero")`,
+  điều hướng từ nút "Anh hùng" của hub. Test `test_receive_query_display_from_config`.)*
+- [x] Fallback: bundle tải lỗi → dùng cache cũ + báo; không có cache → màn lỗi + retry.
+  *(KHÔNG im lặng — `is_stale()`/`last_error_code()` + `push_warning` + banner stale + nút Thử lại; no-cache → empty + Retry.
+  Test `test_..._bundle_download_fails_keeps_old_cache_and_marks_stale`, `test_bundle_failure_falls_back...`,
+  `test_no_cache_shows_empty_then_retry_recovers_via_network`.)*
+- [x] Kịch bản chứng minh: đổi giá trị config server → publish → client reload version mới không build lại.
+  *(Chứng minh tự động: `test_version_bump_reflects_new_data_without_rebuild` (v1 rarity 3 → v2 rarity 5, cùng binary).
+  Seed `config/heroes/hero_sample.json`+`config/skills/skill_sample_basic.json` (số 0, validator exit 0) cho demo server thật.
+  Quy trình demo Docker ghi ở `../gameplay/configuration-and-data.md` §4.3.)*
+- [x] Test gdUnit4 mock: nhận→query→hiển thị; version bump; lỗi→fallback.
+  *(gdUnit4 headless **76/76 pass, 0 orphan**; mock ở boundary `FakeHttpTransport` — ConfigProvider/NetworkClient THẬT.)*
+- [x] Cập nhật `../gameplay/configuration-and-data.md` (ghi rõ luồng e2e + chứng minh).
+  *(§4.1 luồng e2e + hình MAP + endpoint/param thật; §4.2 fallback không im lặng; §4.3 chứng minh không rebuild.)*
 
 # Tiêu chí hoàn thành
 
@@ -83,6 +97,22 @@ Client boot: hỏi version hiện hành → nếu khác cache → tải bundle t
 # Phase Review
 
 Đóng khi luồng config e2e chạy, chứng minh đổi config không rebuild client, fallback hoạt động, test xanh. **Hoàn tất P1 — nền data-driven end-to-end sẵn sàng cho gameplay.**
+
+**Kết quả (2026-08-28, Godot 4.7.1-stable Windows — local PASS):**
+- **Vấn đề tích hợp đã sửa (công việc chính, KHÔNG greenfield):** (1) client `_build_index` chỉ nhận mảng nhưng server phát
+  `data` **map theo id** ⇒ sửa nhận cả hai (index theo `entry.id`); (2) wire sai endpoint (`/config/version`+`?version=`) ⇒
+  đổi sang thật `/config/current`+`?bundleVersion=`; (3) fallback im lặng ⇒ status dict + `is_stale()` + `push_warning` + banner/retry.
+- **Reuse, KHÔNG reinvent:** mở rộng `ConfigProvider` (Phase 16) + `NetworkClient`/`BaseView`/`SceneRouter`; **không** tạo
+  config provider/HTTP client/DTO thứ hai. **Không thêm event EventBus** (danh mục ĐÓNG — tái dùng `config_updated`).
+- **Verify:** config-validator exit 0 (2 file, hero→skill OK); `--headless --import` exit 0 (0/0); gdUnit4 **76/76 pass,
+  0 error/0 failure/0 orphan** (config_provider +7 test mới; hero_list_presenter 5 test); grep guard sạch (view network-free);
+  không drift `client/src/data/generated`/`openapi.json`.
+- **Scope discipline:** màn hero là **mẫu đọc config** (KHÔNG Hero System — phase 27). Nợ Post-MVP: signed/secure bundle,
+  cryptographic verify, advanced LiveOps, live swap.
+- **Demo server thật (Docker):** quy trình ở `../gameplay/configuration-and-data.md` §4.3; nếu môi trường không có Docker,
+  gdUnit4 mock (`test_version_bump_reflects_new_data_without_rebuild`) là bằng chứng "đổi config không rebuild" tự động chuẩn.
+- Doc-sync: `../gameplay/configuration-and-data.md` §4.1–4.3 · `../godot/resources-and-assets.md` §1.1 · `CLAUDE.md` §4.6 ·
+  `.instructions/client.md` · `.claude/agents/godot-client.md` · `.memory/0020-client-config-bundle-e2e-standardized.md`.
 
 ---
 

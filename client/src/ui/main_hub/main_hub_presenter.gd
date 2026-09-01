@@ -8,17 +8,24 @@ class_name MainHubPresenter
 extends RefCounted
 
 const _EVENT_STATE_REFRESHED: StringName = &"state_refreshed"
+## Màn mẫu đọc từ config (Phase 22) — điều hướng khi bấm nút "Anh hùng".
+const HERO_LIST_PATH: String = "res://src/ui/hero_list/hero_list.tscn"
+## Id ý định nút "Anh hùng" (khớp MainHubView.FEATURES).
+const _INTENT_HEROES: StringName = &"heroes"
 
 var _view: BaseView = null
 # Nguồn đọc (inject cho test; mặc định = autoload). CHỈ đọc-cache, không network.
 var _state_cache: Node = null
 var _config_provider: Node = null
+# Điều hướng scene (inject cho test; mặc định = autoload SceneRouter).
+var _scene_router: Node = null
 
 
-func _init(view: BaseView, state_cache: Node = null, config_provider: Node = null) -> void:
+func _init(view: BaseView, state_cache: Node = null, config_provider: Node = null, scene_router: Node = null) -> void:
 	_view = view
 	_state_cache = state_cache if state_cache != null else StateCache
 	_config_provider = config_provider if config_provider != null else ConfigProvider
+	_scene_router = scene_router if scene_router != null else SceneRouter
 	_view.intent.connect(_on_intent)
 	# Vào lại hub sau khi profile về (boot/refresh) → hiển thị lại. Huỷ đăng ký ở `dispose()` (view.unbind).
 	EventBus.subscribe(_EVENT_STATE_REFRESHED, _on_state_refreshed)
@@ -67,7 +74,11 @@ func _format_currency(currencies: Dictionary) -> String:
 	return ", ".join(parts)
 
 
-# Dịch ý định từ view. Phase 17/20 = placeholder (chưa nghiệp vụ); điều hướng feature ở phase sau
-# sẽ đi qua SceneRouter tại đây. KHÔNG tự vẽ nghiệp vụ ngoài phạm vi phase.
+# Dịch ý định từ view. "Anh hùng" → màn mẫu config e2e (Phase 22) qua SceneRouter. Các nút còn lại
+# vẫn là placeholder (feature thật ở phase sau). KHÔNG tự vẽ nghiệp vụ ngoài phạm vi phase.
 func _on_intent(intent_name: StringName, _payload: Dictionary) -> void:
+	if intent_name == _INTENT_HEROES:
+		if _scene_router != null:
+			_scene_router.goto_scene(HERO_LIST_PATH)
+		return
 	print_verbose("MainHub: intent '%s' (placeholder — feature ở phase sau)." % intent_name)

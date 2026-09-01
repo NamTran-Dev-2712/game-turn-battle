@@ -61,6 +61,58 @@ flowchart LR
   nạp khi boot, phát `config_updated` khi đổi version — **không rebuild client**. Chi tiết:
   `../godot/resources-and-assets.md` §1.1.
 
+### 4.1 Luồng config end-to-end (Phase 22)
+Vòng data-driven đầy-đủ từ Configuration Service (server, phase 21) tới UI client:
+
+```text
+Client boot
+  → GET /api/v1/config/current          (ConfigBundleDto: version.bundle = N hiện hành)
+  → so N với version cache đĩa
+  ├─ bằng   → dùng bundle cache (offline-view)
+  └─ mới hơn → GET /api/v1/config/bundle?bundleVersion=N   (bundle NGUYÊN VĂN, bất biến)
+       → ConfigProvider.apply_bundle (validate envelope)
+       → cache đĩa config@vN (ghi-một-lần, KHÔNG ghi đè version cũ)
+       → phát config_updated
+  → Feature query qua ConfigProvider.get_all(&"hero") / get_entry(type,id)
+  → màn mẫu (HeroListView) hiển thị dữ liệu hero từ config
+```
+
+- **Hình dạng `data` server phát:** bundle `data` là **map theo id** — `data.{type}.{id} = entry`
+  (KHÔNG phải mảng). `ConfigProvider._build_index` index theo `entry.id`; chấp nhận cả map (server)
+  lẫn mảng (fixture cũ) để tương thích ngược.
+- **Endpoint & tham số THẬT (phase 21):** `GET /api/v1/config/current` +
+  `GET /api/v1/config/bundle?bundleVersion=N`. Tham số tên **`bundleVersion`** (KHÔNG `version` —
+  trùng token `{version:apiVersion}` phía server). Endpoint config là **public** (`.AllowAnonymous`) —
+  bundle là nội dung chia sẻ, không nhạy cảm; client chỉ đọc.
+- **Version là bất biến & so bắt buộc:** client KHÔNG tự quyết version mới — luôn hỏi
+  `/config/current` rồi so. Mỗi `config@vN` cache dưới file riêng, không bao giờ ghi đè.
+
+### 4.2 Fallback (KHÔNG im lặng)
+Khi tải/áp bundle mới thất bại, client suy giảm có kiểm soát và **báo rõ** (ADR-005; không che lỗi):
+
+- **Có cache cũ (stale):** giữ `config@v(N-1)` đang dùng, `ConfigProvider.is_stale()` = true +
+  `last_error_code()`; boot ghi `push_warning`; màn feature hiện **banner "đang dùng cache cũ"** +
+  nút **Thử lại**. KHÔNG bịa dữ liệu.
+- **Không có cache:** màn feature hiện **empty state + nút Thử lại** (retry gọi lại
+  `check_for_update()` qua đúng abstraction `NetworkClient` — không vòng lặp vô hạn).
+- Boot vẫn **best-effort** với config (không chặn boot) để giữ offline-view (phase 20); UI feature là
+  nơi lộ trạng thái stale + retry cho người dùng.
+
+### 4.3 Chứng minh "đổi config → KHÔNG rebuild client"
+Cùng một binary/scene client, chỉ đổi dữ liệu config phía server:
+
+```text
+config@v1: hero_sample.rarity = 3   → client hiển thị "hero_sample · rarity 3"
+   (sửa config/heroes/hero_sample.json phía server → publish)
+config@v2: hero_sample.rarity = 5   → reload/retry client → hiển thị "hero_sample · rarity 5"
+   → client KHÔNG build lại; chỉ ConfigProvider nạp version mới.
+```
+
+Kiểm chứng tự động: gdUnit4 mock (`tests/core/config/config_provider_test.gd`,
+`tests/ui/hero_list/hero_list_presenter_test.gd`) — nhận→query→hiển thị, version bump, lỗi→fallback,
+no-cache→retry. Seed config mẫu (`config/heroes/hero_sample.json` + `config/skills/skill_sample_basic.json`,
+số 0 — KHÔNG balance) cho phép server thật phát `data.hero` khác rỗng để demo e2e.
+
 ## 5. Ranh giới với backend
 - Domain/Application đọc config qua `IConfigProvider` (port), **không** đọc file trực tiếp (`../backend/`).
 - Combat sim đọc chỉ số từ config version cụ thể (đảm bảo re-sim tất định — ADR-011).

@@ -40,13 +40,17 @@ flowchart LR
 | Cache đĩa **BẤT BIẾN** | Ghi `user://config_cache/config@vN.json` **ghi-một-lần** — **không bao giờ ghi đè** version cũ (`config@vN` immutable, ADR-005). Con trỏ `active.json` trỏ version đang dùng. |
 | Boot | `_ready()` nạp con trỏ + bundle version tương ứng từ đĩa (offline-view); thiếu/hỏng ⇒ trạng thái rỗng, không crash. |
 | Truy vấn (data-driven) | `get_entry(type, id)`, `get_all(type)`, `has_entry(type,id)`, `get_hero(id)`, `current_version()`, `config_label()`, `has_config()` — đọc theo schema phase 06, **KHÔNG nhúng số gameplay**; trả **BẢN SAO** ⇒ caller không sửa được cache. |
-| So version | `check_for_update()` (coroutine) hỏi server version qua `NetworkClient`; version mới hơn ⇒ tải bundle mới ⇒ `apply_bundle`. Endpoint `/api/v1/config/...` là placeholder wire — Config Service hoàn thiện **phase 21**, bundle e2e **phase 22**. Mất mạng ⇒ giữ cache, không bịa. |
+| Hình dạng `data` | `_build_index` chấp nhận **cả hai**: map theo id `data.{type}.{id}=entry` (**Configuration Service THẬT phát**, phase 21) và mảng `data.{type}=[entry…]` (fixture cũ). Index theo `entry.id`. |
+| So version (e2e phase 22) | `check_for_update()` (coroutine): `GET /api/v1/config/current` → so version → nếu mới hơn → `GET /api/v1/config/bundle?bundleVersion=N` → `apply_bundle`. Tham số **`bundleVersion`** (KHÔNG `version`). Endpoint **public** (`.AllowAnonymous`). Trả **status dict** `{updated, used_fallback, error_code, has_config}`. Mất mạng ⇒ giữ cache, không bịa. |
+| Fallback (KHÔNG im lặng) | Tải bundle mới lỗi ⇒ giữ cache cũ + `is_stale()`=true + `last_error_code()` + `push_warning` (Rule E). Không có cache ⇒ feature hiện empty + retry. |
 | Sự kiện | Phát `config_updated` (`{version, config_version}`, §`state-and-signals.md` §3.1) khi active version **đổi**. Áp lại đúng version đang dùng = no-op. |
 
 **Luồng đọc config:** `Server → NetworkClient → ConfigProvider (cache config@vN) → Feature/UI`. Đổi
 version ⇒ tạo cache version mới, phát `config_updated`, feature nạp lại — **không rebuild client**
 (ADR-004/005). Runtime SSOT của config vẫn ở server (Config Service, phase 21); ConfigProvider chỉ
-**cache đọc bất biến** theo version.
+**cache đọc bất biến** theo version. **Màn mẫu e2e (Phase 22):** `HeroListView`/`HeroListPresenter`
+(`src/ui/hero_list/`) đọc `get_all(&"hero")` để chứng minh vòng — chi tiết
+`../gameplay/configuration-and-data.md` §4.1–4.3.
 
 ---
 
