@@ -749,6 +749,50 @@ Canonical: `docs/gameplay/configuration-and-data.md` §4.1–4.3 + `docs/godot/r
   `docs/godot/resources-and-assets.md` §1.1 + `.instructions/client.md` + `.claude/agents/godot-client.md` in sync**
   (doc-sync matrix, §5); the gdUnit4 tests are the behavior contract — update them.
 
+**Combat spec + fixed-point math + golden-vector format are standardized (Phase 23 — closed & verified). OPENS Group 5
+(Deterministic Combat Core).** Phase 23 is a **specification phase, not sim code** — it turns the architecture-only combat
+docs into a precise **combat contract** so the .NET server sim (phase 24) and GDScript client sim (phase 25) implement the
+**same ruleset** and produce **bit-identical `event_log` + `result`** for the same `(config version, team snapshot, stage,
+seed)` (ADR-011). Home of the canon: **`docs/gameplay/combat-framework.md` §9–§20** (detailed spec) + the golden-vector
+format & samples in **`shared/combat-vectors/`** + the determinism summary in **`docs/conventions/code-style.md` §4**.
+**Balance numbers stay in config** (`combat_int` ≥ 0, ADR-004/005) — the spec fixes only *mechanism, formula shape, math,
+RNG, serialization*; **no `float` in any combat arithmetic**. **Constitutional decisions (mechanism; user-approved):**
+(1) **turn order** = stable speed-sort per round, key `(-spd, actor_id)` (tie-break ends in the unique `actor_id`, byte
+compare — never hash/iteration/DB order); (2) **fixed-point** = 64-bit × **`FIXED_SCALE=1000`**, single rounding law
+**round-half-up** at every `fixed_mul`/`fixed_div`/`from_fixed` (no floor/banker's; divide-by-zero guards, never
+NaN/float); (3) **PRNG** = **PCG32** (`pcg_setseq_64_xsh_rr_32`) + **SplitMix64** seed expansion, one stream/battle, seed
+a `uint64` server-generated input, logical shifts + wrapping 64-bit multiply, unbiased `pcg_bounded`, rolls in basis
+points; (4) **RNG consumption order** fixed = `hit` roll then `crit` roll, **miss = 1 roll, hit = 2 rolls** (consume the
+crit roll even when `crit_rate_bp==0`); (5) **damage** = divisive DEF-ratio `atk*coeff*K/(K+def)` in fixed-point, crit
+**after** mitigation, final `from_fixed`, floor `MIN_DMG`; (6) **event log** = a `seq`-ordered stream (same sequence +
+fields, not just final HP); (7) **win/lose/draw** from the `ally` perspective, evaluated after each action/round,
+`max_rounds` ⇒ DRAW. **CB status:** CB1/CB2 **decided** by ADR-011 (server-authoritative; seeded); **CB5** mechanism
+**decided** (thresholds config; disable randomness via `accuracy_bp=10000`/`crit_rate_bp=0`); **CB6** mechanism decided
+(target seconds/`max_rounds` value stay open); **CB3/CB4** are **`[ĐỀ XUẤT]`** (deterministic target/aggro + energy-bar
+mechanism proposed, numbers to config, **pending product** — not promoted to canon). Verified (2026-09-01): two
+reference-generated golden vectors (`vector_01_basic_hit` 59 events → VICTORY; `vector_02_crit_ko` 30 events → VICTORY)
+computed by a spec-faithful reference calculator and **hand-checked** (e.g. `fixed_div(300000,380000)=789`,
+`fixed_mul(200000,789)=157800`, `from_fixed=158`); both files are valid JSON; no-float audit + contradiction audit clean;
+no code/openapi drift (spec-only change). Canonical: `docs/gameplay/combat-framework.md` §9–§20 + `shared/combat-vectors/README.md`
++ `docs/conventions/code-style.md` §4; decision log `.memory/0021-combat-spec-fixedpoint-standardized.md`.
+
+- Future agents **MUST reuse** this spec (`combat-framework.md` §9–§20) + the fixed-point/PRNG/damage/turn-order rules +
+  the golden-vector format before writing any sim code; **MUST NOT** use `float`/`double` in combat arithmetic, introduce
+  a second fixed-point scale/rounding law or a second PRNG, depend on hash/iteration/DB/insertion order, use global RNG or
+  wall-clock time in the sim, or hand-decide balance numbers (they are `combat_int` from config).
+- **Golden vectors are a living contract** (`shared/combat-vectors/`): a deliberate sim/spec change updates the vectors in
+  the same change **and explains WHY**; **never** edit a vector to make CI green. Two implementations must match `event_log`
+  + `result` **bit-for-bit** (phase 26 adds the full suite + cross-impl CI gate).
+- **Anti-self-invention is binding:** search repo → prefer ADR/spec → mark `[ĐỀ XUẤT]`/`[OPEN]` for anything product has
+  not decided; **never** silently close a CB open question. CB3/CB4 stay proposals until product confirms.
+- **Out of scope (do not pull in):** sim implementation = **phases 24/25**; full golden-vector suite + cross-impl CI gate =
+  **phase 26**; complex skill/effect impl = **phase 28**; battle UI/animation = **phase 30**; fast-forward/skip (CB7),
+  signed vectors = Post-MVP.
+- When changing the combat contract, keep **`docs/gameplay/combat-framework.md` §9–§20 + `shared/combat-vectors/*` (README
+  format + sample vectors, updated deliberately) + `docs/conventions/code-style.md` §4 + `docs/mvp/10-open-questions.md`
+  (CB1–CB6) + ADR-011 (only if the decision changes) + `.instructions/combat.md` + `.claude/agents/combat-determinism.md`
+  + `.agents/ROLES.md` in sync** (doc-sync matrix, §5); the golden vectors are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

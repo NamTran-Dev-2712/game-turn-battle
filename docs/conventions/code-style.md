@@ -54,6 +54,21 @@
 | Cùng (config version, snapshot, seed) ⇒ cùng output | Điều kiện re-sim server |
 | Client & server hiện thực **cùng ruleset**; có golden test vector | Verify khớp |
 
+**Chốt cụ thể (Phase 23 — canon ở `../gameplay/combat-framework.md` §9–§20, đừng lặp số ở đây):**
+
+| Điểm | Quyết định (mechanism; số liệu để config) |
+|---|---|
+| **Fixed-point** | Integer **64-bit** × `FIXED_SCALE = 1000`; làm tròn **round-half-up** — **một luật duy nhất** tại mọi `fixed_mul`/`fixed_div` và `from_fixed`. Không floor/banker's. Chia 0 = guard (không NaN/float). |
+| **PRNG** | **PCG32** (`pcg_setseq_64_xsh_rr_32`) + nở seed **SplitMix64**; một stream/trận; seed `uint64` **server sinh**, input tường minh. Dịch phải = **logical shift**; nhân **wrap mod 2^64**. `pcg_bounded` không thiên vị; roll theo **basis points** [0,10000). |
+| **Thứ tự hành động** | Speed-sort **mỗi round**, khoá `(-spd, actor_id)`, **stable sort**; tie-break cuối = `actor_id` (so byte/UTF-8). Không dựa hash/iteration/insertion/DB order. |
+| **RNG consumption** | Thứ tự cố định: roll `hit` trước, `crit` sau. **Miss = 1 roll; Hit = 2 roll** (kể cả `crit_rate_bp==0`). Không bỏ/gộp roll. |
+| **Damage** | Divisive DEF-ratio `atk*coeff*K/(K+def)` fixed-point; crit **sau** mitigation; làm tròn cuối `from_fixed`; sàn `MIN_DMG`. Thứ tự phép tính + điểm làm tròn **cố định**. |
+| **Event log** | Chuỗi có `seq` tăng dần; hai phía phát **cùng chuỗi + cùng trường** (không chỉ HP cuối). Golden vector là hợp đồng (`../../shared/combat-vectors/`); đổi sim ⇒ cập nhật vector **có chủ đích**. |
+| **Thắng/thua/hoà** | Góc nhìn đội `ally`; đánh giá sau mỗi action/round; `max_rounds` ⇒ DRAW. |
+
+> Không tự bịa cân bằng: mọi con số (stat/coeff/rate/K/cost/cooldown) là `combat_int` từ config. CB3/CB4 là **đề xuất
+> chờ product** — xem `../mvp/10-open-questions.md` CB1–CB6.
+
 ## 5. Documentation style (trong code)
 
 - **GDScript**: docstring `##` cho class & hàm public; nêu ý định + tham số + tác dụng phụ (signal phát ra).
