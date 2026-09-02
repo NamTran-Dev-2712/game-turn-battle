@@ -32,6 +32,22 @@
 | CB6 | Độ dài một trận mục tiêu (giây)? Có giới hạn thời gian/hòa? | 🟢 |
 | CB7 | Tốc độ tua hỗ trợ (2x/4x) và skip trận — vào MVP hay Post? | 🟢 |
 
+> **CB1–CB6 — cập nhật Phase 23 (2026-09-01):** đặc tả combat chốt tại
+> [`../gameplay/combat-framework.md`](../gameplay/combat-framework.md) §9–§20 + [`ADR-011`](../adr/ADR-011-combat-authority-and-determinism.md).
+> Số liệu cân bằng để **config** (`combat_int`); spec chỉ chốt cơ chế.
+> - **CB1 — ĐÃ CHỐT (ADR-011):** combat tính ở **server** (server-authoritative + re-sim); client chỉ hiển thị/replay.
+> - **CB2 — ĐÃ CHỐT (ADR-011):** **có**, deterministic theo seed (integer/fixed-point + seeded PRNG).
+> - **CB3 — cơ chế ĐỀ XUẤT (chờ product 🟠):** resolve target tất định (ứng viên = địch còn sống, sắp `(slot, actor_id)`,
+>   aggro **policy = config**, mặc định slot nhỏ nhất; re-resolve khi mục tiêu chết giữa action). Chi tiết lưới front/back
+>   phụ thuộc **GP5** (còn mở). §14.
+> - **CB4 — cơ chế ĐỀ XUẤT (chờ product 🟠):** energy-bar (initial/gain/cost/cooldown/cap = **config**); ultimate thay
+>   đòn thường khi đủ energy & hết cooldown. Bật ultimate ở MVP hay không **vẫn mở**. §15.
+> - **CB5 — cơ chế ĐÃ CHỐT (số liệu config):** hit/crit qua seeded PRNG, ngưỡng `accuracy_bp`/`crit_rate_bp` (bp). Thứ tự
+>   roll cố định (hit→crit); crit chỉ khi Hit; miss = không damage. Tắt ngẫu nhiên = `accuracy_bp=10000`, `crit_rate_bp=0`. §16.
+> - **CB6 — cơ chế ĐÃ CHỐT, số liệu mở (🟢):** thắng/thua/hoà theo §19; `max_rounds` (config) chạm ⇒ **DRAW**. **Độ dài
+>   giây mục tiêu + giá trị `max_rounds` chuẩn** vẫn mở (tuning/presentation).
+> - **CB7** — ngoài phạm vi Phase 23 (giữ mở).
+
 ---
 
 ## 3. Economy
@@ -153,8 +169,8 @@
 
 > Những câu này **nên có định hướng trước khi bắt đầu Architecture**:
 
-1. **CB1/BE1** — Combat & hệ nhạy cảm tính ở client hay server?
-2. **CB2** — Combat có cần deterministic không?
+1. ~~**CB1/BE1** — Combat & hệ nhạy cảm tính ở client hay server?~~ → **ĐÃ CHỐT: server** (ADR-011; xem §2 note).
+2. ~~**CB2** — Combat có cần deterministic không?~~ → **ĐÃ CHỐT: có, seeded** (ADR-011; xem §2 note).
 3. **BE2** — Online-only hay offline-first có đồng bộ?
 
 ---

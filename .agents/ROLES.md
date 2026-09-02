@@ -9,6 +9,14 @@
   fix the code or propose a new ADR.
 - No role introduces Forbidden Patterns (`docs/ai/coding-rules.md` §3) or violates the dependency rule.
 - Ambiguity → `docs/mvp/10-open-questions.md`, never a silent guess.
+- **Anti-self-invention:** search the repo first; prefer an existing decision → ADR → canonical gameplay doc.
+  Never invent a gameplay/balance rule or silently resolve an open question — mark it `[ĐỀ XUẤT]`/`[OPEN]`/`TBD` and
+  never promote a proposal to canon without approval.
+- **Completion workflow (every task — canon in CLAUDE.md §4.5/§4.6):** read the phase requirement + its
+  source-of-truth → implement/document in scope → check consistency with ADRs and across docs → run the fitting
+  validation/self-review → tick the checklist `[x]` **only after** verification passes (leave `[ ]` with a written
+  reason if blocked/out-of-scope) → sync every affected downstream/upstream doc (doc-sync matrix) → audit the whole
+  checklist before declaring done. "Memory through documentation" — do not rely on model memory.
 
 ## Roles
 
