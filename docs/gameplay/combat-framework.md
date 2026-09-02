@@ -336,3 +336,47 @@ compute_damage(attacker, target, skill, crit):
   `vector_02`). Phase 23 chỉ chốt **định dạng + vector mẫu**; **bộ vector đầy đủ + CI gate cross-impl = phase 26**.
 - Vector = **hợp đồng**: input `(config_version, seed, stage, team_snapshot, config_excerpt)` → output `(event_log, result)`.
   Nếu đổi cơ chế sim ⇒ **cập nhật vector có chủ đích** trong cùng thay đổi (agent `combat-determinism`).
+
+## 21. Hiện thực server (.NET) — Phase 24  [CHỐT]
+
+> Phase 24 **hiện thực** spec §9–§20 thành sim server .NET — **nguồn chân lý** kết quả trận (ADR-011). Không thay đổi
+> spec; đây là chi tiết hiện thực. Golden vector `vector_01`/`vector_02` khớp **bit-for-bit**; determinism N=200 lần trùng.
+
+### 21.1 Kiến trúc & phân tầng
+- **Lõi sim thuần ở `GameTeam.Domain/Combat/`** (package-free — qua guard `Domain_should_not_depend_on_framework_packages`
+  + `Combat_domain_sim_should_not_depend_on_framework_or_persistence`). Nhận `BattleInput` **tự chứa** (đã nạp sẵn chỉ số),
+  trả `BattleOutput`. Không I/O, không wall-clock (sim **không cần** `IClock` — mạnh hơn "inject clock"), không `float`/`double`,
+  không RNG global. Thư mục: `Numerics/FixedPoint`, `Rng/Pcg32`, `Model/*` (BattleInput/UnitSnapshot/CombatRules/SkillDef/
+  EffectDef…), `State/UnitState`, `Events/*` (13 loại), `Effects/*` (registry + handler), `Serialization/CombatEventSerializer`,
+  `BattleSimulator`, `BattleOutput`/`BattleResult`.
+- **Tầng data-driven ở `GameTeam.Application/Combat/`**: `CombatInputResolver` đọc hero/skill/stage qua **`IConfigProvider`**
+  (Phase 21) → dựng `BattleInput`. Đổi giá trị config ⇒ kết quả sim đổi, **không sửa code** (ADR-004). Không endpoint (phase 30).
+
+### 21.2 Fixed-point & PRNG (khớp §10/§11)
+- `FixedPoint` (long): `FixedScale=1000`, `RoundHalfUp(num,den) = (num + den/2)/den` (chia nguyên; guard `den≥1`, `num≥0`),
+  `ToFixed`/`FromFixed`/`Mul`/`Div`/`Clamp`. Làm tròn round-half-up tại **mọi** toán tử.
+- `Pcg32` (class khả biến, **một instance/trận**, seed `ulong` tường minh): SplitMix64 seed-expand + PCG32
+  `pcg_setseq_64_xsh_rr_32`; nhân **`unchecked`** (wrap mod 2^64), dịch phải **logical** (`ulong >>`); `Bounded` rejection
+  không thiên vị. Kiểm chứng: seed 12345 → 7329/4605; seed 999 → 8003/8884.
+
+### 21.3 Vòng đời & effect registry
+- `BattleSimulator.Simulate` chạy §12 (RoundStarted → thứ tự lượt `(-spd, actor_id)` ổn định qua
+  `OrderByDescending(spd).ThenBy(actor_id, Ordinal)` → mỗi actor: §16 hit→crit rolls, §14 chọn mục tiêu `(slot, actor_id)` →
+  áp effect → end-check §19 sau mỗi action/round → RoundEnded → BattleEnded).
+- **Effect registry (ADR-004):** `EffectRegistry` ánh xạ `effect_type` → `IEffectHandler`; lõi **không** switch skill. Handler
+  mẫu: `DamageEffectHandler` (§17, config-driven), `HealEffectHandler` (mẫu thứ hai chứng minh mở rộng). `effect_type` lạ ⇒
+  ném (hợp đồng rõ ràng). Thêm skill = thêm handler + config, không sửa lõi.
+- **Năng lượng/ultimate (§15, CB4 `[ĐỀ XUẤT]`):** `EnergyRules`/`UnitState.Energy` được nối sẵn nhưng **chưa kích hoạt**
+  cơ chế gain/ultimate ở phase 24 (CB4 là đề xuất, chưa canon; vector mẫu tắt năng lượng) — hoàn thiện ở phase sau.
+
+### 21.4 Event log & serialize
+- Mỗi `CombatEvent` tự ghi trường qua `WriteBody(Utf8JsonWriter)`; `CombatEventSerializer` gán `seq` theo **vị trí** (0..n-1)
+  ⇒ không thể lệch seq. Xuất JSON compact tất định `{event_log, result}` khớp golden format; `final_hp` thứ tự ally→enemy.
+  Dùng cho test byte-identical (cùng input ⇒ cùng chuỗi byte).
+
+### 21.5 Test = hợp đồng
+- `GameTeam.Domain.Tests/Combat`: FixedPoint biên, Pcg32 khớp roll golden, EffectRegistry, **GoldenVectorTests** (khớp từng
+  sự kiện + result cho 2 vector), **DeterminismTests** (N=200 byte-identical), outcome (DEFEAT/DRAW/Miss/turn-order).
+- `GameTeam.Application.Tests/Combat`: **data-driven** (đổi atk config ⇒ damage 158→316, ít vòng hơn), thiếu config ⇒ `Result`
+  lỗi; **CombatPuritySourceScanTests** (quét mã: cấm float/double/DateTime/Stopwatch/RNG global) + NetArchTest lõi combat.
+- Không cần Docker (sim thuần). Đã verify local: Domain 77, Application 45, Contracts 36; negative-test guard đỏ→revert xanh.

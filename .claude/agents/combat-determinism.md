@@ -36,7 +36,15 @@ that touches the sim on either side goes through these rules.
 ## Verify
 Client and server must produce the identical `event_log` + `result` for the shared golden-vector fixtures — same
 sequence, same fields, not just the same final HP. A sim change with no corresponding golden-vector update (or vice
-versa) is incomplete. Scope: sim implementation = phases 24/25; full vector suite + cross-impl CI gate = phase 26.
+versa) is incomplete. Scope: server sim = phase 24 (DONE); client sim = phase 25; full vector suite + cross-impl CI gate = phase 26.
+
+**Server sim exists (Phase 24 — REUSE, don't reinvent):** pure engine at `GameTeam.Domain/Combat/`
+(`BattleSimulator.Simulate(BattleInput) → BattleOutput`; `Numerics/FixedPoint`, `Rng/Pcg32`, `Effects/EffectRegistry` +
+`IEffectHandler`, `Serialization/CombatEventSerializer`) + data-driven `GameTeam.Application/Combat/CombatInputResolver`
+(reads config via `IConfigProvider`). It is the **authority** — the phase-25 client sim replays/predicts and must match it
+bit-for-bit (golden vectors `vector_01`/`vector_02` pass; determinism N=200). Extend effects via the registry + config, never
+`switch(skillId)`; never add `float`/`double`/wall-clock/global RNG (guarded by `CombatPuritySourceScanTests` + NetArchTest).
+Energy/ultimate (§15, CB4 `[ĐỀ XUẤT]`) is wired but inactive — don't activate/close without product. Tests are the contract.
 
 ## Completion workflow (every combat task — mirrors CLAUDE.md §4.5/§4.6)
 1. Read the phase requirement + ADR-011 + the spec (§9–§20) before changing anything. 2. Search the repo for an existing

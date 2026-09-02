@@ -17,6 +17,13 @@ Golden-vector format + samples: `shared/combat-vectors/`. Agent: `.claude/agents
 - **RNG order:** `hit` roll then `crit` roll; **miss = 1 roll, hit = 2 rolls** (consume the crit roll even when `crit_rate_bp==0`).
 - **Damage:** divisive DEF-ratio `atk*coeff*K/(K+def)`, crit **after** mitigation, final `from_fixed`, floor `MIN_DMG`.
 - **Balance numbers = config** (`combat_int`) — never hardcode/invent. CB3/CB4 are `[ĐỀ XUẤT]` (pending product); never silently close a CB.
-- **Scope:** sim code = phases 24/25; full vector suite + cross-impl CI gate = phase 26. Not here.
+- **Scope:** server sim = phase 24 (DONE); client sim = phase 25; full vector suite + cross-impl CI gate = phase 26.
+
+**Realized (Phase 24 — server .NET sim; REUSE, don't reinvent):**
+- **Pure engine:** `GameTeam.Domain/Combat/` — `Numerics/FixedPoint`, `Rng/Pcg32`, `Model/*` (`BattleInput`…), `State/UnitState`, `Events/*`, `Effects/*` (registry), `Serialization/CombatEventSerializer`, `BattleSimulator` (entry: `Simulate(BattleInput) → BattleOutput`). Package-free, no `IClock`/wall-clock/`float`/global RNG. This is the **authority** — client (phase 25) must match it bit-for-bit; never define a divergent client result.
+- **Data-driven layer:** `GameTeam.Application/Combat/CombatInputResolver` reads hero/skill/stage via `IConfigProvider` → builds `BattleInput`. Combat config POCOs live here (`combat_rules` sourced from **stage config** — schema formalization is a follow-up). No battle endpoint (phase 30).
+- **Effects:** extend via `IEffectHandler` + `EffectRegistry` (`effect_type` → handler) + config; unknown type throws. Never `switch(skillId)` in the core. `DamageEffectHandler`/`HealEffectHandler` are the samples; full content = phase 28.
+- **Determinism guards:** `GameTeam.Domain.Tests/Combat` (golden vectors + N=200 byte-identical) + `GameTeam.Application.Tests/Combat` (data-driven + `CombatPuritySourceScanTests` banning float/double/DateTime/RNG-global) + NetArchTest. Tests are the behavior contract — update them with any sim change; never edit a golden vector to make CI green.
+- **Energy/ultimate (§15, CB4 `[ĐỀ XUẤT]`):** wired but inactive at phase 24 (proposal, not canon). Don't activate/close it without product.
 
 **After any combat-doc/spec change (completion workflow — same as CLAUDE.md §4.5/§4.6):** read the spec + ADR-011 first → don't invent beyond scope → keep `combat-framework.md` §9–§20 + `code-style.md` §4 + `shared/combat-vectors/*` + open-questions CB1–CB6 in sync → update golden vectors deliberately → run the combat-determinism self-review → tick the phase checklist `[x]` **only** after verification.
