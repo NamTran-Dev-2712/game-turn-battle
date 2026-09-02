@@ -98,6 +98,30 @@ public class ArchitectureTests
     }
 
     [Fact]
+    public void Combat_domain_sim_should_not_depend_on_framework_or_persistence()
+    {
+        // Phase 24: combat sim (GameTeam.Domain.Combat) là THUẦN, tất định (ADR-011). Không EF/ASP.NET/
+        // MediatR/Redis/Npgsql. float/double/DateTime/RNG-global được canh riêng bởi
+        // CombatPuritySourceScanTests (quét mã nguồn). Đây là gác cổng phụ thuộc assembly cho lõi combat.
+        TestResult result = Types.InAssembly(typeof(GameTeam.Domain.AssemblyMarker).Assembly)
+            .That()
+            .ResideInNamespaceStartingWith("GameTeam.Domain.Combat")
+            .Should()
+            .NotHaveDependencyOnAny(
+                "Microsoft.EntityFrameworkCore",
+                "Microsoft.AspNetCore",
+                "Microsoft.Extensions",
+                "MediatR",
+                "FluentValidation",
+                "Npgsql",
+                "StackExchange.Redis")
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(
+            "Combat sim phải thuần — không EF/HTTP/persistence/framework (ADR-011).");
+    }
+
+    [Fact]
     public void Contracts_should_not_depend_on_application_or_infrastructure()
     {
         // Hướng phụ thuộc hợp lệ: Contracts → Domain (enum/hằng) MÀ THÔI

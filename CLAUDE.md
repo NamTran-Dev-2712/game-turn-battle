@@ -793,6 +793,43 @@ no code/openapi drift (spec-only change). Canonical: `docs/gameplay/combat-frame
   (CB1–CB6) + ADR-011 (only if the decision changes) + `.instructions/combat.md` + `.claude/agents/combat-determinism.md`
   + `.agents/ROLES.md` in sync** (doc-sync matrix, §5); the golden vectors are the behavior contract — update them.
 
+**Deterministic combat sim server (.NET) is standardized (Phase 24 — closed & verified).** Phase 24 **implements** the
+frozen Phase-23 spec (§9–§20) as the **pure, deterministic** server simulator — the server-authoritative source of truth
+for battle results (ADR-011). It does **not** change the spec. Two layers: **(1) pure engine in `GameTeam.Domain/Combat/`**
+(package-free — guarded by `Domain_should_not_depend_on_framework_packages` +
+`Combat_domain_sim_should_not_depend_on_framework_or_persistence`): `BattleSimulator.Simulate(BattleInput) → BattleOutput`
+over `Numerics/FixedPoint` (`long`, `FixedScale=1000`, **single** round-half-up law, div-by-zero/negative guards — **no
+`float`/`double`**), `Rng/Pcg32` (PCG32 `pcg_setseq_64_xsh_rr_32` + SplitMix64, explicit `ulong` seed, **one stream/battle**,
+`unchecked` wrapping 64-bit, logical shifts — **no global RNG**), `Model/*` (self-contained `BattleInput`), `State/UnitState`,
+`Events/*` (13 types, `seq` by list position, golden field names), `Effects/*` (`EffectRegistry` `effect_type`→`IEffectHandler`;
+sample `DamageEffectHandler` §17 + `HealEffectHandler`; unknown type throws; **never `switch(skillId)`** in the core),
+`Serialization/CombatEventSerializer` (deterministic compact JSON). The engine takes **no `IClock`/time** at all (stronger than
+"inject the clock") and does **no I/O**. **(2) Data-driven layer in `GameTeam.Application/Combat/`**: `CombatInputResolver`
+reads hero/skill/stage via the Phase-10/21 **`IConfigProvider`** port → builds `BattleInput`; combat config POCOs live here
+(`combat_rules` sourced from **stage config** — formalizing it into the stage JSON Schema is a documented follow-up). **No
+battle endpoint** (phase 30) and **no DI wiring** yet. Verified (2026-09-02, local, no Docker): `dotnet build -c Release` 0
+error, `dotnet test` **Domain 77 / Application 45 / Contracts 36** pass — golden `vector_01_basic_hit` (59 ev) +
+`vector_02_crit_ko` (30 ev) match **event-by-event + result**; determinism **N=200 byte-identical**; PRNG matches golden rolls
+(12345→7329/4605, 999→8003/8884); data-driven (`hero.atk` 200→400 ⇒ damage 158→316, fewer rounds, no code change); purity
+guard (`CombatPuritySourceScanTests` + NetArchTest) red on injected `double` → reverted green; no `openapi.json`/generated
+drift. Canonical: `docs/gameplay/combat-framework.md` §21; decision log: `.memory/0022-combat-sim-server-standardized.md`.
+
+- Future agents **MUST reuse** `BattleSimulator`/`FixedPoint`/`Pcg32`/`EffectRegistry`/`CombatEventSerializer` +
+  `CombatInputResolver` before adding any combat logic; **MUST NOT** create a second simulator/fixed-point/PRNG/registry, use
+  `float`/`double`/`DateTime`/wall-clock/global `Random` in the sim path, depend on hash/iteration/DB order, read config from
+  the filesystem in the sim, or hand-decide balance numbers (they are `combat_int` from config — ADR-004).
+- **The server sim is the authority (ADR-011):** the phase-25 client sim replays/predicts and **must match it bit-for-bit**;
+  never let the client define a divergent result. **Golden vectors are the contract** — a deliberate sim change updates the
+  vectors in the same change and explains WHY; **never** edit a vector to make CI green (full suite + cross-impl CI gate = phase 26).
+- **Extend via the registry, not the core:** a new effect = a new `IEffectHandler` + config, never a `switch`. **Energy/ultimate**
+  (§15, CB4 `[ĐỀ XUẤT]`) is wired but **inactive** — do not activate or close CB3/CB4 without product; do not implement future-phase
+  scope (client 25, endpoint 30, full skill content 28).
+- When changing the combat sim, keep **`GameTeam.Domain/Combat/*` + `GameTeam.Application/Combat/*` + the combat tests
+  (`GameTeam.Domain.Tests/Combat` + `GameTeam.Application.Tests/Combat` + `ArchitectureTests` — behavior contract) +
+  `docs/gameplay/combat-framework.md` §21 + `.instructions/combat.md` + `.instructions/backend.md` +
+  `.claude/agents/combat-determinism.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the golden
+  vectors + determinism/purity tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,
