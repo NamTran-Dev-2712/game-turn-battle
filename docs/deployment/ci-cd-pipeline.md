@@ -39,8 +39,14 @@ flowchart LR
 | Client | setup Godot (ghim version) → import → test headless → export (release) |
 | Config | validate → version bundle → (release) publish lên Config Service |
 
-## 4. Golden vector cross-phía
-- Job chạy sim server + sim client trên **cùng test vector**; so khớp output (ADR-011). Lệch → fail (bảo vệ determinism).
+## 4. Golden vector cross-phía (Phase 26 — đã bật)
+- Gate `golden-vector` chạy sim server + sim client trên **cùng bộ vector** `shared/combat-vectors/` (9 kịch bản: basic/crit/
+  miss/defeat/draw/multi-unit/mixed-crit/boundary). Baseline (`expected`) **sinh từ sim server** bằng `tools/combat-baseline`
+  (nguồn chân lý, ADR-011) — không viết tay.
+- **Server:** job `golden-vector` trong `ci-server.yml` = `bash tools/combat-baseline/run.sh check` (baseline drift guard, so byte)
+  + `dotnet test --filter GoldenVector` (tự khám phá mọi vector). **Client:** `ci-client.yml` (gdUnit4 `golden_vector_test`,
+  trigger thêm `shared/combat-vectors/**`). Cả hai so CÙNG baseline ⇒ **server ≡ client ≡ baseline**; lệch → **fail** (BLOCKING,
+  không `continue-on-error`). Negative đã kiểm: `+1` damage một phía ⇒ gate đỏ; revert ⇒ xanh.
 
 ## 4b. `ci-server.yml` chi tiết (Phase 02 — hiện trạng thực tế)
 
@@ -67,7 +73,7 @@ Có `concurrency` (huỷ run cũ cùng ref) và `permissions: contents: read` (l
 | 10 | **Domain→Infrastructure** | Rule `Domain_should_not_depend_on_outer_layers` (ADR-003): Domain phụ thuộc Infrastructure ⇒ `architecture-test` **đỏ**. Đã xác minh negative test (thêm leak ⇒ đỏ → revert). |
 | 11 | **Path filter** | Xem danh sách `paths` ở trên (backend/shared/build-props kích hoạt; client-only thì không). |
 | 12 | **`config-validate`** (con trỏ) | **MOVED** — GATE thật đã bật ở `validate-config.yml` (**Phase 07**: `tools/config-validator` — JSON Schema + referential integrity + `schema_version`). Job ở `ci-server.yml` chỉ còn là con trỏ. |
-| 13 | **`golden-vector`** (hook) | **PLACEHOLDER** — job in ghi chú TODO, chưa so khớp vector. Bản thật: **Phase 26** (sim server vs client, ADR-011 — xem §4). |
+| 13 | **`golden-vector`** (gate thật — **Phase 26**) | **ĐÃ BẬT** — job `golden-vector` chạy `bash tools/combat-baseline/run.sh check` (baseline drift guard) + `dotnet test --filter GoldenVector` (server sim == baseline). BLOCKING. Nửa client ở `ci-client.yml` (gdUnit4). Xem §4. |
 
 **Chưa có ở `ci-server.yml` (đích §3, để phase sau):** `publish` + Docker image, lint/format gate,
 CodeQL/security (xem §1). Negative test architecture chạy thủ công/local, không phải job thường trực.
@@ -78,7 +84,8 @@ CodeQL/security (xem §1). Negative test architecture chạy thủ công/local, 
 > sau Phase 03: dựng cổng nền Godot headless (import + 1 smoke test). Feature/golden test client
 > mở rộng ở phase sau.
 
-**Trigger & path filter.** `push` (`main`, `dev`) và `pull_request` khi đụng `client/**` hoặc
+**Trigger & path filter.** `push` (`main`, `dev`) và `pull_request` khi đụng `client/**`,
+**`shared/combat-vectors/**`** (Phase 26 — nửa client của gate golden-vector) hoặc
 `.github/workflows/ci-client.yml`. Có `concurrency` (huỷ run cũ cùng ref), `permissions: contents: read`,
 `timeout-minutes: 25`.
 
@@ -90,10 +97,11 @@ CodeQL/security (xem §1). Negative test architecture chạy thủ công/local, 
 | 4 | **Version guard** | `godot --headless --version` phải khớp `GODOT_VERSION` (lệch ⇒ job đỏ). |
 | 5 | **Import gate** | `godot --headless --import --path client`; **không che exit code** → lỗi import ⇒ job đỏ. |
 | 6 | **gdUnit4 addon** | Vendored (commit) tại `client/addons/gdUnit4`, pin **v6.2.0** (yêu cầu Godot ≥ 4.5), enable ở `project.godot`. Plugin tự bỏ qua UI khi headless/`--import`/CLI. |
-| 7 | **Smoke test** | 1 test tất định `client/tests/smoke/example_smoke_test.gd` (`extends GdUnitTestSuite`). Chạy `runtest.sh -a res://tests -rd reports` dưới `xvfb-run` (lần chạy đầu của runner cần display ảo). |
+| 7 | **gdUnit4 tests** | `runtest.sh -a res://tests -rd reports` dưới `xvfb-run` (cả cây `client/tests`: smoke + combat Phase 25 + **golden vector Phase 26** `tests/combat/golden_vector_test.gd` = nửa client của gate `golden-vector`, so client sim với baseline server). |
 | 8 | **JUnit** | gdUnit4 ghi `client/reports/report_<n>/results.xml`; `actions/upload-artifact@v4` tên `gdunit4-results`, `if-no-files-found: error`. Test/exit ≠ 0 ⇒ job đỏ. |
 
-**Chưa có ở `ci-client.yml` (để phase sau):** golden vector client so khớp server (**Phase 26**, ADR-011),
+**Golden vector client (Phase 26 — đã bật):** `tests/combat/golden_vector_test.gd` tự khám phá mọi vector và so với baseline
+**server-generated**; trigger `shared/combat-vectors/**` đảm bảo đổi vector re-chạy client. **Chưa có (để phase sau):**
 feature test client thật (nhóm phase 3+), export Android (**Phase 55**).
 
 ## 4d. `validate-config.yml` chi tiết (Phase 07 — GATE bắt buộc)

@@ -1,0 +1,18 @@
+<Project>
+  <!-- Central Package Management (ADR-010): phien ban goi khai bao TAP TRUNG o day;
+       csproj chi <PackageReference Include="..."/> khong kem Version.
+       Solution nay TACH RIENG khoi server/ nen co Directory.Packages.props rieng.
+       Core + CLI khong dung goi ngoai (chi BCL + ProjectReference GameTeam.Domain). -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+</Project>

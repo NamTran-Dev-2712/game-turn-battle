@@ -1,8 +1,9 @@
 name: ci-server
 
 # Cổng chất lượng CI cho backend .NET 9 (docs/deployment/ci-cd-pipeline.md §7).
-# Job: build-test (build Release + test + coverage) và architecture-test (NetArchTest gate) chạy
-# song song; hai job placeholder (config-validate, golden-vector) chừa hook cho phase 07/26.
+# Job: build-test (build Release + test + coverage), architecture-test (NetArchTest gate) và
+# golden-vector (Phase 26 — server sim == baseline; client half ở ci-client.yml) chạy song song;
+# config-validate là con trỏ (gate thật ở validate-config.yml, Phase 07).
 on:
   push:
     branches: [main, dev]
@@ -122,16 +123,38 @@ jobs:
           echo "SCOPE  : JSON Schema + referential integrity + schema_version (tools/config-validator)"
           echo "OWNER  : Phase 07 — docs/roadmap/07-config-validator-tool.md"
 
-  # PLACEHOLDER — chỉ là hook, KHÔNG chạy so khớp golden vector ở phase này.
-  # Owner: Phase 26 (docs/roadmap/26-*.md). TODO: chạy sim server + client trên cùng test vector,
-  # so khớp output để bảo vệ determinism (ADR-011).
+  # GATE golden-vector (Phase 26 — ĐÃ BẬT): sim server .NET == baseline đã commit (nguồn chân lý,
+  # ADR-011). Phía client chạy song song ở `.github/workflows/ci-client.yml` (gdUnit4 golden_vector_test)
+  # — cả hai so CÙNG baseline `shared/combat-vectors/*` ⇒ server ≡ client ≡ baseline. Lệch (sim drift
+  # hoặc sửa vector) ⇒ CI đỏ, chặn merge. Gate BLOCKING — KHÔNG continue-on-error / '|| true'.
   golden-vector:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - name: Placeholder notice
-        run: |
-          echo "STATUS : PLACEHOLDER (chưa thực thi)"
-          echo "GATE   : golden-vector (deterministic combat)"
-          echo "TODO   : so khớp output sim server vs client trên cùng test vector (ADR-011)"
-          echo "OWNER  : Phase 26 — docs/roadmap"
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('server/Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # Baseline drift guard: regenerate 'expected' từ sim server rồi so BYTE với vector đã commit.
+      # Fail ⇒ sim đổi mà baseline chưa regenerate CÓ CHỦ ĐÍCH (xem tools/combat-baseline/README.md).
+      - name: Golden baseline check (server sim == committed baseline)
+        run: bash tools/combat-baseline/run.sh check
+
+      # Hợp đồng: sim server khớp TỪNG golden vector (event_log + result), tự khám phá mọi vector.
+      - name: Server golden vector tests
+        run: >-
+          dotnet test server/tests/GameTeam.Domain.Tests/GameTeam.Domain.Tests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName~GoldenVector"
+          --verbosity normal

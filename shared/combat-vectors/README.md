@@ -116,8 +116,32 @@ dmg_f = fixed_mul(200000, 789) = 157800
 dmg   = from_fixed(157800) = 158    → enemy hp 500-158 = 342   ✓ (khớp event seq 6)
 ```
 
+## Bộ vector đa kịch bản (Phase 26 — đã hiện thực)
+
+Baseline (`expected`) của MỌI vector sinh từ **sim server** bằng `tools/combat-baseline`
+(`bash tools/combat-baseline/run.sh generate`) — KHÔNG viết tay. Bộ hiện tại (9 vector):
+
+| File | Kịch bản |
+|---|---|
+| `vector_01_basic_hit` | 1v1 luôn trúng / không crit — VICTORY |
+| `vector_02_crit_ko` | 1v1 luôn crit (×1.5) — VICTORY nhanh |
+| `vector_03_miss` | accuracy_bp=5000 ⇒ có **Miss** xen kẽ (miss = 1 hit-roll, 0 crit-roll) |
+| `vector_04_defeat` | enemy mạnh + nhanh ⇒ **DEFEAT** (winner=enemy) |
+| `vector_05_draw` | sát thương tối thiểu + def cao ⇒ **DRAW** ở max_rounds |
+| `vector_06_multi_unit` | 2v2 — turn order `(-spd, actor_id)` + **tie-break** + đổi target khi front chết |
+| `vector_07_mixed_crit` | crit_rate_bp=5000 ⇒ **crit lẫn thường** trong cùng trận |
+| `vector_08_boundary_lethal` | damage **==** HP ⇒ `target_hp_after=0` + Death (biên chết) |
+| `vector_09_boundary_survive` | damage **<** HP ⇒ `target_hp_after=1`, KHÔNG Death (biên sống) |
+
+Test hai phía **tự khám phá** mọi `*.json` (server `GoldenVectorTests` `[MemberData]`; client
+`CombatVectorLoader.list_vector_files()`) ⇒ thêm vector = KHÔNG sửa code test. Gate CI `golden-vector`
+(server: `run.sh check` + golden tests; client: gdUnit4) so cả hai với CÙNG baseline ⇒ **server ≡ client ≡ baseline**.
+
+**Cập nhật baseline CÓ CHỦ ĐÍCH:** xem `tools/combat-baseline/README.md` (đổi công thức → regenerate → review diff →
+ghi WHY → doc-sync). Không sửa baseline âm thầm.
+
 ## Ngoài phạm vi
 
-- Bộ vector đầy đủ (miss/draw/multi-unit/ultimate) + **CI gate cross-impl** = **phase 26**.
+- Vector cho **ultimate/energy** (CB4 `[ĐỀ XUẤT]`, chưa canon) + skill/effect mới = **phase 28** (mở rộng vector khi có).
 - Signed/secure vector, nén, delta = Post-MVP.
 - Hiện thực sim (24/25), Hero/Skill thật (27/28) — không thuộc đây.

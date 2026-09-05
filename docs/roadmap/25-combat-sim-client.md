@@ -41,15 +41,15 @@ ADR-011: client sim chỉ để hiển thị/dự đoán; server là chân lý. 
 
 # Công việc cần thực hiện
 
-- [ ] Dựng sim GDScript theo spec 23 (state, vòng lượt, thứ tự xác định).
-- [ ] Fixed-point/integer math GDScript khớp lib server (cùng điểm làm tròn); cấm `float` trong tính combat.
-- [ ] Seeded PRNG GDScript cùng thuật toán server (cùng seed → cùng chuỗi số).
-- [ ] Đọc chỉ số từ ConfigProvider (phase 16/22) — cùng config version với server.
-- [ ] Registry effect skill khớp server (cùng effect-data → cùng kết quả).
-- [ ] Sinh event log đúng golden format để UI replay.
-- [ ] Test gdUnit4: determinism (N lần trùng) + khớp vector mẫu (đáp án server).
-- [ ] Static typing, tab indent; lõi sim không phụ thuộc scene/UI.
-- [ ] Cập nhật `../gameplay/combat-framework.md` (client).
+- [x] Dựng sim GDScript theo spec 23 (state, vòng lượt, thứ tự xác định). — `client/src/combat/battle_simulator.gd`
+- [x] Fixed-point/integer math GDScript khớp lib server (cùng điểm làm tròn); cấm `float` trong tính combat. — `client/src/shared/fixed_point.gd`
+- [x] Seeded PRNG GDScript cùng thuật toán server (cùng seed → cùng chuỗi số). — `client/src/combat/rng/pcg32.gd` (seed 12345→7329/4605)
+- [x] Đọc chỉ số từ ConfigProvider (phase 16/22) — cùng config version với server. — `client/src/combat/combat_input_resolver.gd`
+- [x] Registry effect skill khớp server (cùng effect-data → cùng kết quả). — `client/src/combat/effects/*` + registry
+- [x] Sinh event log đúng golden format để UI replay. — `client/src/combat/events/combat_events.gd` (13 loại, seq theo vị trí)
+- [x] Test gdUnit4: determinism (N lần trùng) + khớp vector mẫu (đáp án server). — `client/tests/combat/*` (24–25 test xanh, 0 orphan)
+- [x] Static typing, tab indent; lõi sim không phụ thuộc scene/UI. — grep sạch (không import `core/net`/UI; không `float`)
+- [x] Cập nhật `../gameplay/combat-framework.md` (client). — §21.6 "Hiện thực client (GDScript) — Phase 25"
 
 # Tiêu chí hoàn thành
 
@@ -85,6 +85,21 @@ Client sim **không** quyết kết quả; khi vào battle flow (phase 30), clie
 # Phase Review
 
 Đóng khi sim client khớp quy tắc server (cùng seed→cùng output, khớp vector mẫu), thuần, không float, test gdUnit4 xanh.
+
+## Kết quả (ĐÓNG — verify local 2026-09-04)
+
+- **PASS.** Sim client GDScript (`client/src/combat/*` + `client/src/shared/fixed_point.gd`) song ánh bit-for-bit sim
+  server (Phase 24): `BattleSimulator.simulate`, `FixedPoint` (round-half-up, **không float**), `Pcg32` (SplitMix64→PCG32,
+  logical shift), 13 event type, `DamageEffectHandler`, effect registry, `CombatInputResolver`.
+- **Test gdUnit4 xanh (Godot 4.7.1 local):** `client/tests/combat/*` — golden (khớp baseline server), determinism,
+  outcome (DEFEAT/DRAW/miss/turn-order + tie-break), fixed_point, pcg32, resolver. **24–25 test, 0 failure, 0 orphan.**
+- **Sửa nợ (Phase 26 phát hiện):** `battle_simulator_outcome_test.gd` có helper `_input(...)` trùng virtual
+  `Node._input(InputEvent)` ⇒ Godot 4.7.1 parse-error chặn cả suite; đổi tên `_input`→`_make_input` (chỉ đổi tên helper test,
+  không đổi hành vi sim).
+- **Authority/độ thuần:** client chỉ replay/dự đoán, **không** quyết kết quả (ADR-011); grep sạch (lõi sim không import
+  `core/net`/UI; không `float` trong tính combat).
+- **Doc-sync:** `docs/gameplay/combat-framework.md` §21.6 (client) + §22 (golden Phase 26). Đủ điều kiện đóng.
+- **CI-pending:** `ci-client.yml` chạy trên Actions (bộ combat + golden nằm trong `res://tests`).
 
 ---
 

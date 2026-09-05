@@ -3,12 +3,14 @@ name: ci-client
 # Cổng CI client Godot headless (docs/deployment/ci-cd-pipeline.md §4c).
 # Phase 03: cài Godot 4.7 (pin + verify + cache) → `--headless --import` → gdUnit4 smoke test
 # headless (xuất JUnit). Feature test client mở rộng ở nhóm phase 3+ (đây chỉ dựng cổng nền).
+# Phase 26: thêm trigger `shared/combat-vectors/**` — đây là NỬA CLIENT của gate golden-vector
+# (gdUnit4 golden_vector_test so client sim với baseline dùng chung); đổi vector phải re-chạy client.
 on:
   push:
     branches: [main, dev]
-    paths: ["client/**", ".github/workflows/ci-client.yml"]
+    paths: ["client/**", "shared/combat-vectors/**", ".github/workflows/ci-client.yml"]
   pull_request:
-    paths: ["client/**", ".github/workflows/ci-client.yml"]
+    paths: ["client/**", "shared/combat-vectors/**", ".github/workflows/ci-client.yml"]
 
 # Huỷ run cũ khi có commit mới trên cùng ref (đồng bộ convention ci-server.yml).
 concurrency:

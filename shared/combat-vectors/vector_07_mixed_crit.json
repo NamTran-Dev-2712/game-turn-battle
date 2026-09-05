@@ -1,0 +1,1188 @@
+{
+  "format_version": 1,
+  "name": "vector_07_mixed_crit",
+  "description": "1v1 voi crit_rate_bp=5000 (50%) => log co ca don crit (Crit + crit=true) lan don thuong (crit=false). Kiem tra thu tu RNG hit->crit va nhan gia tri crit sau mitigation.",
+  "input": {
+    "config_version": "config@v1",
+    "seed": 3,
+    "stage": {
+      "id": "stage_sample_01",
+      "max_rounds": 15
+    },
+    "team_snapshot": {
+      "ally": [
+        {
+          "actor_id": "u_ally_01",
+          "hero_id": "hero_sample",
+          "team": "ally",
+          "slot": 0,
+          "stats": {
+            "hp": 1000,
+            "atk": 200,
+            "def": 100,
+            "spd": 120
+          }
+        }
+      ],
+      "enemy": [
+        {
+          "actor_id": "u_enemy_01",
+          "hero_id": "hero_sample",
+          "team": "enemy",
+          "slot": 0,
+          "stats": {
+            "hp": 2000,
+            "atk": 100,
+            "def": 80,
+            "spd": 90
+          }
+        }
+      ]
+    },
+    "config_excerpt": {
+      "skill_basic": {
+        "coeff_fixed": 1000
+      },
+      "combat_rules": {
+        "def_constant_k": 300,
+        "min_damage": 1,
+        "crit_multiplier_fixed": 1500,
+        "accuracy_bp": 10000,
+        "crit_rate_bp": 5000,
+        "max_rounds": 15,
+        "energy": {
+          "initial": 0,
+          "on_attack": 0,
+          "on_hit": 0,
+          "ultimate_cost": 100,
+          "max": 100
+        }
+      }
+    }
+  },
+  "expected": {
+    "event_log": [
+      {
+        "seq": 0,
+        "type": "RoundStarted",
+        "round": 1
+      },
+      {
+        "seq": 1,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 2,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 3,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 3797
+      },
+      {
+        "seq": 4,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 5,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 1839
+      },
+      {
+        "seq": 6,
+        "type": "Crit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 7,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 237,
+        "target_hp_after": 1763,
+        "crit": true
+      },
+      {
+        "seq": 8,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 9,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 10,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 11,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6605
+      },
+      {
+        "seq": 12,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 13,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9175
+      },
+      {
+        "seq": 14,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 925,
+        "crit": false
+      },
+      {
+        "seq": 15,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 16,
+        "type": "RoundEnded",
+        "round": 1
+      },
+      {
+        "seq": 17,
+        "type": "RoundStarted",
+        "round": 2
+      },
+      {
+        "seq": 18,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 19,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 20,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6888
+      },
+      {
+        "seq": 21,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 22,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9513
+      },
+      {
+        "seq": 23,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 158,
+        "target_hp_after": 1605,
+        "crit": false
+      },
+      {
+        "seq": 24,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 25,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 26,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 27,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4351
+      },
+      {
+        "seq": 28,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 29,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9808
+      },
+      {
+        "seq": 30,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 850,
+        "crit": false
+      },
+      {
+        "seq": 31,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 32,
+        "type": "RoundEnded",
+        "round": 2
+      },
+      {
+        "seq": 33,
+        "type": "RoundStarted",
+        "round": 3
+      },
+      {
+        "seq": 34,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 35,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 36,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4327
+      },
+      {
+        "seq": 37,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 38,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6428
+      },
+      {
+        "seq": 39,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 158,
+        "target_hp_after": 1447,
+        "crit": false
+      },
+      {
+        "seq": 40,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 41,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 42,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 43,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 8582
+      },
+      {
+        "seq": 44,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 45,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 4354
+      },
+      {
+        "seq": 46,
+        "type": "Crit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 47,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 113,
+        "target_hp_after": 737,
+        "crit": true
+      },
+      {
+        "seq": 48,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 49,
+        "type": "RoundEnded",
+        "round": 3
+      },
+      {
+        "seq": 50,
+        "type": "RoundStarted",
+        "round": 4
+      },
+      {
+        "seq": 51,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 52,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 53,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4694
+      },
+      {
+        "seq": 54,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 55,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 4852
+      },
+      {
+        "seq": 56,
+        "type": "Crit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 57,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 237,
+        "target_hp_after": 1210,
+        "crit": true
+      },
+      {
+        "seq": 58,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 59,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 60,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 61,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 596
+      },
+      {
+        "seq": 62,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 63,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7440
+      },
+      {
+        "seq": 64,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 662,
+        "crit": false
+      },
+      {
+        "seq": 65,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 66,
+        "type": "RoundEnded",
+        "round": 4
+      },
+      {
+        "seq": 67,
+        "type": "RoundStarted",
+        "round": 5
+      },
+      {
+        "seq": 68,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 69,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 70,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 1932
+      },
+      {
+        "seq": 71,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 72,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 1181
+      },
+      {
+        "seq": 73,
+        "type": "Crit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 74,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 237,
+        "target_hp_after": 973,
+        "crit": true
+      },
+      {
+        "seq": 75,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 76,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 77,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 78,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6805
+      },
+      {
+        "seq": 79,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 80,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7471
+      },
+      {
+        "seq": 81,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 587,
+        "crit": false
+      },
+      {
+        "seq": 82,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 83,
+        "type": "RoundEnded",
+        "round": 5
+      },
+      {
+        "seq": 84,
+        "type": "RoundStarted",
+        "round": 6
+      },
+      {
+        "seq": 85,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 86,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 87,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7515
+      },
+      {
+        "seq": 88,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 89,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6981
+      },
+      {
+        "seq": 90,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 158,
+        "target_hp_after": 815,
+        "crit": false
+      },
+      {
+        "seq": 91,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 92,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 93,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 94,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 3171
+      },
+      {
+        "seq": 95,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 96,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7455
+      },
+      {
+        "seq": 97,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 512,
+        "crit": false
+      },
+      {
+        "seq": 98,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 99,
+        "type": "RoundEnded",
+        "round": 6
+      },
+      {
+        "seq": 100,
+        "type": "RoundStarted",
+        "round": 7
+      },
+      {
+        "seq": 101,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 102,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 103,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 5226
+      },
+      {
+        "seq": 104,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 105,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6188
+      },
+      {
+        "seq": 106,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 158,
+        "target_hp_after": 657,
+        "crit": false
+      },
+      {
+        "seq": 107,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 108,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 109,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 110,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2081
+      },
+      {
+        "seq": 111,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 112,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2891
+      },
+      {
+        "seq": 113,
+        "type": "Crit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 114,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 113,
+        "target_hp_after": 399,
+        "crit": true
+      },
+      {
+        "seq": 115,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 116,
+        "type": "RoundEnded",
+        "round": 7
+      },
+      {
+        "seq": 117,
+        "type": "RoundStarted",
+        "round": 8
+      },
+      {
+        "seq": 118,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 119,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 120,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 265
+      },
+      {
+        "seq": 121,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 122,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 8849
+      },
+      {
+        "seq": 123,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 158,
+        "target_hp_after": 499,
+        "crit": false
+      },
+      {
+        "seq": 124,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 125,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 126,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 127,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 1382
+      },
+      {
+        "seq": 128,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 129,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2755
+      },
+      {
+        "seq": 130,
+        "type": "Crit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 131,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 113,
+        "target_hp_after": 286,
+        "crit": true
+      },
+      {
+        "seq": 132,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 133,
+        "type": "RoundEnded",
+        "round": 8
+      },
+      {
+        "seq": 134,
+        "type": "RoundStarted",
+        "round": 9
+      },
+      {
+        "seq": 135,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 136,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 137,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4963
+      },
+      {
+        "seq": 138,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 139,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 1944
+      },
+      {
+        "seq": 140,
+        "type": "Crit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 141,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 237,
+        "target_hp_after": 262,
+        "crit": true
+      },
+      {
+        "seq": 142,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 143,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 144,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 145,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4124
+      },
+      {
+        "seq": 146,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 147,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 8591
+      },
+      {
+        "seq": 148,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 211,
+        "crit": false
+      },
+      {
+        "seq": 149,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 150,
+        "type": "RoundEnded",
+        "round": 9
+      },
+      {
+        "seq": 151,
+        "type": "RoundStarted",
+        "round": 10
+      },
+      {
+        "seq": 152,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 153,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 154,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 1990
+      },
+      {
+        "seq": 155,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 156,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6574
+      },
+      {
+        "seq": 157,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 158,
+        "target_hp_after": 104,
+        "crit": false
+      },
+      {
+        "seq": 158,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 159,
+        "type": "ActionStarted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 160,
+        "type": "TargetSelected",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 161,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2385
+      },
+      {
+        "seq": 162,
+        "type": "Hit",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01"
+      },
+      {
+        "seq": 163,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5978
+      },
+      {
+        "seq": 164,
+        "type": "DamageApplied",
+        "actor": "u_enemy_01",
+        "target": "u_ally_01",
+        "amount": 75,
+        "target_hp_after": 136,
+        "crit": false
+      },
+      {
+        "seq": 165,
+        "type": "ActionCompleted",
+        "actor": "u_enemy_01"
+      },
+      {
+        "seq": 166,
+        "type": "RoundEnded",
+        "round": 10
+      },
+      {
+        "seq": 167,
+        "type": "RoundStarted",
+        "round": 11
+      },
+      {
+        "seq": 168,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 169,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 170,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4581
+      },
+      {
+        "seq": 171,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 172,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2289
+      },
+      {
+        "seq": 173,
+        "type": "Crit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 174,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 237,
+        "target_hp_after": 0,
+        "crit": true
+      },
+      {
+        "seq": 175,
+        "type": "Death",
+        "unit": "u_enemy_01"
+      },
+      {
+        "seq": 176,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 177,
+        "type": "RoundEnded",
+        "round": 11
+      },
+      {
+        "seq": 178,
+        "type": "BattleEnded"
+      }
+    ],
+    "result": {
+      "outcome": "VICTORY",
+      "winner_team": "ally",
+      "rounds": 11,
+      "final_hp": {
+        "u_ally_01": 136,
+        "u_enemy_01": 0
+      }
+    }
+  }
+}

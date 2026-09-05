@@ -7,7 +7,7 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
 - No client-side authority (economy/result/reward) — call the server (ADR-007/011).
 - Naming: `snake_case` members, `PascalCase` `class_name`, `CONSTANT_CASE` consts, `##` docs; **TAB** indent (`.editorconfig`).
 - Feature layout: `.templates/godot-feature/`.
-- Combat sim: pure/node-decoupled, integer/fixed-point, seeded RNG; match server golden vector (ADR-011).
+- Combat sim: pure/node-decoupled, integer/fixed-point, seeded RNG; match server golden vector (ADR-011). **Golden gate (Phase 26):** `client/tests/combat/golden_vector_test.gd` **auto-discovers** every `shared/combat-vectors/*.json` (`CombatVectorLoader.list_vector_files()`) and matches each against the **server-generated** baseline; client replays, never redefines the result. Baseline change = server-side `tools/combat-baseline` only (never hand-edit a vector). `ci-client.yml` triggers on `shared/combat-vectors/**`.
 - Tests: gdUnit4 under `client/tests/`.
 - **Contract models are generated (Phase 08 — closed & verified).** DTO/enum read-models live in
   `client/src/data/generated/` (`AUTO-GENERATED — DO NOT EDIT`), produced by `shared/codegen` from

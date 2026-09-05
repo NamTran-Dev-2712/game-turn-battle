@@ -1,0 +1,140 @@
+{
+  "format_version": 1,
+  "name": "vector_08_boundary_lethal",
+  "description": "Bien: sat thuong == HP con lai (atk 200/def 100 => damage 150, enemy hp 150) => target_hp_after=0 + Death ngay don dau. Kiem tra bien chet chinh xac (damage == hp).",
+  "input": {
+    "config_version": "config@v1",
+    "seed": 1,
+    "stage": {
+      "id": "stage_sample_01",
+      "max_rounds": 30
+    },
+    "team_snapshot": {
+      "ally": [
+        {
+          "actor_id": "u_ally_01",
+          "hero_id": "hero_sample",
+          "team": "ally",
+          "slot": 0,
+          "stats": {
+            "hp": 1000,
+            "atk": 200,
+            "def": 100,
+            "spd": 120
+          }
+        }
+      ],
+      "enemy": [
+        {
+          "actor_id": "u_enemy_01",
+          "hero_id": "hero_sample",
+          "team": "enemy",
+          "slot": 0,
+          "stats": {
+            "hp": 150,
+            "atk": 100,
+            "def": 100,
+            "spd": 90
+          }
+        }
+      ]
+    },
+    "config_excerpt": {
+      "skill_basic": {
+        "coeff_fixed": 1000
+      },
+      "combat_rules": {
+        "def_constant_k": 300,
+        "min_damage": 1,
+        "crit_multiplier_fixed": 1500,
+        "accuracy_bp": 10000,
+        "crit_rate_bp": 0,
+        "max_rounds": 30,
+        "energy": {
+          "initial": 0,
+          "on_attack": 0,
+          "on_hit": 0,
+          "ultimate_cost": 100,
+          "max": 100
+        }
+      }
+    }
+  },
+  "expected": {
+    "event_log": [
+      {
+        "seq": 0,
+        "type": "RoundStarted",
+        "round": 1
+      },
+      {
+        "seq": 1,
+        "type": "ActionStarted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 2,
+        "type": "TargetSelected",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 3,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6492
+      },
+      {
+        "seq": 4,
+        "type": "Hit",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01"
+      },
+      {
+        "seq": 5,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 16
+      },
+      {
+        "seq": 6,
+        "type": "DamageApplied",
+        "actor": "u_ally_01",
+        "target": "u_enemy_01",
+        "amount": 150,
+        "target_hp_after": 0,
+        "crit": false
+      },
+      {
+        "seq": 7,
+        "type": "Death",
+        "unit": "u_enemy_01"
+      },
+      {
+        "seq": 8,
+        "type": "ActionCompleted",
+        "actor": "u_ally_01"
+      },
+      {
+        "seq": 9,
+        "type": "RoundEnded",
+        "round": 1
+      },
+      {
+        "seq": 10,
+        "type": "BattleEnded"
+      }
+    ],
+    "result": {
+      "outcome": "VICTORY",
+      "winner_team": "ally",
+      "rounds": 1,
+      "final_hp": {
+        "u_ally_01": 1000,
+        "u_enemy_01": 0
+      }
+    }
+  }
+}
