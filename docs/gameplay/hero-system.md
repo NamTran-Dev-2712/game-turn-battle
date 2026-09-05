@@ -49,7 +49,36 @@ flowchart LR
 - Thêm faction/hero mới = thêm **config**, không sửa code (ADR-004).
 - Skin/awakening (Future — `../mvp/04` F37): thêm trường config + trạng thái, không phá schema (versioning ADR-005).
 
-## 7. Liên kết
+## 7. Trạng thái hiện thực (Phase 27 — đã đóng)
+
+Nền tảng Hero data-driven đã hiện thực (ADR-004/007). Chi tiết vận hành:
+
+**Server (chân lý):**
+- **HeroDefinition = config, KHÔNG hardcode.** Đọc qua port **`IConfigProvider.Get<HeroConfig>("hero", id)`**
+  (`server/src/GameTeam.Application/Features/Heroes/HeroConfig.cs`) — faction/class/element/role/rarity/base_stats/
+  skills/art từ `config/heroes/*.json` (schema phase 06, thêm field tuỳ chọn `art`). KHÔNG có nguồn hero thứ hai.
+- **`OwnedHero`** (`GameTeam.Domain/Heroes/OwnedHero.cs`, `AggregateRoot<Guid>`): instance động gắn
+  **`ProfileId`** (khoá ngoại `player_profiles`), `HeroId` (ref config), `Level`/`Stars` nền. Bảng `owned_heroes`
+  (unique `(profile_id, hero_id)`). Chỉ số tĩnh KHÔNG lưu ở đây — đọc từ config.
+- **Queries:** `GetMyHeroesQuery` (owner suy TỪ token `sub` qua `ICurrentUser` — chống IDOR; trả
+  `MyHeroesResponse` bọc `OwnedHeroDto{heroId,level,stars}`) + `GetHeroDefinitionQuery` (definition từ config →
+  `HeroDefinitionDto`). Endpoint: `GET /api/v1/heroes` (protected) + `GET /api/v1/heroes/{heroId}/definition`
+  (public catalog).
+- **Seed tạm:** guest login cấp toàn bộ hero trong config (`GetIds("hero")`) cùng transaction — **tạm tới
+  phase 33 (summon)**, KHÔNG phải cơ chế nhận thật.
+
+**Client (hiển thị, không chân lý):**
+- **Hero List** (`client/src/ui/hero_list/`): GHÉP hero **owned** (`StateCache.get_heroes()`, server-authoritative)
+  + **definition** (`ConfigProvider.get_hero(id)`, data-driven). Đổi config → định nghĩa đổi KHÔNG rebuild.
+- **Hero Detail** (`client/src/ui/hero_detail/`): chi tiết một hero (id truyền qua `SceneRouter.route_context()`);
+  **art tải LAZY** qua **`AssetLoader`** (`client/src/core/assets/asset_loader.gd`, autoload) — placeholder trước,
+  art thật sau (KHÔNG chặn list — ADR-009), đường dẫn art từ config (field `art`), giải phóng khi rời màn.
+- Contract→codegen: DTO hero ở `GameTeam.Contracts/Hero/*` → `openapi.json` → GDScript generated (DO-NOT-EDIT).
+
+**Ranh giới quyền:** client KHÔNG tự thêm hero / đổi owner / level / sao / chỉ số. Definition từ config; ownership
+từ server/profile. Ngoài phạm vi Phase 27: skill (28), formation (29), battle (30), summon (33), nâng cấp (35/39).
+
+## 8. Liên kết
 - Combat: `combat-framework.md` · Skill: `skill-framework.md`
-- Progression: `progression-and-economy.md` · Config: `configuration-and-data.md`
-- Nguồn: `../mvp/03`, `../mvp/05`
+- Progression: `progression-and-economy.md` · Config: `configuration-and-data.md` · Assets: `../godot/resources-and-assets.md`
+- Nguồn: `../mvp/03`, `../mvp/05` · Roadmap: `../roadmap/27-hero-system.md`

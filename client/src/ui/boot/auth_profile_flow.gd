@@ -14,6 +14,8 @@ extends RefCounted
 const AUTH_GUEST_PATH: String = "/api/v1/auth/guest"
 ## Endpoint profile (GET, cần Authorization; owner suy từ token `sub` — chống IDOR).
 const PROFILE_PATH: String = "/api/v1/profile"
+## Endpoint hero owned (GET, cần Authorization; owner suy từ token — server-authoritative, phase 27).
+const HEROES_PATH: String = "/api/v1/heroes"
 ## Số lần re-login TỐI ĐA khi 401 (chống vòng lặp login→401→login…).
 const MAX_RELOGIN: int = 1
 
@@ -48,7 +50,7 @@ func run() -> Dictionary:
 	while true:
 		var res: NetResult = await network_client.get_json(PROFILE_PATH, NetworkResponseParser.parse_profile)
 		if res.ok:
-			_apply_profile(res.value)
+			await _apply_profile_and_heroes(res.value)
 			return {"ok": true, "offline": false, "code": ""}
 		if res.kind == NetResult.Kind.UNAUTHORIZED and relogins < MAX_RELOGIN:
 			relogins += 1
@@ -79,10 +81,14 @@ func _guest_login() -> Dictionary:
 	return {"ok": true, "code": ""}
 
 
-# Nạp profile server vào StateCache (đường ghi DUY NHẤT = apply_snapshot; wire key camelCase như server).
-func _apply_profile(profile: ProfileDto) -> void:
+# Nạp profile + hero owned server vào StateCache trong MỘT snapshot (đường ghi DUY NHẤT = apply_snapshot,
+# thay nguyên snapshot ⇒ gộp profile+heroes để không ghi đè mất nhau). Hero là best-effort: lỗi ⇒ danh
+# sách rỗng (KHÔNG bịa dữ liệu — ADR-011), profile vẫn vào cache. Definition (chỉ số) client ghép từ
+# ConfigProvider theo hero id (phase 27) — KHÔNG gửi trùng qua đây.
+func _apply_profile_and_heroes(profile: ProfileDto) -> void:
 	if state_cache == null:
 		return
+	var heroes: Array = await _fetch_heroes()
 	state_cache.apply_snapshot({
 		"profile": {
 			"playerId": profile.player_id,
@@ -90,7 +96,22 @@ func _apply_profile(profile: ProfileDto) -> void:
 			"level": profile.level,
 			"schemaVersion": profile.schema_version,
 		},
+		"heroes": heroes,
 	})
+
+
+# Tải hero owned (best-effort). Trả mảng snapshot [{id, level, stars}] (khoá "id" để StateCache.get_hero
+# khớp). Lỗi/không có ⇒ mảng rỗng (không bịa). Server là chân lý ownership (ADR-007).
+func _fetch_heroes() -> Array:
+	if network_client == null:
+		return []
+	var res: NetResult = await network_client.get_json(HEROES_PATH, NetworkResponseParser.parse_my_heroes)
+	if not res.ok or res.value == null:
+		return []
+	var out: Array = []
+	for dto in res.value:
+		out.append({"id": dto.hero_id, "level": dto.level, "stars": dto.stars})
+	return out
 
 
 # Suy giảm có kiểm soát: có cache cũ ⇒ offline-view (không bịa); không có ⇒ thất bại (boot màn lỗi).

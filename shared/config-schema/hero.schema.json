@@ -31,6 +31,11 @@
       "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/skill_id" },
       "minItems": 1,
       "uniqueItems": true
+    },
+    "art": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tham chiếu asset art của hero (id → path/atlas, ADR-009/004) — data-driven, KHÔNG hardcode rải rác ở code. TUỲ CHỌN (additive, phase 27): thiếu ⇒ client dùng placeholder + lazy-load (ADR-009). Art nặng tách khỏi data nhẹ."
     }
   },
   "additionalProperties": false

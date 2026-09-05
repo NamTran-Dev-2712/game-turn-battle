@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
 using GameTeam.Application.Features.Auth.Commands;
@@ -9,6 +10,7 @@ using GameTeam.Application.Tests.TestSupport;
 using GameTeam.Contracts.Auth;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
 using NSubstitute;
 using Xunit;
@@ -23,6 +25,8 @@ public sealed class CreateGuestAccountCommandTests
 {
     private static readonly FixedClock Clock =
         new(new DateTimeOffset(2026, 8, 21, 9, 0, 0, TimeSpan.Zero));
+
+    private static readonly string[] SeededHeroIds = ["hero_sample"];
 
     [Fact]
     public async Task Handler_creates_guest_account_and_returns_token_from_port()
@@ -43,7 +47,16 @@ public sealed class CreateGuestAccountCommandTests
         profiles.AddAsync(Arg.Do<PlayerProfile>(p => addedProfile = p), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
-        var handler = new CreateGuestAccountCommandHandler(repository, profiles, tokenService, Clock);
+        // Phase 27: the guest-login command also seeds owned heroes from config (temporary, until phase 33).
+        var ownedHeroes = Substitute.For<IOwnedHeroRepository>();
+        OwnedHero? addedHero = null;
+        ownedHeroes.AddAsync(Arg.Do<OwnedHero>(h => addedHero = h), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var config = Substitute.For<IConfigProvider>();
+        config.GetIds("hero").Returns(SeededHeroIds);
+
+        var handler = new CreateGuestAccountCommandHandler(
+            repository, profiles, ownedHeroes, config, tokenService, Clock);
 
         Result<AuthGuestResponse> result = await handler.Handle(
             new CreateGuestAccountCommand("device-1"), CancellationToken.None);
@@ -65,6 +78,14 @@ public sealed class CreateGuestAccountCommandTests
         addedProfile.Should().NotBeNull();
         addedProfile!.AccountId.Should().Be(added.Id);
         addedProfile.SchemaVersion.Should().Be(PlayerProfile.CurrentSchemaVersion);
+
+        // An owned hero was seeded from config for the SAME profile (data-driven seed, Phase 27).
+        await ownedHeroes.Received(1).AddAsync(Arg.Any<OwnedHero>(), Arg.Any<CancellationToken>());
+        addedHero.Should().NotBeNull();
+        addedHero!.ProfileId.Should().Be(addedProfile.Id);
+        addedHero.HeroId.Should().Be("hero_sample");
+        addedHero.Level.Should().Be(OwnedHero.InitialLevel);
+        addedHero.Stars.Should().Be(OwnedHero.InitialStars);
     }
 
     [Theory]

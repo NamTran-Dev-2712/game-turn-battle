@@ -60,3 +60,8 @@ Runtime SSOT for config lives in `server/src/GameTeam.Infrastructure/Configurati
   unknown ⇒ 404 `CONFIG_BUNDLE_NOT_FOUND`).
 - **Out of scope:** client bundle caching/e2e = phase 22 (client `ConfigProvider` = phase 16); typed gameplay POCOs =
   phases 27+; live swap without deploy = Post-MVP; feature flags / A-B = phase 49. Canonical: `docs/backend/infrastructure.md` §3.1.
+- **Hero config (Phase 27):** `config/heroes/*.json` (schema `hero.schema.json`) mang faction/class/element/role/rarity/
+  base_stats/skills + field **tuỳ chọn `art`** (path/atlas → client `AssetLoader` lazy, ADR-009 — thêm additive, KHÔNG bump
+  `schema_version`). Server đọc definition qua **`IConfigProvider.Get<HeroConfig>("hero", id)`** (POCO Application, phase 27)
+  — **KHÔNG hardcode chỉ số**. `hero.skills[]` phải trỏ skill tồn tại (`config/skills/*.json`) — validator phase 07 bắt
+  `REF001`. Thêm hero = **thêm config**, không sửa code.

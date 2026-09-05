@@ -66,6 +66,24 @@ static func parse_profile(data: Dictionary) -> ProfileDto:
 	return model
 
 
+## Parse `GET /api/v1/heroes` → Array[OwnedHeroDto] (phase 27). Body bọc object `{ "heroes": [ {heroId,
+## level, stars} ] }` (không mảng trần — hợp NetworkClient chỉ nhận Dictionary). `null` nếu thiếu `heroes`
+## hoặc phần tử sai hình dạng (thiếu `heroId`). Mảng rỗng là hợp lệ (chưa sở hữu hero nào).
+static func parse_my_heroes(data: Dictionary) -> Variant:
+	if not data.has("heroes") or not (data["heroes"] is Array):
+		return null
+	var result: Array[OwnedHeroDto] = []
+	for item in data["heroes"]:
+		if not (item is Dictionary) or not item.has("heroId"):
+			return null
+		var dto := OwnedHeroDto.new()
+		dto.hero_id = str(item["heroId"])
+		dto.level = int(item.get("level", 0))
+		dto.stars = int(item.get("stars", 0))
+		result.append(dto)
+	return result
+
+
 ## Parse metadata bundle `{ "version": { "bundle": int, "schema": int } }` → ConfigBundleDto.
 ## Dùng cho ConfigProvider so version (phase 16). `null` nếu thiếu `version`/`bundle`.
 static func parse_config_bundle(data: Dictionary) -> ConfigBundleDto:

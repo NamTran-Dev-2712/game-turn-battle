@@ -31,4 +31,14 @@ public class GdNamingTests
     [InlineData("HealthResponse", "health_response.gd")]
     public void ToFileName_is_snake_case_gd(string input, string expected) =>
         GdNaming.ToFileName(input).Should().Be(expected);
+
+    [Theory]
+    [InlineData("class", "class_")]   // wire "class" trùng từ khoá GDScript → escape (HeroDefinitionDto).
+    [InlineData("func", "func_")]
+    [InlineData("var", "var_")]
+    [InlineData("signal", "signal_")]
+    [InlineData("heroId", "hero_id")] // không phải từ khoá → snake_case bình thường.
+    [InlineData("def", "def")]        // "def" KHÔNG là từ khoá GDScript → giữ nguyên.
+    public void ToFieldName_escapes_gdscript_reserved_words(string input, string expected) =>
+        GdNaming.ToFieldName(input).Should().Be(expected);
 }

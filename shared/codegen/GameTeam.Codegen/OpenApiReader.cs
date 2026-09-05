@@ -148,6 +148,6 @@ public static class OpenApiReader
             notes.Add(baseType.DocNote);
         }
 
-        return new DtoProperty(wireName, GdNaming.ToSnakeCase(wireName), annotation, notes);
+        return new DtoProperty(wireName, GdNaming.ToFieldName(wireName), annotation, notes);
     }
 }

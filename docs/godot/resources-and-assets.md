@@ -69,6 +69,23 @@ version ⇒ tạo cache version mới, phát `config_updated`, feature nạp l�
 > asset nặng ⇒ boot không block. Async/lazy/pool/atlas ở trên vẫn là **thiết kế**, hiện thực khi feature cần
 > (tối ưu asset/anim = phase 52, ADR-009). Giải phóng scene khi chuyển đã có qua `SceneRouter` (`queue_free`).
 
+### 2.1 AssetLoader — lazy async (Phase 27 — đã chốt)
+
+> Nguồn: `client/src/core/assets/asset_loader.gd` (autoload `AssetLoader`, bỏ `class_name`). Dịch vụ nạp
+> asset **nặng** tối giản (bản hiện thực đầu tiên của ADR-009), do Hero System (phase 27) là feature đầu cần art.
+
+| API | Trách nhiệm |
+|---|---|
+| `load_texture(path) -> Texture2D` | Coroutine: nạp texture **bất đồng bộ** (`ResourceLoader.load_threaded_request` + poll), **KHÔNG chặn** caller. Cache theo path (lần sau trả ngay). |
+| `placeholder() -> Texture2D` | Texture giữ chỗ dùng chung (dựng lazy) — hiển thị khi đang chờ / không có art. |
+| `release(path)` / `clear()` | Giải phóng cache khi rời scene/feature (ADR-009 §3). |
+
+- **Đường dẫn art đến TỪ CONFIG** (hero schema field tuỳ chọn `art`: id → path) — **KHÔNG hardcode rải rác**
+  ở feature (ADR-004/009). Thiếu path / không tồn tại / nạp lỗi ⇒ **placeholder** (không crash, không chặn).
+- **Danh sách KHÔNG tải art** (chỉ text); art chỉ tải ở màn chi tiết ⇒ list không phụ thuộc art đã nạp.
+- Tối ưu nâng cao (atlas/nén/pool lớn) vẫn hoãn tới **phase 52**. Tái dùng `AssetLoader` — **KHÔNG** tạo bộ nạp
+  asset thứ hai; đường dẫn art luôn từ config.
+
 ---
 
 ## 3. Memory management

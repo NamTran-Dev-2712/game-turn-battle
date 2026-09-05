@@ -44,6 +44,8 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("/api/v1/profile")]
     [InlineData("/api/v1/config/current")] // Phase 21: reimplemented the Phase-05 "/config/{version}" stub
     [InlineData("/api/v1/config/bundle")]  //           as current-version + versioned-bundle endpoints
+    [InlineData("/api/v1/heroes")]                       // Phase 27: owned heroes (server-authoritative)
+    [InlineData("/api/v1/heroes/{heroId}/definition")]  //           + hero definition from config
     public async Task OpenApi_document_exposes_foundation_paths(string path)
     {
         (OpenApiDocument doc, _) = await ReadDocumentAsync();
@@ -60,6 +62,10 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("ErrorResponse")]
     [InlineData("ErrorEnvelope")]
     [InlineData("HealthResponse")]
+    [InlineData("OwnedHeroDto")]        // Phase 27
+    [InlineData("MyHeroesResponse")]   // Phase 27
+    [InlineData("HeroDefinitionDto")]  // Phase 27
+    [InlineData("HeroBaseStatsDto")]   // Phase 27
     public async Task OpenApi_document_exposes_foundation_dto_schemas(string schemaName)
     {
         (OpenApiDocument doc, _) = await ReadDocumentAsync();

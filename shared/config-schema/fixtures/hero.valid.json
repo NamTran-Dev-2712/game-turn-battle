@@ -7,5 +7,6 @@
   "role": "tank",
   "rarity": 3,
   "base_stats": { "hp": 0, "atk": 0, "def": 0, "spd": 0 },
-  "skills": ["skill_sample_basic"]
+  "skills": ["skill_sample_basic"],
+  "art": "res://assets/heroes/hero_sample.png"
 }

@@ -127,6 +127,76 @@
         }
       }
     },
+    "/api/v1/heroes": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetMyHeroes",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyHeroesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/heroes/{heroId}/definition": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetHeroDefinition",
+        "parameters": [
+          {
+            "name": "heroId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeroDefinitionDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -223,106 +293,6 @@
           0
         ]
       },
-      "Class": {
-        "enum": [
-          "None",
-          "Warrior",
-          "Mage",
-          "Ranger",
-          "Support"
-        ],
-        "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
-        "x-enum-varnames": [
-          "None",
-          "Warrior",
-          "Mage",
-          "Ranger",
-          "Support"
-        ],
-        "x-enum-values": [
-          0,
-          1,
-          2,
-          3,
-          4
-        ]
-      },
-      "Element": {
-        "enum": [
-          "None",
-          "Fire",
-          "Water",
-          "Earth",
-          "Light",
-          "Dark"
-        ],
-        "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
-        "x-enum-varnames": [
-          "None",
-          "Fire",
-          "Water",
-          "Earth",
-          "Light",
-          "Dark"
-        ],
-        "x-enum-values": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
-        ]
-      },
-      "Role": {
-        "enum": [
-          "None",
-          "Tank",
-          "Dps",
-          "Support",
-          "Healer"
-        ],
-        "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
-        "x-enum-varnames": [
-          "None",
-          "Tank",
-          "Dps",
-          "Support",
-          "Healer"
-        ],
-        "x-enum-values": [
-          0,
-          1,
-          2,
-          3,
-          4
-        ]
-      },
-      "Rarity": {
-        "enum": [
-          "None",
-          "Three",
-          "Four",
-          "Five"
-        ],
-        "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
-        "x-enum-varnames": [
-          "None",
-          "Three",
-          "Four",
-          "Five"
-        ],
-        "x-enum-values": [
-          0,
-          3,
-          4,
-          5
-        ]
-      },
       "Currency": {
         "enum": [
           "None",
@@ -377,6 +347,31 @@
           }
         }
       },
+      "Class": {
+        "enum": [
+          "None",
+          "Warrior",
+          "Mage",
+          "Ranger",
+          "Support"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Warrior",
+          "Mage",
+          "Ranger",
+          "Support"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
       "ConfigBundleDto": {
         "required": [
           "version"
@@ -404,6 +399,34 @@
             "format": "int32"
           }
         }
+      },
+      "Element": {
+        "enum": [
+          "None",
+          "Fire",
+          "Water",
+          "Earth",
+          "Light",
+          "Dark"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Fire",
+          "Water",
+          "Earth",
+          "Light",
+          "Dark"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
       },
       "ErrorEnvelope": {
         "required": [
@@ -447,6 +470,115 @@
           }
         }
       },
+      "HeroBaseStatsDto": {
+        "required": [
+          "hp",
+          "atk",
+          "def",
+          "spd"
+        ],
+        "type": "object",
+        "properties": {
+          "hp": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "atk": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "def": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "spd": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "HeroDefinitionDto": {
+        "required": [
+          "heroId",
+          "faction",
+          "class",
+          "element",
+          "role",
+          "rarity",
+          "baseStats",
+          "skills",
+          "art"
+        ],
+        "type": "object",
+        "properties": {
+          "heroId": {
+            "type": "string"
+          },
+          "faction": {
+            "type": "string"
+          },
+          "class": {
+            "$ref": "#/components/schemas/Class"
+          },
+          "element": {
+            "$ref": "#/components/schemas/Element"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "rarity": {
+            "$ref": "#/components/schemas/Rarity"
+          },
+          "baseStats": {
+            "$ref": "#/components/schemas/HeroBaseStatsDto"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "art": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MyHeroesResponse": {
+        "required": [
+          "heroes"
+        ],
+        "type": "object",
+        "properties": {
+          "heroes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnedHeroDto"
+            }
+          }
+        }
+      },
+      "OwnedHeroDto": {
+        "required": [
+          "heroId",
+          "level",
+          "stars"
+        ],
+        "type": "object",
+        "properties": {
+          "heroId": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stars": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ProfileDto": {
         "required": [
           "playerId",
@@ -471,6 +603,53 @@
             "format": "int32"
           }
         }
+      },
+      "Rarity": {
+        "enum": [
+          "None",
+          "Three",
+          "Four",
+          "Five"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Three",
+          "Four",
+          "Five"
+        ],
+        "x-enum-values": [
+          0,
+          3,
+          4,
+          5
+        ]
+      },
+      "Role": {
+        "enum": [
+          "None",
+          "Tank",
+          "Dps",
+          "Support",
+          "Healer"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Tank",
+          "Dps",
+          "Support",
+          "Healer"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
       },
       "ServerTimeResponse": {
         "required": [

@@ -12,6 +12,7 @@ const _AUTH_FLOW := preload("res://src/ui/boot/auth_profile_flow.gd")
 
 const _GUEST_JSON := '{"accessToken":"fake-jwt","refreshToken":"fake-refresh","expiresInSeconds":3600}'
 const _PROFILE_JSON := '{"playerId":"acc-1","displayName":"Guest","level":1,"schemaVersion":1}'
+const _HEROES_JSON := '{"heroes":[{"heroId":"hero_sample","level":1,"stars":1}]}'  # phase 27
 const _ERROR_401 := '{"error":{"code":"UNAUTHENTICATED","message":"nope","traceId":null}}'
 
 var _cache_dir: String
@@ -83,6 +84,7 @@ func test_happy_path_login_token_profile_into_state_cache() -> void:
 	var fake := FakeHttpTransport.new()
 	fake.queue_ok(200, _GUEST_JSON)    # POST /auth/guest
 	fake.queue_ok(200, _PROFILE_JSON)  # GET /profile
+	fake.queue_ok(200, _HEROES_JSON)   # GET /heroes (phase 27)
 	var ctx := _build(fake)
 	var result: Dictionary = await ctx["flow"].run()
 
@@ -96,24 +98,32 @@ func test_happy_path_login_token_profile_into_state_cache() -> void:
 	assert_str(str(profile.get("displayName"))).is_equal("Guest")
 	assert_int(int(profile.get("level"))).is_equal(1)
 	assert_str(ctx["sc"].source()).is_equal("server")
-	# Thứ tự request: auth/guest rồi profile; profile CÓ Authorization header.
-	assert_int(fake.requests.size()).is_equal(2)
+	# Hero owned từ server đã vào StateCache (phase 27) — cùng snapshot với profile (không ghi đè mất nhau).
+	var heroes: Array = ctx["sc"].get_heroes()
+	assert_int(heroes.size()).is_equal(1)
+	assert_str(str(heroes[0].get("id"))).is_equal("hero_sample")
+	# Thứ tự request: auth/guest → profile → heroes; profile+heroes CÓ Authorization header.
+	assert_int(fake.requests.size()).is_equal(3)
 	assert_bool(str(fake.requests[0]["url"]).ends_with("/api/v1/auth/guest")).is_true()
 	assert_bool(str(fake.requests[1]["url"]).ends_with("/api/v1/profile")).is_true()
+	assert_bool(str(fake.requests[2]["url"]).ends_with("/api/v1/heroes")).is_true()
 	assert_bool(_has_auth_header(fake.requests[1]["headers"])).is_true()
+	assert_bool(_has_auth_header(fake.requests[2]["headers"])).is_true()
 
 
 func test_existing_valid_token_skips_guest_login() -> void:
 	var fake := FakeHttpTransport.new()
-	fake.queue_ok(200, _PROFILE_JSON)  # CHỈ profile được kỳ vọng
+	fake.queue_ok(200, _PROFILE_JSON)  # profile
+	fake.queue_ok(200, _HEROES_JSON)   # heroes (phase 27) — KHÔNG gọi /auth/guest
 	var ctx := _build(fake)
 	ctx["ts"].save_tokens("existing-jwt", "fake-refresh", 3600)  # còn hạn
 	var result: Dictionary = await ctx["flow"].run()
 
 	assert_bool(result["ok"]).is_true()
-	# Đúng 1 request (profile) — KHÔNG gọi /auth/guest.
-	assert_int(fake.requests.size()).is_equal(1)
+	# profile + heroes (KHÔNG /auth/guest vì token còn hạn).
+	assert_int(fake.requests.size()).is_equal(2)
 	assert_bool(str(fake.requests[0]["url"]).ends_with("/api/v1/profile")).is_true()
+	assert_bool(str(fake.requests[1]["url"]).ends_with("/api/v1/heroes")).is_true()
 	assert_bool(_has_auth_header(fake.requests[0]["headers"])).is_true()
 
 
@@ -122,6 +132,7 @@ func test_unauthorized_triggers_bounded_relogin_then_succeeds() -> void:
 	fake.queue_ok(401, _ERROR_401)     # profile #1 → 401
 	fake.queue_ok(200, _GUEST_JSON)    # re-login guest
 	fake.queue_ok(200, _PROFILE_JSON)  # profile #2 → ok
+	fake.queue_ok(200, _HEROES_JSON)   # heroes (phase 27)
 	var ctx := _build(fake)
 	ctx["ts"].save_tokens("stale-jwt", "fake-refresh", 3600)  # server sẽ từ chối
 	var result: Dictionary = await ctx["flow"].run()
@@ -131,7 +142,7 @@ func test_unauthorized_triggers_bounded_relogin_then_succeeds() -> void:
 	assert_str(str(ctx["sc"].get_profile().get("displayName"))).is_equal("Guest")
 	assert_str(ctx["ts"].get_access_token()).is_equal("fake-jwt")  # token mới thay token cũ
 	assert_int(_unauthorized.size()).is_greater_equal(1)  # sự kiện unauthorized đã phát
-	assert_int(fake.requests.size()).is_equal(3)  # profile401, guest, profile200 — có giới hạn
+	assert_int(fake.requests.size()).is_equal(4)  # profile401, guest, profile200, heroes — có giới hạn
 
 
 func test_relogin_is_bounded_no_infinite_loop_when_401_persists() -> void:
@@ -152,14 +163,15 @@ func test_expired_token_relogins_proactively() -> void:
 	var fake := FakeHttpTransport.new()
 	fake.queue_ok(200, _GUEST_JSON)    # guest login (vì token hết hạn)
 	fake.queue_ok(200, _PROFILE_JSON)  # profile
+	fake.queue_ok(200, _HEROES_JSON)   # heroes (phase 27)
 	var ctx := _build(fake)
 	ctx["ts"].save_tokens("old-jwt", "fake-refresh", 3600)
 	ctx["ts"]._expires_at_unix = int(Time.get_unix_time_from_system()) - 10  # ép hết hạn
 	var result: Dictionary = await ctx["flow"].run()
 
 	assert_bool(result["ok"]).is_true()
-	# Request đầu = guest (re-login chủ động), rồi profile.
-	assert_int(fake.requests.size()).is_equal(2)
+	# Request đầu = guest (re-login chủ động), rồi profile, rồi heroes.
+	assert_int(fake.requests.size()).is_equal(3)
 	assert_bool(str(fake.requests[0]["url"]).ends_with("/api/v1/auth/guest")).is_true()
 	assert_str(ctx["ts"].get_access_token()).is_equal("fake-jwt")
 

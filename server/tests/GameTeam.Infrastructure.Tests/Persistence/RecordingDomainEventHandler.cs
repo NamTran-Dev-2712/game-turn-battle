@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
 using GameTeam.Infrastructure.Persistence;
 using MediatR;
@@ -66,6 +67,24 @@ public sealed class RecordingPlayerProfileCreatedHandler
     public RecordingPlayerProfileCreatedHandler(DispatchedEventsCollector collector) => _collector = collector;
 
     public Task Handle(DomainEventNotification<PlayerProfileCreated> notification, CancellationToken cancellationToken)
+    {
+        _collector.Add(notification.DomainEvent);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Handler cho <see cref="DomainEventNotification{TDomainEvent}"/> của <see cref="OwnedHeroGranted"/> (Phase 27) —
+/// chứng minh event khi cấp hero cũng dispatch qua đúng kiểu cụ thể sau SaveChanges.
+/// </summary>
+public sealed class RecordingOwnedHeroGrantedHandler
+    : INotificationHandler<DomainEventNotification<OwnedHeroGranted>>
+{
+    private readonly DispatchedEventsCollector _collector;
+
+    public RecordingOwnedHeroGrantedHandler(DispatchedEventsCollector collector) => _collector = collector;
+
+    public Task Handle(DomainEventNotification<OwnedHeroGranted> notification, CancellationToken cancellationToken)
     {
         _collector.Add(notification.DomainEvent);
         return Task.CompletedTask;

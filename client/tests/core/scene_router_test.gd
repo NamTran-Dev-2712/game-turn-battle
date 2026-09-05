@@ -78,3 +78,25 @@ func test_navigation_emits_scene_changed() -> void:
 	assert_dict(_changes[0]).contains_key_value("to", _PATH_A)
 	assert_dict(_changes[1]).contains_key_value("to", _PATH_B)
 	assert_dict(_changes[1]).contains_key_value("from", _PATH_A)
+
+
+# ── Phase 27: route context (truyền hero_id vào scene đích) ─────────────────────────────────────────
+
+func test_goto_scene_with_context_exposes_route_context() -> void:
+	assert_bool(SceneRouter.goto_scene(_PATH_A, {"hero_id": "hero_ignis"})).is_true()
+	assert_dict(SceneRouter.route_context()).contains_key_value("hero_id", "hero_ignis")
+
+
+func test_goto_scene_without_context_defaults_empty() -> void:
+	# Gọi một tham số (tương thích ngược) → context rỗng.
+	assert_bool(SceneRouter.goto_scene(_PATH_A)).is_true()
+	assert_dict(SceneRouter.route_context()).is_empty()
+
+
+func test_back_clears_route_context() -> void:
+	SceneRouter.goto_scene(_PATH_A, {"hero_id": "a"})
+	SceneRouter.goto_scene(_PATH_B, {"hero_id": "b"})
+	assert_dict(SceneRouter.route_context()).contains_key_value("hero_id", "b")
+	assert_bool(SceneRouter.back()).is_true()
+	# Context chỉ dành cho lần đi tới; back xoá về rỗng.
+	assert_dict(SceneRouter.route_context()).is_empty()

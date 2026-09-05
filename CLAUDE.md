@@ -890,6 +890,56 @@ client golden red; revert ⇒ both green. Canonical: `docs/gameplay/combat-frame
   `.instructions/combat.md`/`backend.md`/`client.md` in sync** (doc-sync matrix, §5); the golden vectors + gate are the
   behavior contract — update them deliberately.
 
+**Hero System is standardized (Phase 27 — closed & verified). OPENS Group 6 (Gameplay Vertical Slice).** The Hero
+foundation is **data-driven** (ADR-004) + **server-authoritative** (ADR-007). Two homes: **server**
+`GameTeam.Domain/Heroes/` + `GameTeam.Application/Features/Heroes/`; **client** `client/src/ui/hero_list/` +
+`client/src/ui/hero_detail/` + `client/src/core/assets/`. **HeroDefinition = config, never hardcode:** read via the
+Phase-10/21 port **`IConfigProvider.Get<HeroConfig>("hero", id)`** (POCO `HeroConfig`, snake_case↔PascalCase; bám hero
+schema Phase 06 — added optional additive field **`art`**). **`OwnedHero : AggregateRoot<Guid>`** (ProfileId FK,
+`HeroId` config ref, `Level`/`Stars` base; factory `Grant` raises `OwnedHeroGranted`; table **`owned_heroes`** — index
+`profile_id` + **unique `(profile_id, hero_id)`** + FK→`player_profiles` cascade; migration `AddOwnedHeroes`) is the
+server-authoritative ownership record extending the Phase-19 save root — **stats are NOT stored, always read from
+config**. Queries: **`GetMyHeroesQuery`** (owner ONLY from `ICurrentUser` token `sub` — IDOR-safe; returns
+**`MyHeroesResponse`** wrapping lean **`OwnedHeroDto{heroId,level,stars}`** — client joins definition from
+ConfigProvider) → `GET /api/v1/heroes` (protected); **`GetHeroDefinitionQuery`** (definition from config →
+`HeroDefinitionDto`; `HERO_DEFINITION_NOT_FOUND`) → `GET /api/v1/heroes/{heroId}/definition` (public catalog).
+**Temporary seed:** `CreateGuestAccountCommandHandler` grants all config heroes (`GetIds("hero")`) in the SAME
+transaction as account+profile — **temporary until Phase 33 (summon)**, NOT real acquisition. **Client:** Hero List
+joins **owned** (`StateCache.get_heroes()`) + **definition** (`ConfigProvider.get_hero(id)`); Hero Detail is a separate
+routed scene (hero id via the additively-extended **`SceneRouter.goto_scene(path, context)`** + **`route_context()`**);
+**hero art lazy-loads** via the new autoload **`AssetLoader`** (`load_texture` async + placeholder + `release`, art path
+from config `art` — ADR-009; list loads NO art). **Contract→codegen** carried the hero DTOs; fixed the generator to
+**escape GDScript reserved words** (wire `class` → var `class_`, `## wire: class` kept) in `shared/codegen` `GdNaming.ToFieldName`.
+Verified (local 2026-09-05, Docker Desktop 28.5.1): build Release 0/0, `dotnet test` Domain 88 / Application 51 /
+Contracts 36 / Infrastructure 44 / Api 56; codegen 41; config-validator 45 + `run.sh` exit 0; Godot 4.7.1 import exit 0;
+gdUnit4 **113/113 pass, 0 orphan**; `has-pending-model-changes` clean; no openapi/generated drift beyond additive hero.
+Canonical: `docs/gameplay/hero-system.md` §7 + `docs/backend/domain-and-application.md` (Hero feature) +
+`docs/backend/infrastructure.md` §1.3 + `docs/backend/api-and-versioning.md` + `docs/godot/resources-and-assets.md` §2.1
++ `docs/godot/scene-architecture.md` §4.1 + `docs/gameplay/configuration-and-data.md` §2b; decision log:
+`.memory/0025-hero-system-standardized.md`.
+
+- Future agents **MUST reuse** `HeroConfig`/`IConfigProvider` (definition), `OwnedHero`/`IOwnedHeroRepository`
+  (ownership), `GetMyHeroes`/`GetHeroDefinition`, client `ConfigProvider`+`StateCache` join, and `AssetLoader` (art)
+  before adding any hero plumbing; **MUST NOT** hardcode gameplay stats in code, create a second hero definition source,
+  store hero stats in `owned_heroes`, read owner from client input (body/route/query — IDOR), fabricate ownership on the
+  client, create a second asset loader / config / state cache, or hand-edit `client/src/data/generated`.
+- **Contract/DTO change workflow (binding):** edit `GameTeam.Contracts/Hero/*` → rebuild (regenerate `openapi.json`) →
+  `bash shared/codegen/run.sh` → commit generated diff → extend `Api.IntegrationTests`/`OpenApiContractTests` → doc-sync.
+  A new contract field that is a GDScript reserved word is escaped by the generator (extend `GdNaming` + a test, never
+  hand-edit generated files).
+- **Art is config-driven + lazy (ADR-004/009):** art path comes from the config `art` field (never scattered hardcoded
+  paths); the list must not block on art; free art on scene exit. Real art content + atlas/pool tuning = later (phase 52).
+- **Out of scope (leave as debt / future phases):** skill logic (28), formation (29), battle (30), summon / real hero
+  acquisition (33), level/star upgrade (35/39). Do NOT implement future-phase scope.
+- When changing the Hero System, keep **`GameTeam.Domain/Heroes/*` + `GameTeam.Application/Features/Heroes/*` +
+  `IOwnedHeroRepository`/`OwnedHeroRepository`/`OwnedHeroConfiguration`/migration + `Contracts/Hero/*` + regenerated
+  `openapi.json` + `client/src/data/generated/**` + `CreateGuestAccountCommandHandler` (seed) + `client/src/ui/hero_list/*`
+  + `client/src/ui/hero_detail/*` + `client/src/core/assets/asset_loader.gd` + `SceneRouter` (context) +
+  `client/src/ui/boot/auth_profile_flow.gd` (hero fetch) + `response_parser.gd` + `config/heroes|skills/*` +
+  `shared/config-schema/hero.schema.json` (`art`) + all the tests (behavior contract) + the docs listed above +
+  `.instructions/backend.md`/`client.md`/`config.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync**
+  (doc-sync matrix, §5); the tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

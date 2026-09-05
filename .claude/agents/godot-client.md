@@ -89,6 +89,21 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   never add a second auth/token/HTTP/profile abstraction, never put auth in a view, never bypass StateCache, never add a
   refresh-token architecture beyond scope.** Canonical: `docs/godot/state-and-signals.md` §4.1/§3.1 +
   `docs/godot/ui-architecture.md` §4.1; decision log `.memory/0018-client-auth-profile-standardized.md`.
+- **Hero System (Phase 27, closed — opens Group 6):** Hero List (`src/ui/hero_list/`) joins **owned** heroes
+  (`StateCache.get_heroes()`, server-authoritative) + **definition** (`ConfigProvider.get_hero(id)`, data-driven — config
+  change re-renders WITHOUT rebuild); tap → intent `open_hero {id}`. **Hero Detail** (`src/ui/hero_detail/`, NEW) is a
+  separate routed scene; hero id passed via **`SceneRouter.goto_scene(path, context)`** + read with
+  **`SceneRouter.route_context()`** (additive Phase-14 extension). **Hero art lazy-loads** via autoload **`AssetLoader`**
+  (`src/core/assets/asset_loader.gd`: `load_texture` async + `placeholder` + `release`) — art path **from config** (`art`
+  field), placeholder on missing/error, **the list loads NO art** (never blocks — ADR-009). Boot `AuthProfileFlow` fetches
+  `/api/v1/heroes` (`parse_my_heroes`) → one combined `{profile, heroes}` snapshot (StateCache replaces the whole
+  snapshot). **No new EventBus event** (reuse `config_updated`/`state_refreshed`; catalogue stays CLOSED). Hero DTOs are
+  **generated** (`data/generated/` — DO-NOT-EDIT); consume a new endpoint by adding a parse func in `response_parser.gd`.
+  **Reuse `AssetLoader`/`ConfigProvider`/`StateCache`/`NetworkClient` — never a second asset/config/state/HTTP abstraction;
+  never hardcode hero stats in a view/scene; never let a view call the network; never fabricate ownership (server is the
+  authority).** Out of scope: skill (28)/formation (29)/battle (30)/summon (33)/upgrade (35/39)/real art + atlas-pool (52).
+  Canonical: `docs/gameplay/hero-system.md` §7 + `docs/godot/resources-and-assets.md` §2.1 +
+  `docs/godot/scene-architecture.md` §4.1; decision log `.memory/0025-hero-system-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

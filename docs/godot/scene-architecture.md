@@ -76,7 +76,8 @@ flowchart LR
 
 | Hàm | Ý nghĩa |
 |---|---|
-| `goto_scene(path: String) -> bool` | Chuyển tới scene tại `path`, đẩy scene hiện tại vào back stack. `false` + `push_error` nếu path lỗi (không ném, không nuốt lỗi). |
+| `goto_scene(path: String, context := {}) -> bool` | Chuyển tới scene tại `path`, đẩy scene hiện tại vào back stack. `false` + `push_error` nếu path lỗi (không ném, không nuốt lỗi). **`context`** (tuỳ chọn, **additive — Phase 27**): dữ liệu điều hướng cho presenter scene đích (vd `{"hero_id": ...}`). |
+| `route_context() -> Dictionary` | (**Phase 27**) Ngữ cảnh điều hướng của scene hiện tại (bản sao; `{}` nếu không có). Presenter scene đích đọc tại đây (vd `SceneRouter.route_context().get("hero_id")`) — vì mô hình scene-host không truyền tham số qua ctor scene. Đặt **trước** khi instantiate (⇒ `_ready` đọc được ngay); `back()` reset về `{}`. |
 | `back() -> bool` | Quay lại scene trước trong back stack. `false` nếu stack rỗng. |
 | `stack_depth() -> int` | Số phần tử back stack (kiểm thử/gỡ lỗi). |
 | `clear_history()` | Xoá back stack (không đổi scene hiện tại) — dùng khi reset điều hướng (boot/logout). |
