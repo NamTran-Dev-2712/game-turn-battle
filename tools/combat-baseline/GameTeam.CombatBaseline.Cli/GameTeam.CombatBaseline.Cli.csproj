@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CLI mong: parse args, goi core, in report, dat exit code. Khong chua logic sinh baseline. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>combat-baseline</AssemblyName>
+    <RootNamespace>GameTeam.CombatBaseline.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GameTeam.CombatBaseline\GameTeam.CombatBaseline.csproj" />
+  </ItemGroup>
+</Project>

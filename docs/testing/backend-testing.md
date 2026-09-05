@@ -52,6 +52,27 @@
 - **Architecture test** (Phase 11 thêm): `Application_should_not_depend_on_efcore_or_npgsql` — EF/Npgsql CHỈ ở
   Infrastructure. Chạy cùng bộ NetArchTest trong `GameTeam.Application.Tests`.
 
+### 4.2 Golden vector suite + CI gate (Phase 26 — đã hiện thực)
+- **Hợp đồng cross-impl:** `shared/combat-vectors/*.json` là bộ vector dùng CHUNG server (.NET) và client (GDScript).
+  Mỗi vector = `input → expected` (baseline). Cùng `(config_version, team_snapshot, stage, seed)` ⇒ hai hiện thực
+  phải cho **cùng `event_log` + `result`** (ADR-011). Baseline SINH TỪ SIM SERVER (nguồn chân lý), **không viết tay**.
+- **Nguồn baseline = tool `tools/combat-baseline`** (.NET console, ProjectReference `GameTeam.Domain` — dùng ĐÚNG một
+  `BattleSimulator`, KHÔNG fork sim thứ hai): `run.sh generate` ghi khối `expected` từ sim server (chuẩn tắc 2-space,
+  LF); `run.sh check` regenerate trong bộ nhớ rồi so BYTE với vector đã commit (exit 1 nếu drift). Xem
+  `tools/combat-baseline/README.md`.
+- **Test server:** `GameTeam.Domain.Tests/Combat/GoldenVectorTests` là `[Theory]`+`[MemberData]` **tự khám phá** mọi
+  `*.json` trong thư mục vector (thêm vector = KHÔNG sửa code test), so từng sự kiện + result qua `JsonStructuralComparer`
+  (so toàn chuỗi, không nới lỏng). Bộ vector hiện tại phủ: đội khác nhau, đa-unit (turn order + tie-break + đổi target),
+  skill/damage, crit, **miss**, VICTORY/DEFEAT/**DRAW**, và biên sát-thương-== / < HP.
+- **CI gate `golden-vector`** (`.github/workflows/ci-server.yml`, **BLOCKING**, không `continue-on-error`): chạy
+  `tools/combat-baseline/run.sh check` (baseline drift guard) + `dotnet test --filter GoldenVector`. Nửa client chạy
+  song song ở `ci-client.yml` (gdUnit4). Cả hai so CÙNG baseline ⇒ **server ≡ client ≡ baseline**; lệch một phía ⇒ CI đỏ.
+- **Cập nhật baseline CÓ CHỦ ĐÍCH:** đổi công thức sim → chạy golden (đỏ) → xác nhận đổi là cố ý → `run.sh generate`
+  → **review diff** → ghi lý do trong PR → doc-sync → review `combat-determinism`. **KHÔNG regenerate baseline âm thầm**
+  để che drift/bug (agent `combat-determinism` + `reviewer` enforce).
+- **Negative đã kiểm (Phase 26):** thêm `+1` vào `DamageEffectHandler.ComputeDamage` ⇒ `run.sh check` exit 1 + 9/9
+  `GoldenVectorTests` đỏ; revert ⇒ exit 0 + xanh.
+
 ## 5. Liên kết
 - Strategy: `README.md` · Combat: `../gameplay/combat-framework.md`, ADR-011
 - Backend design: `../backend/`

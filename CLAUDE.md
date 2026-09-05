@@ -830,6 +830,66 @@ drift. Canonical: `docs/gameplay/combat-framework.md` §21; decision log: `.memo
   `.claude/agents/combat-determinism.md` + `.claude/agents/dotnet-backend.md` in sync** (doc-sync matrix, §5); the golden
   vectors + determinism/purity tests are the behavior contract — update them.
 
+**Deterministic combat sim client (GDScript) is standardized (Phase 25 — closed & verified).** The client combat sim
+**mirrors the server (Phase 24) bit-for-bit** and is **display/replay only, NOT authority** (ADR-011). Home:
+**`client/src/combat/`** + **`client/src/shared/fixed_point.gd`** (pure, scene/UI-decoupled): `BattleSimulator.simulate(BattleInput)
+→ {event_log, result}`; `FixedPoint` (`FIXED_SCALE=1000`, round-half-up — **no float**); `rng/pcg32.gd` (SplitMix64→PCG32,
+**logical** shift since GDScript `>>` is arithmetic, constants match `Pcg32.cs`); `events/combat_events.gd` (13 types,
+snake_case factories, `seq` by position); `effects/damage_effect_handler.gd` (divisive DEF-ratio) + registry; `model/*`
+(mirror server) + `combat_input_resolver.gd`. Ordering matches server: action `(-spd, actor_id)`, target `(slot, actor_id)`,
+hit-then-crit rolls. Verified (Godot 4.7.1 local): gdUnit4 `client/tests/combat/*` (golden/determinism/outcome/fixed_point/
+pcg32/resolver) **24–25 pass, 0 orphan**; grep clean (sim imports no `core/net`/UI; no `float`). Fixed a latent test bug:
+`battle_simulator_outcome_test.gd` helper `_input(...)` collided with the `Node._input(InputEvent)` virtual (Godot 4.7.1
+parse-error blocked the whole suite) → renamed `_input`→`_make_input` (test-helper name only, no sim change). Canonical:
+`docs/gameplay/combat-framework.md` §21.6; decision log: `.memory/0023-combat-sim-client-standardized.md`.
+
+- Future agents **MUST reuse** the client `BattleSimulator`/`FixedPoint`/`Pcg32`/effect registry — **MUST NOT** fork a
+  second client sim, use `float`/wall-clock/global RNG in combat math, let the sim import `core/net`/UI, or let the client
+  **decide** a battle result (it replays the server's seed; server is authority — ADR-011).
+- **Never name a test/helper function after a Godot virtual** (`_input`/`_ready`/`_process`/`_notification`…) — it silently
+  collides and can break parse/discovery of the whole suite.
+- When changing the client sim, keep **`client/src/combat/*` + `client/src/shared/fixed_point.gd` + `client/tests/combat/*`
+  (behavior contract) + `docs/gameplay/combat-framework.md` §21.6 + `.instructions/client.md` + `.claude/agents/godot-client.md`
+  in sync**, and it **must still match the server golden vectors** (Phase 26 gate) — never diverge silently.
+
+**Golden vector suite + cross-impl CI gate is standardized (Phase 26 — closed & verified). CLOSES Group 5 (Deterministic
+Combat Core).** The combat sim is now safety-locked: a shared multi-scenario golden-vector set whose **baseline is generated
+from the server sim** (the authority, ADR-011), run by both implementations in CI against the **same** committed baseline ⇒
+**server ≡ client ≡ baseline**; a **blocking** `golden-vector` gate fails merge on any drift. **9 vectors** in
+**`shared/combat-vectors/`** (`vector_01`..`vector_09`: basic / crit / **miss** / **DEFEAT** / **DRAW** / multi-unit
+turn-order+tie-break+retarget / mixed-crit / boundary damage==HP / boundary damage<HP). Baseline generator =
+**`tools/combat-baseline/`** (.NET console, mirrors `tools/config-validator`; **ProjectReference `GameTeam.Domain`** ⇒ one
+`BattleSimulator`+`CombatEventSerializer`, **no forked sim**): `run.sh generate` writes each vector's `expected` from the
+server sim (canonical 2-space/LF, idempotent); `run.sh check` regenerates in-memory and **byte-compares** vs committed
+(exit 1 on drift — the drift guard). The tool's `input` parser mirrors the test-side `GoldenVectorLoader` and is
+cross-checked automatically (a divergence turns `GoldenVectorTests` red). Both suites **auto-discover** vectors — server
+`GoldenVectorTests` (`[Theory]`+`[MemberData]`), client `golden_vector_test.gd` (`CombatVectorLoader.list_vector_files()`)
+— so adding a vector needs **no test-code change**. Gate: `.github/workflows/ci-server.yml` job `golden-vector` (real:
+`run.sh check` + `dotnet test --filter GoldenVector`) + `ci-client.yml` (gdUnit4, now triggered by `shared/combat-vectors/**`),
+**BLOCKING** (no `continue-on-error`/`|| true`). Verified (local 2026-09-04): server 9/9 golden + `run.sh check` exit 0 + tool
+xUnit 4/4; client gdUnit4 golden auto-discovers 9, 24 pass/0 orphan. **Negative proven on BOTH sides:** `+1` in the server
+`DamageEffectHandler.ComputeDamage` ⇒ `run.sh check` exit 1 + 9/9 golden red; `+1` in client `damage_effect_handler.gd` ⇒
+client golden red; revert ⇒ both green. Canonical: `docs/gameplay/combat-framework.md` §22 + `shared/combat-vectors/README.md`
++ `tools/combat-baseline/README.md`; decision log: `.memory/0024-combat-golden-vectors-standardized.md`.
+
+- Future agents **MUST reuse** the 9 vectors + `tools/combat-baseline` + the auto-discovery tests before touching combat;
+  **MUST NOT** fork a second baseline generator/sim, hand-write or hand-edit a vector's `expected`, edit a vector to make CI
+  green, weaken the comparison, or make the `golden-vector` gate non-blocking. The baseline is **server-generated** — the
+  client replays and must match it, never the reverse.
+- **Baseline changes are deliberate (doc-sync row "Combat sim change"):** an intentional sim-formula change → run golden
+  (red) → confirm the diff is intentional (not a bug) → `run.sh generate` → **review the diff** → write WHY in the PR →
+  doc-sync → `combat-determinism`/`reviewer` review. **Never** regenerate to silence an unexplained mismatch. After ANY
+  combat-sim change, run the gate on **both** sides.
+- **Out of scope (leave as debt):** ultimate/energy vectors (CB4 `[ĐỀ XUẤT]`, inactive) + new skill/effect content = phase 28;
+  signed/compressed/delta vectors = Post-MVP. Do not activate energy/ultimate or add future-phase content here.
+- When changing the golden system, keep **`shared/combat-vectors/*` + `tools/combat-baseline/*` (core+tests+README) +
+  `server/tests/GameTeam.Domain.Tests/Combat/GoldenVectorTests.cs` + `client/tests/combat/golden_vector_test.gd` +
+  `client/tests/combat/support/combat_vector_loader.gd` + `.github/workflows/ci-server.yml` + `.github/workflows/ci-client.yml`
+  + `docs/gameplay/combat-framework.md` §22 + `docs/testing/backend-testing.md` §4.2 + `docs/testing/godot-testing.md` §3 +
+  `docs/deployment/ci-cd-pipeline.md` §4 + `.claude/agents/combat-determinism.md` + `.claude/agents/reviewer.md` +
+  `.instructions/combat.md`/`backend.md`/`client.md` in sync** (doc-sync matrix, §5); the golden vectors + gate are the
+  behavior contract — update them deliberately.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

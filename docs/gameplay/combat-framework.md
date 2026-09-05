@@ -332,8 +332,8 @@ compute_damage(attacker, target, skill, crit):
 
 ## 20. Golden vector (tóm tắt) — chi tiết ở `shared/combat-vectors/`
 
-- **Định dạng + 1–2 vector mẫu** (đã kiểm tham chiếu) nằm ở `../../shared/combat-vectors/` (README = schema; `vector_01`,
-  `vector_02`). Phase 23 chỉ chốt **định dạng + vector mẫu**; **bộ vector đầy đủ + CI gate cross-impl = phase 26**.
+- **Định dạng + vector mẫu** nằm ở `../../shared/combat-vectors/` (README = schema). Phase 23 chốt **định dạng + vector
+  mẫu**; **bộ vector đầy đủ (đa kịch bản) + CI gate cross-impl = phase 26 (đã hiện thực — §22)**.
 - Vector = **hợp đồng**: input `(config_version, seed, stage, team_snapshot, config_excerpt)` → output `(event_log, result)`.
   Nếu đổi cơ chế sim ⇒ **cập nhật vector có chủ đích** trong cùng thay đổi (agent `combat-determinism`).
 
@@ -380,3 +380,47 @@ compute_damage(attacker, target, skill, crit):
 - `GameTeam.Application.Tests/Combat`: **data-driven** (đổi atk config ⇒ damage 158→316, ít vòng hơn), thiếu config ⇒ `Result`
   lỗi; **CombatPuritySourceScanTests** (quét mã: cấm float/double/DateTime/Stopwatch/RNG global) + NetArchTest lõi combat.
 - Không cần Docker (sim thuần). Đã verify local: Domain 77, Application 45, Contracts 36; negative-test guard đỏ→revert xanh.
+
+### 21.6 Hiện thực client (GDScript) — Phase 25  [CHỐT]
+- **Song ánh bit-for-bit** với server, thuần/không phụ thuộc scene, ở `client/src/combat/` + `client/src/shared/fixed_point.gd`:
+  `BattleSimulator.simulate(BattleInput) → { event_log, result }`, `FixedPoint` (`FIXED_SCALE=1000`, round-half-up — **không
+  float**), `Pcg32` (SplitMix64→PCG32; xử lý int 64-bit có dấu như bit-pattern unsigned, `_lsr` dịch logical), `combat/events/`
+  (13 loại, factory snake_case khớp golden), `combat/effects/damage_effect_handler.gd` (`compute_damage` divisive DEF-ratio),
+  `combat/model/*` + `combat_input_resolver.gd`. Cùng thứ tự lượt/target/RNG như §13/§14/§16; `seq` gán theo vị trí.
+- **Client KHÔNG phải chân lý (ADR-011):** chỉ replay/dự đoán theo seed server trả; kết quả canon do server quyết (phase 30).
+- Test gdUnit4 (`client/tests/combat/*`): determinism (N lần trùng), outcome (DEFEAT/DRAW/miss/turn-order), fixed_point, pcg32,
+  resolver, và **golden vector** (khớp baseline server — Phase 26 §22). Đã verify local (Godot 4.7.1): 24–25 test xanh, 0 orphan.
+
+## 22. Golden vector suite + CI gate — Phase 26  [CHỐT — combat core đóng]
+
+> Phase 26 **khoá an toàn** hai hiện thực: bộ vector đa kịch bản + baseline sinh từ sim server + gate CI hai phía + quy
+> trình cập nhật baseline có chủ đích. Từ đây, **mọi thay đổi combat sim phải đi qua golden gate** (ADR-011). Không đổi spec.
+
+### 22.1 Bộ vector (hợp đồng, `shared/combat-vectors/`)
+- **9 vector** phủ đủ kịch bản (không chỉ happy-path): `vector_01_basic_hit` (VICTORY), `vector_02_crit_ko` (always-crit),
+  `vector_03_miss` (accuracy_bp<10000 ⇒ có Miss), `vector_04_defeat` (**DEFEAT**), `vector_05_draw` (**DRAW** ở max_rounds),
+  `vector_06_multi_unit` (2v2: turn order `(-spd, actor_id)` + tie-break + đổi target khi front chết),
+  `vector_07_mixed_crit` (crit_rate_bp=5000 ⇒ crit lẫn thường), `vector_08_boundary_lethal` (damage == HP ⇒ Death),
+  `vector_09_boundary_survive` (damage < HP ⇒ còn 1 HP, không Death).
+- Mỗi file = `format_version/name/description/input/expected`; `expected` là **baseline** (event_log + result). Chỉ số
+  nguyên (`combat_int`), `snake_case`, so **toàn chuỗi + mọi trường** (anchor `seq`). Năng lượng/ultimate (CB4) **tắt** — không
+  tạo vector "ultimate" (chưa canon).
+
+### 22.2 Baseline sinh từ server = `tools/combat-baseline`
+- Console .NET, **ProjectReference `GameTeam.Domain`** ⇒ dùng ĐÚNG một `BattleSimulator`+`CombatEventSerializer` (KHÔNG fork
+  sim thứ hai). `run.sh generate [file…]` ghi khối `expected` từ sim server (chuẩn tắc 2-space, LF, newline cuối; idempotent);
+  `run.sh check` regenerate trong bộ nhớ rồi so **BYTE** với vector đã commit (exit 1 nếu drift). Parser `input` của tool song
+  ánh `GoldenVectorLoader` bên test ⇒ nếu lệch, `GoldenVectorTests` tự đỏ (tự kiểm chéo). Chi tiết: `tools/combat-baseline/README.md`.
+
+### 22.3 Test hai phía + gate CI (BLOCKING)
+- **Server:** `GameTeam.Domain.Tests/Combat/GoldenVectorTests` = `[Theory]`+`[MemberData]` **tự khám phá** mọi vector.
+- **Client:** `client/tests/combat/golden_vector_test.gd` tự khám phá mọi vector qua `CombatVectorLoader.list_vector_files()`.
+- **Gate `golden-vector`** (`.github/workflows/ci-server.yml`): `run.sh check` + server golden tests; **nửa client** ở
+  `ci-client.yml` (gdUnit4, trigger thêm `shared/combat-vectors/**`). Cả hai so CÙNG baseline ⇒ **server ≡ client ≡ baseline**;
+  lệch một phía ⇒ CI đỏ, chặn merge. Không `continue-on-error`/`|| true`.
+
+### 22.4 Cập nhật baseline có chủ đích (không sửa âm thầm)
+- Đổi công thức sim → chạy golden (đỏ) → xác nhận đổi là **cố ý** → `run.sh generate` → **review diff** → ghi lý do trong PR →
+  doc-sync ("Combat sim change") → review `combat-determinism`/`reviewer` → merge. **Cấm** regenerate baseline để che drift/bug.
+- **Negative đã kiểm (Phase 26):** `+1` vào `DamageEffectHandler.ComputeDamage` (server) ⇒ `run.sh check` exit 1 + 9/9 golden
+  đỏ; `+1` ở `damage_effect_handler.gd` (client) ⇒ golden client đỏ. Revert ⇒ cả hai xanh.

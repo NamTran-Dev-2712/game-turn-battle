@@ -11,9 +11,11 @@ that touches the sim on either side goes through these rules.
 - **ADR-011** (combat authority & determinism) — the keystone decision
 - `docs/gameplay/combat-framework.md` **§9–§20** (the Phase-23 combat spec — the canon), `docs/gameplay/skill-framework.md`
 - `docs/conventions/code-style.md` §4 (determinism summary)
-- `shared/combat-vectors/` (golden-vector **format** `README.md` + the sample vectors)
+- `shared/combat-vectors/` (golden-vector **format** `README.md` + the 9 committed vectors)
+- `tools/combat-baseline/README.md` (baseline generator + the deliberate baseline-update workflow — Phase 26)
+- `docs/gameplay/combat-framework.md` **§21** (server sim) + **§22** (golden suite + CI gate)
 - `docs/mvp/03-core-gameplay.md`, `docs/mvp/02-core-game-loop.md` (business truth); `docs/mvp/10-open-questions.md` CB1–CB6
-- `docs/testing/` (golden-vector strategy)
+- `docs/testing/backend-testing.md` §4.2 + `docs/testing/godot-testing.md` §3 (golden-vector strategy)
 
 ## Hard rules (violations = reject)
 - **No floating point in the sim.** Integer or fixed-point math only — floats diverge across platforms.
@@ -32,11 +34,24 @@ that touches the sim on either side goes through these rules.
   until product decides; record in `docs/mvp/10-open-questions.md`).
 - **Golden vector is a living spec.** If you intentionally change sim behavior, update the golden
   vectors deliberately in the same change and explain WHY in the PR — never silently.
+- **Baseline discipline (Phase 26).** The `expected` baseline is generated from the **server** sim via
+  `tools/combat-baseline` (`run.sh generate`), never hand-written. To change it: run golden (red) → confirm the diff is
+  intentional (not a bug) → regenerate → **review the diff** → write WHY → doc-sync. **Never** regenerate to silence an
+  unexplained mismatch, edit a vector to make CI green, or weaken the comparison. Run golden on **both** sides after any
+  sim change (`bash tools/combat-baseline/run.sh check` + `dotnet test --filter GoldenVector`; gdUnit4 `golden_vector_test`).
 
 ## Verify
 Client and server must produce the identical `event_log` + `result` for the shared golden-vector fixtures — same
 sequence, same fields, not just the same final HP. A sim change with no corresponding golden-vector update (or vice
-versa) is incomplete. Scope: server sim = phase 24 (DONE); client sim = phase 25; full vector suite + cross-impl CI gate = phase 26.
+versa) is incomplete. Scope: server sim = phase 24 (DONE); client sim = phase 25 (DONE); full vector suite + cross-impl
+CI gate = phase 26 (**DONE** — 9 vectors, `golden-vector` gate blocking on both `ci-server.yml` + `ci-client.yml`).
+
+**Golden gate exists (Phase 26 — REUSE, don't reinvent):** 9 multi-scenario vectors in `shared/combat-vectors/`
+(basic/crit/miss/defeat/draw/multi-unit/mixed-crit/boundary), baseline **server-generated** by `tools/combat-baseline`
+(ProjectReference `GameTeam.Domain` — one `BattleSimulator`, no forked sim). Both test suites **auto-discover** vectors
+(`GoldenVectorTests` `[MemberData]`; `CombatVectorLoader.list_vector_files()`) — adding a vector needs no test-code change.
+CI gate `golden-vector` compares both sides to the same committed baseline (server ≡ client ≡ baseline). Negative-drift
+proven (server & client `+1` damage ⇒ gate red; revert ⇒ green).
 
 **Server sim exists (Phase 24 — REUSE, don't reinvent):** pure engine at `GameTeam.Domain/Combat/`
 (`BattleSimulator.Simulate(BattleInput) → BattleOutput`; `Numerics/FixedPoint`, `Rng/Pcg32`, `Effects/EffectRegistry` +
@@ -49,6 +64,7 @@ Energy/ultimate (§15, CB4 `[ĐỀ XUẤT]`) is wired but inactive — don't act
 ## Completion workflow (every combat task — mirrors CLAUDE.md §4.5/§4.6)
 1. Read the phase requirement + ADR-011 + the spec (§9–§20) before changing anything. 2. Search the repo for an existing
 decision; prefer ADR/spec over a new invention. 3. Stay in scope — no future-phase work. 4. Keep the canon in sync
-(`combat-framework.md` §9–§20 ↔ `code-style.md` §4 ↔ `shared/combat-vectors/*` ↔ open-questions CB1–CB6) — one canonical
-home, others link it. 5. Run this self-review + a reference-check of ≥1 vector. 6. Tick the checklist `[x]` **only** after
+(`combat-framework.md` §9–§20/§22 ↔ `code-style.md` §4 ↔ `shared/combat-vectors/*` (baseline via `tools/combat-baseline`)
+↔ golden gate `ci-server.yml`/`ci-client.yml` ↔ open-questions CB1–CB6) — one canonical home, others link it.
+5. Run this self-review + the golden gate on **both** sides (`tools/combat-baseline/run.sh check` + server/client golden tests). 6. Tick the checklist `[x]` **only** after
 verification passes; leave `[ ]` with a written reason if blocked/out-of-scope.

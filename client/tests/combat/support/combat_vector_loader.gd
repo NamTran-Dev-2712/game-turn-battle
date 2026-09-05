@@ -44,6 +44,24 @@ static func load_input(file: String) -> BattleInput:
 	return build_input(load_vector(file).get("input", {}))
 
 
+## Liệt kê MỌI file vector `*.json` trong `shared/combat-vectors/` (sắp xếp — xác định).
+## Dùng để test tự khám phá toàn bộ bộ vector (thêm vector = không sửa code test).
+static func list_vector_files() -> PackedStringArray:
+	var dir_path := _vector_path("").trim_suffix("/")
+	var names := PackedStringArray()
+	var d := DirAccess.open(dir_path)
+	assert(d != null, "Không mở được thư mục vector: %s" % dir_path)
+	d.list_dir_begin()
+	var entry := d.get_next()
+	while entry != "":
+		if not d.current_is_dir() and entry.ends_with(".json"):
+			names.append(entry)
+		entry = d.get_next()
+	d.list_dir_end()
+	names.sort()
+	return names
+
+
 static func _units(arr: Array) -> Array[UnitSnapshot]:
 	var out: Array[UnitSnapshot] = []
 	for u in arr:

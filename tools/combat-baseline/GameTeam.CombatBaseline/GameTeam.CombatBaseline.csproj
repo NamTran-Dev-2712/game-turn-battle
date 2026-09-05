@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Core lib: sinh/kiem baseline golden-vector tu sim server (nguon chan ly, ADR-011).
+       ProjectReference GameTeam.Domain de dung DUNG mot BattleSimulator + CombatEventSerializer
+       (KHONG fork sim thu hai). Khong goi ngoai. -->
+  <PropertyGroup>
+    <RootNamespace>GameTeam.CombatBaseline</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\server\src\GameTeam.Domain\GameTeam.Domain.csproj" />
+  </ItemGroup>
+</Project>
