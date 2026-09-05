@@ -54,7 +54,13 @@ public static class DependencyInjection
         // Transformer bổ sung: publish enum dùng chung vào components.schemas cho client codegen.
         services.AddOpenApi(
             GameTeam.Contracts.Common.ApiVersions.V1,
-            options => options.AddDocumentTransformer<ContractEnumsDocumentTransformer>());
+            options =>
+            {
+                // Enum được DTO tham chiếu: làm giàu metadata (schema transformer).
+                options.AddSchemaTransformer<ContractEnumSchemaTransformer>();
+                // Enum chưa DTO nào tham chiếu: force-publish (document transformer).
+                options.AddDocumentTransformer<ContractEnumsDocumentTransformer>();
+            });
 
         // Xử lý lỗi tập trung (Phase 13): exception chưa bắt → 500 ErrorEnvelope (không lộ nội bộ).
         // AddProblemDetails() để framework có fallback chuẩn; handler của ta vẫn ghi ErrorEnvelope.

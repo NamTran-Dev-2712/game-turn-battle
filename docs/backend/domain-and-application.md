@@ -145,6 +145,27 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 > — **không bao giờ** từ body/route/query của client. Endpoint chỉ "profile của tôi" ⇒ không có route nhận id người khác
 > (chống IDOR theo cấu trúc). Mọi thay đổi profile qua command server (client không authority).
 
+### Hero feature: definition data-driven + owned server-authoritative (Phase 27 — đã đóng)
+
+`GameTeam.Domain/Heroes/` + `GameTeam.Application/Features/Heroes/`:
+
+- **`OwnedHero : AggregateRoot<Guid>`** — instance hero người chơi sở hữu, gắn **`ProfileId`** (mở rộng gốc save
+  `PlayerProfile`; bảng `owned_heroes`, `infrastructure.md` §1.3), `HeroId` (ref config), `Level`/`Stars` nền. Factory
+  `Grant(...)` raise `OwnedHeroGranted`. Chỉ số tĩnh **KHÔNG** lưu ở entity — đọc từ config.
+- **`HeroConfig`** (Application POCO) đọc definition qua **`IConfigProvider.Get<HeroConfig>("hero", id)`** (data-driven,
+  ADR-004 — **không hardcode chỉ số**; bám hero schema phase 06).
+- **`GetMyHeroesQuery`** — hero owned của **chính** người gọi (owner từ `ICurrentUser`, chống IDOR); trả
+  `MyHeroesResponse` (bọc `OwnedHeroDto{heroId,level,stars}` — bản wire tối giản, client ghép definition từ
+  ConfigProvider). Là `GET /api/v1/heroes` (protected).
+- **`GetHeroDefinitionQuery`** — definition từ config → `HeroDefinitionDto`; `HERO_DEFINITION_NOT_FOUND` nếu thiếu. Là
+  `GET /api/v1/heroes/{heroId}/definition` (public catalog).
+- **Seed tạm:** `CreateGuestAccountCommandHandler` cấp toàn bộ hero trong config (`GetIds("hero")`) cùng transaction —
+  **tạm tới phase 33 (summon)**, KHÔNG phải nhận thật.
+
+> **Ranh giới (ADR-004/007):** definition = **config** (không hardcode / không nguồn thứ hai); ownership =
+> **server/profile** (client không tự thêm hero / đổi owner / level / sao). Ngoài scope: skill (28), formation (29),
+> nâng cấp (35/39).
+
 ---
 
 ## 3. Ví dụ trách nhiệm: Start Battle (không phải code)

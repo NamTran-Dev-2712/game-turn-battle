@@ -1,14 +1,15 @@
-# HeroListView — màn MẪU chứng minh vòng config data-driven end-to-end (Phase 22). KHÔNG phải Hero
-# System (feature thật = phase 27) — chỉ hiển thị danh sách hero placeholder ĐỌC TỪ config bundle để
-# xác nhận: server đổi config → publish version mới → client hiển thị dữ liệu mới KHÔNG rebuild.
-# View thuần (ADR-002): data-in (`set_data`→`_render`) → intent-out (`emit_intent`). KHÔNG gọi network,
-# KHÔNG đọc ConfigProvider trực tiếp, KHÔNG hardcode dữ liệu hero — presenter nạp mọi thứ.
-# Fallback KHÔNG im lặng (Rule E): banner "cache cũ" khi stale; nút Thử lại khi lỗi/không có config.
-# Chi tiết: docs/godot/ui-architecture.md, docs/gameplay/configuration-and-data.md §4.
+# HeroListView — màn danh sách hero NGƯỜI CHƠI SỞ HỮU (Phase 27, Hero System thật). View thuần (ADR-002):
+# data-in (`set_data`→`_render`) → intent-out (`emit_intent`). KHÔNG gọi network, KHÔNG đọc ConfigProvider/
+# StateCache trực tiếp, KHÔNG hardcode dữ liệu hero — presenter ghép owned (StateCache) + definition
+# (ConfigProvider) rồi đẩy vào. DANH SÁCH KHÔNG tải art (art nặng ⇒ chỉ ở màn chi tiết, lazy — ADR-009):
+# list không phụ thuộc art đã nạp. Bấm một hero → intent open_hero {id} (presenter mở màn chi tiết).
+# Fallback KHÔNG im lặng (Rule E): banner "cache cũ" khi stale; nút Thử lại. Chi tiết: ui-architecture.md.
 class_name HeroListView
 extends BaseView
 
-## Ý định: người dùng bấm "Thử lại" (tải lại config). Presenter dịch → ConfigProvider.check_for_update.
+## Ý định: mở chi tiết một hero (payload {id}). Presenter → SceneRouter.goto_scene(hero_detail, {hero_id}).
+const INTENT_OPEN_HERO: StringName = &"open_hero"
+## Ý định: bấm "Thử lại" (tải lại config). Presenter → ConfigProvider.check_for_update.
 const INTENT_RETRY: StringName = &"retry"
 ## Ý định: quay lại hub.
 const INTENT_BACK: StringName = &"back"
@@ -18,13 +19,12 @@ var _version_label: Label = null
 var _stale_banner: Label = null
 var _empty_label: Label = null
 var _list: VBoxContainer = null
-var _retry_button: Button = null
 var _presenter: HeroListPresenter = null
 
 
 func _ready() -> void:
 	_build()
-	# Presenter nạp dữ liệu hiển thị (ConfigProvider — đọc, không network) + nghe intent của view.
+	# Presenter ghép dữ liệu hiển thị (owned + config — đọc, không network) + nghe intent của view.
 	_presenter = HeroListPresenter.new(self)
 
 
@@ -35,7 +35,7 @@ func _build() -> void:
 	add_child(box)
 
 	_title = Label.new()
-	_title.text = "Anh hùng (mẫu từ config)"
+	_title.text = "Anh hùng của tôi"
 	box.add_child(_title)
 
 	_version_label = Label.new()
@@ -46,7 +46,7 @@ func _build() -> void:
 	_stale_banner.visible = false
 	box.add_child(_stale_banner)
 
-	# Thông báo khi KHÔNG có config nào (no-cache) — kèm nút Thử lại.
+	# Thông báo khi CHƯA sở hữu hero nào — kèm nút Thử lại.
 	_empty_label = Label.new()
 	_empty_label.visible = false
 	box.add_child(_empty_label)
@@ -57,10 +57,10 @@ func _build() -> void:
 
 	var buttons := HBoxContainer.new()
 	box.add_child(buttons)
-	_retry_button = Button.new()
-	_retry_button.text = "Thử lại"
-	_retry_button.pressed.connect(func() -> void: emit_intent(INTENT_RETRY))
-	buttons.add_child(_retry_button)
+	var retry_button := Button.new()
+	retry_button.text = "Thử lại"
+	retry_button.pressed.connect(func() -> void: emit_intent(INTENT_RETRY))
+	buttons.add_child(retry_button)
 	var back_button := Button.new()
 	back_button.text = "Quay lại"
 	back_button.pressed.connect(func() -> void: emit_intent(INTENT_BACK))
@@ -68,10 +68,12 @@ func _build() -> void:
 
 
 # Render dữ liệu hiển thị do presenter đẩy vào. Khoá dữ liệu:
-#   version_label:String, stale:bool, error_code:String, heroes:Array[Dictionary]{id,rarity,class}.
+#   version_label:String, stale:bool, error_code:String, offline:bool,
+#   heroes:Array[Dictionary]{id, level, stars, rarity, class, element, role, has_definition}.
 func _render(data: Dictionary) -> void:
 	if _version_label != null and data.has("version_label"):
-		_version_label.text = str(data["version_label"])
+		var suffix := " · offline" if bool(data.get("offline", false)) else ""
+		_version_label.text = "%s%s" % [str(data["version_label"]), suffix]
 
 	var stale := bool(data.get("stale", false))
 	if _stale_banner != null:
@@ -83,12 +85,12 @@ func _render(data: Dictionary) -> void:
 	if _empty_label != null:
 		_empty_label.visible = heroes.is_empty()
 		if heroes.is_empty():
-			_empty_label.text = "Chưa có cấu hình hero. Vui lòng thử lại."
+			_empty_label.text = "Chưa sở hữu hero nào."
 
 	_rebuild_list(heroes)
 
 
-# Xoá + dựng lại danh sách hero từ data (mỗi lần render). Dữ liệu từ config, KHÔNG hardcode.
+# Xoá + dựng lại danh sách hero từ data (mỗi lần render). Mỗi hero là một nút → intent open_hero {id}.
 func _rebuild_list(heroes: Array) -> void:
 	if _list == null:
 		return
@@ -97,12 +99,17 @@ func _rebuild_list(heroes: Array) -> void:
 	for hero in heroes:
 		if not (hero is Dictionary):
 			continue
-		var row := Label.new()
-		row.text = "%s · rarity %d · %s" % [
-			str(hero.get("id", "?")),
+		var id: String = str(hero.get("id", "?"))
+		var row := Button.new()
+		row.text = "%s · Lv.%d ★%d · rarity %d · %s" % [
+			id,
+			int(hero.get("level", 0)),
+			int(hero.get("stars", 0)),
 			int(hero.get("rarity", 0)),
 			str(hero.get("class", "?")),
 		]
+		# Bind id vào callable (mỗi nút mở đúng hero của nó).
+		row.pressed.connect(func() -> void: emit_intent(INTENT_OPEN_HERO, {"id": id}))
 		_list.add_child(row)
 
 

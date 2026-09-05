@@ -7,10 +7,12 @@ using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Features.Auth.Commands;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
+using GameTeam.Application.Features.Heroes.Queries;
 using GameTeam.Application.Features.Profile.Commands;
 using GameTeam.Contracts.Auth;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
+using GameTeam.Contracts.Hero;
 using GameTeam.Contracts.Profile;
 using GameTeam.Domain.Common;
 using GameTeam.Infrastructure;
@@ -120,6 +122,28 @@ apiV1.MapGet("/profile", (ISender sender, HttpContext httpContext) =>
     .MapToApiVersion(1)
     .Produces<ProfileDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// GET /api/v1/heroes (Phase 27): danh sách hero CHÍNH mình sở hữu — chủ sở hữu suy từ token sub
+// (GetMyHeroesQuery → ICurrentUser), KHÔNG nhận owner từ client ⇒ không đọc hero người khác (chống IDOR).
+// Protected mặc định (KHÔNG .AllowAnonymous). Bản wire tối giản (OwnedHeroDto); client ghép definition từ
+// ConfigProvider (data-driven, ADR-004).
+apiV1.MapGet("/heroes", (ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new GetMyHeroesQuery()), httpContext))
+    .WithName("GetMyHeroes")
+    .MapToApiVersion(1)
+    .Produces<MyHeroesResponse>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// GET /api/v1/heroes/{heroId}/definition (Phase 27): definition tĩnh đọc từ config (data-driven). PUBLIC
+// (.AllowAnonymous) — nội dung config chung, không nhạy cảm (như /config/*). Không tồn tại ⇒ 404
+// ErrorEnvelope (HERO_DEFINITION_NOT_FOUND).
+apiV1.MapGet("/heroes/{heroId}/definition", (string heroId, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new GetHeroDefinitionQuery(heroId)), httpContext))
+    .WithName("GetHeroDefinition")
+    .MapToApiVersion(1)
+    .AllowAnonymous()
+    .Produces<HeroDefinitionDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC

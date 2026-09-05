@@ -13,14 +13,29 @@ public class RealSpecTests
         files.Single(f => f.FileName == name).Content;
 
     [Fact]
-    public void Generates_six_enums_and_eight_dtos()
+    public void Generates_shared_enums_and_dtos()
     {
         IReadOnlyList<GeneratedFile> files = Real();
 
         files.Select(f => f.FileName).Should().BeEquivalentTo(
             "faction.gd", "class.gd", "element.gd", "role.gd", "rarity.gd", "currency.gd",
             "auth_guest_request.gd", "auth_guest_response.gd", "config_bundle_dto.gd", "config_version.gd",
-            "error_envelope.gd", "error_response.gd", "health_response.gd", "profile_dto.gd");
+            "error_envelope.gd", "error_response.gd", "health_response.gd", "profile_dto.gd",
+            "server_time_response.gd",
+            // Phase 27 — hero contract.
+            "owned_hero_dto.gd", "my_heroes_response.gd", "hero_definition_dto.gd", "hero_base_stats_dto.gd");
+    }
+
+    [Fact]
+    public void HeroDefinitionDto_escapes_class_keyword_and_maps_enum_and_nested()
+    {
+        string gd = Content(Real(), "hero_definition_dto.gd");
+        gd.Should().Contain("class_name HeroDefinitionDto");
+        // Wire "class" trùng từ khoá GDScript ⇒ biến escape "class_"; chú thích giữ khoá wire thật.
+        gd.Should().Contain("## wire: class | enum: Class (wire: string)");
+        gd.Should().Contain("var class_: int");
+        gd.Should().Contain("var base_stats: HeroBaseStatsDto");
+        gd.Should().Contain("var skills: Array[String]");
     }
 
     [Fact]

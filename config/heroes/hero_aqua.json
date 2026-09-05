@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "hero_aqua",
+  "faction": "none",
+  "class": "support",
+  "element": "water",
+  "role": "healer",
+  "rarity": 4,
+  "base_stats": { "hp": 1100, "atk": 90, "def": 80, "spd": 95 },
+  "skills": ["skill_aqua_heal"],
+  "art": "res://assets/heroes/hero_aqua.png"
+}

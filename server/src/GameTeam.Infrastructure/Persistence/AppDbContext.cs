@@ -1,6 +1,7 @@
 using System.Reflection;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,6 +46,9 @@ public class AppDbContext : DbContext
 
     /// <summary>Hồ sơ người chơi — gốc save server-authoritative, gắn 1-1 với Account (Phase 19, ADR-007).</summary>
     public DbSet<PlayerProfile> PlayerProfiles => Set<PlayerProfile>();
+
+    /// <summary>Hero người chơi sở hữu — instance gắn profile; definition đọc từ config (Phase 27, ADR-004/007).</summary>
+    public DbSet<OwnedHero> OwnedHeroes => Set<OwnedHero>();
 
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();

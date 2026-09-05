@@ -24,7 +24,7 @@
 | Auth | `POST /api/v1/auth/guest`, `/auth/refresh` | command |
 | Profile | `GET /api/v1/profile` | query |
 | Config | `GET /api/v1/config/current`, `GET /api/v1/config/bundle?bundleVersion=N` | query (public, cache) |
-| Heroes | `GET /api/v1/heroes` | query |
+| Heroes | `GET /api/v1/heroes` (owned, protected — owner từ token), `GET /api/v1/heroes/{heroId}/definition` (config, public) | query (Phase 27) |
 | Formation | `PUT /api/v1/teams/{id}` | command |
 | Battle | `POST /api/v1/battles` | command (re-sim) |
 | Summon | `POST /api/v1/summons` | command (idempotent) |

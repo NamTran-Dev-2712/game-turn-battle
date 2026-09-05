@@ -29,7 +29,7 @@ Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/conf
 
 | Config type | Schema | Nguồn gameplay | Tham chiếu chính | Ghi chú |
 |---|---|---|---|---|
-| hero | `hero.schema.json` | `hero-system.md` | `skills` → skill id | `base_stats` integer; `faction` chuỗi (GP2 chưa chốt) |
+| hero | `hero.schema.json` | `hero-system.md` | `skills` → skill id | `base_stats` integer; `faction` chuỗi (GP2 chưa chốt); **`art`** tuỳ chọn (path/atlas → AssetLoader lazy, ADR-009 — thêm additive phase 27) |
 | skill | `skill.schema.json` | `skill-framework.md` | `effects[].effect_type` (registry) | effect_type: damage/heal/apply_buff/apply_debuff/shield; `params` mở |
 | stage | `stage.schema.json` | `progression-and-economy.md` | `enemies[].hero_id` → hero; `rewards[]` → reward | `energy_cost` integer |
 | reward | `reward.schema.json` | `progression-and-economy.md` | `entries[].ref_id` (currency/hero/fragment/item) | `amount` integer |

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "hero_ignis",
+  "faction": "none",
+  "class": "mage",
+  "element": "fire",
+  "role": "dps",
+  "rarity": 5,
+  "base_stats": { "hp": 900, "atk": 220, "def": 60, "spd": 110 },
+  "skills": ["skill_ignis_strike"],
+  "art": "res://assets/heroes/hero_ignis.png"
+}

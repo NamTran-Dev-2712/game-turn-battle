@@ -1,33 +1,17 @@
-using GameTeam.Contracts.Enums;
 using Microsoft.AspNetCore.OpenApi;
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Interfaces;
 using Microsoft.OpenApi.Models;
 
 namespace GameTeam.Api.OpenApi;
 
 /// <summary>
-/// Đăng ký các enum dùng chung (spine contract — Phase 05) vào <c>components.schemas</c> của OpenAPI,
-/// kể cả khi CHƯA có DTO nền nào tham chiếu (hero DTO dùng chúng ở feature phase).
-/// <para>
-/// Lý do: enum là hợp đồng dùng chung, client codegen (Phase 08) cần model của chúng từ
-/// shared/contracts. Serialize dạng CHUỖI (canonical name) khớp cấu hình JSON của Api.
-/// Đây là metadata contract — KHÔNG phải hiện thực nghiệp vụ.
-/// </para>
+/// Force-publish các enum dùng chung (spine contract — Phase 05) vào <c>components.schemas</c> khi CHƯA có
+/// DTO nào tham chiếu (vd Faction/Currency) — để client codegen (Phase 08) vẫn sinh đủ model từ
+/// shared/contracts. Enum ĐÃ được DTO tham chiếu do bộ sinh OpenAPI tự tạo schema (và
+/// <see cref="ContractEnumSchemaTransformer"/> làm giàu metadata) ⇒ KHÔNG thêm ở đây, tránh trùng khoá với
+/// reference-transformer nội bộ. Đây là metadata contract — KHÔNG phải hiện thực nghiệp vụ.
 /// </summary>
 public sealed class ContractEnumsDocumentTransformer : IOpenApiDocumentTransformer
 {
-    // Thứ tự ổn định (deterministic) để spec sinh ra không đổi vô cớ.
-    private static readonly Type[] SharedEnums =
-    [
-        typeof(Faction),
-        typeof(Class),
-        typeof(Element),
-        typeof(Role),
-        typeof(Rarity),
-        typeof(Currency),
-    ];
-
     public Task TransformAsync(
         OpenApiDocument document,
         OpenApiDocumentTransformerContext context,
@@ -36,39 +20,17 @@ public sealed class ContractEnumsDocumentTransformer : IOpenApiDocumentTransform
         document.Components ??= new OpenApiComponents();
         document.Components.Schemas ??= new Dictionary<string, OpenApiSchema>();
 
-        foreach (Type enumType in SharedEnums)
+        foreach (Type enumType in ContractEnumSchema.SharedEnums)
         {
-            // Tên canonical + giá trị số nền, giữ nguyên thứ tự khai báo (deterministic).
-            string[] names = Enum.GetNames(enumType);
-            int[] values = Enum.GetValuesAsUnderlyingType(enumType).Cast<object>()
-                .Select(v => Convert.ToInt32(v, System.Globalization.CultureInfo.InvariantCulture))
-                .ToArray();
-
-            OpenApiSchema schema = new()
+            // Enum đã được DTO tham chiếu ⇒ bộ sinh tạo schema riêng (schema transformer làm giàu). Thêm lại
+            // ở đây gây trùng khoá với reference-transformer nội bộ ⇒ bỏ qua.
+            if (ContractEnumSchema.IsReferencedByAnyContract(enumType))
             {
-                Type = "string",
-                Description =
-                    "Enum dùng chung (ổn định, chỉ thêm — additive). "
-                    + "docs/backend/api-and-versioning.md §4.",
-                Enum = names.Select(name => (IOpenApiAny)new OpenApiString(name)).ToList(),
-                Extensions = new Dictionary<string, IOpenApiExtension>
-                {
-                    // x-enum-varnames + x-enum-values: mang giá trị số C# (vd Rarity=0,3,4,5 có "khoảng
-                    // trống") qua spec — nguồn DUY NHẤT để codegen client (Phase 08) sinh enum GDScript
-                    // KHỚP số của GameTeam.Contracts. Wire serialize vẫn là CHUỖI (JsonStringEnumConverter).
-                    ["x-enum-varnames"] = new OpenApiArray(),
-                    ["x-enum-values"] = new OpenApiArray(),
-                },
-            };
-
-            var varnames = (OpenApiArray)schema.Extensions["x-enum-varnames"];
-            var enumValues = (OpenApiArray)schema.Extensions["x-enum-values"];
-            for (int i = 0; i < names.Length; i++)
-            {
-                varnames.Add(new OpenApiString(names[i]));
-                enumValues.Add(new OpenApiInteger(values[i]));
+                continue;
             }
 
+            OpenApiSchema schema = new();
+            ContractEnumSchema.Apply(schema, enumType);
             document.Components.Schemas[enumType.Name] = schema;
         }
 

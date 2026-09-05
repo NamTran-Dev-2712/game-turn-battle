@@ -41,6 +41,45 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("accounts", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Heroes.OwnedHero", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("HeroId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("hero_id");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Stars")
+                        .HasColumnType("integer")
+                        .HasColumnName("stars");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId")
+                        .HasDatabaseName("ix_owned_heroes_profile_id");
+
+                    b.HasIndex("ProfileId", "HeroId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_owned_heroes_profile_id_hero_id");
+
+                    b.ToTable("owned_heroes", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Domain.Profiles.PlayerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -154,6 +193,15 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                             Id = (short)1,
                             Version = 1
                         });
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Heroes.OwnedHero", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GameTeam.Domain.Profiles.PlayerProfile", b =>

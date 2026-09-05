@@ -98,3 +98,17 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   architecture beyond scope.** Out of scope: provider linking (Post-MVP), refresh endpoint, currency (phase 31), config
   bundle (phase 22). Canonical: `docs/godot/state-and-signals.md` §4.1/§3.1 + `docs/godot/ui-architecture.md` §4.1;
   decision log `.memory/0018-client-auth-profile-standardized.md`.
+- **Hero System (Phase 27, đã chốt — mở Nhóm 6):** Hero List (`src/ui/hero_list/`) GHÉP hero **owned**
+  (`StateCache.get_heroes()`, server-authoritative) + **definition** (`ConfigProvider.get_hero(id)`, data-driven) — đổi
+  config → định nghĩa đổi KHÔNG rebuild; bấm hero → intent `open_hero {id}`. **Hero Detail** (`src/ui/hero_detail/`, MỚI)
+  là scene riêng; hero id truyền qua **`SceneRouter.goto_scene(path, context)`** + đọc bằng **`SceneRouter.route_context()`**
+  (mở rộng additive Phase 14). **Art tải LAZY** qua autoload **`AssetLoader`** (`src/core/assets/asset_loader.gd`:
+  `load_texture` async + `placeholder` + `release`) — đường dẫn art **từ config** (field `art`), placeholder khi thiếu/lỗi,
+  **list KHÔNG tải art** (không chặn — ADR-009). Boot `AuthProfileFlow` fetch `/api/v1/heroes` (`parse_my_heroes`) → gộp
+  vào **một** snapshot `{profile, heroes}` (StateCache thay nguyên snapshot ⇒ không ghi đè mất nhau). **KHÔNG thêm event
+  EventBus** (tái dùng `config_updated`/`state_refreshed`, catalogue vẫn ĐÓNG). DTO hero là **generated** (`data/generated/`
+  — DO-NOT-EDIT); consume endpoint mới = thêm parse func ở `response_parser.gd`. **Reuse `AssetLoader`/`ConfigProvider`/
+  `StateCache`/`NetworkClient` — KHÔNG bộ nạp asset / config / state / HTTP thứ 2; KHÔNG hardcode chỉ số hero ở view/scene;
+  KHÔNG để view gọi network; KHÔNG bịa ownership (chân lý ở server).** Ngoài scope: skill (28)/formation (29)/battle (30)/
+  summon (33)/upgrade (35/39)/art thật + atlas-pool (52). Canonical: `docs/gameplay/hero-system.md` §7 +
+  `docs/godot/resources-and-assets.md` §2.1 + `docs/godot/scene-architecture.md` §4.1; decision log `.memory/0025`.

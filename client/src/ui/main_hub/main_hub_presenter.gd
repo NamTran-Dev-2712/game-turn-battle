@@ -8,7 +8,7 @@ class_name MainHubPresenter
 extends RefCounted
 
 const _EVENT_STATE_REFRESHED: StringName = &"state_refreshed"
-## Màn mẫu đọc từ config (Phase 22) — điều hướng khi bấm nút "Anh hùng".
+## Màn danh sách hero sở hữu (Phase 27, Hero System) — điều hướng khi bấm nút "Anh hùng".
 const HERO_LIST_PATH: String = "res://src/ui/hero_list/hero_list.tscn"
 ## Id ý định nút "Anh hùng" (khớp MainHubView.FEATURES).
 const _INTENT_HEROES: StringName = &"heroes"
@@ -74,7 +74,7 @@ func _format_currency(currencies: Dictionary) -> String:
 	return ", ".join(parts)
 
 
-# Dịch ý định từ view. "Anh hùng" → màn mẫu config e2e (Phase 22) qua SceneRouter. Các nút còn lại
+# Dịch ý định từ view. "Anh hùng" → màn danh sách hero (Phase 27) qua SceneRouter. Các nút còn lại
 # vẫn là placeholder (feature thật ở phase sau). KHÔNG tự vẽ nghiệp vụ ngoài phạm vi phase.
 func _on_intent(intent_name: StringName, _payload: Dictionary) -> void:
 	if intent_name == _INTENT_HEROES:

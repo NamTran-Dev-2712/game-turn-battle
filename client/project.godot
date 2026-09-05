@@ -22,6 +22,7 @@ SceneRouter="*res://src/core/scene/scene_router.gd"
 NetworkClient="*res://src/core/net/network_client.gd"
 ConfigProvider="*res://src/core/config/config_provider.gd"
 StateCache="*res://src/core/state/state_cache.gd"
+AssetLoader="*res://src/core/assets/asset_loader.gd"
 
 [display]
 
