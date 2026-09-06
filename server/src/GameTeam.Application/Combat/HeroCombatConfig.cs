@@ -17,4 +17,13 @@ public sealed class HeroCombatConfig
 
     /// <summary>Tốc độ.</summary>
     public int Spd { get; init; }
+
+    /// <summary>
+    /// Id skill đòn thường riêng của hero (tuỳ chọn, §23). Có ⇒ đơn vị dùng skill này thay vì basic skill
+    /// dùng chung của màn. Lát cắt combat; ánh xạ từ gameplay <c>hero.skills[]</c> là phase 30.
+    /// </summary>
+    public string? BasicSkillId { get; init; }
+
+    /// <summary>Id skill ultimate của hero (tuỳ chọn, §15) — cast theo năng lượng+hồi chiêu; <c>null</c> = không có ultimate.</summary>
+    public string? UltimateSkillId { get; init; }
 }

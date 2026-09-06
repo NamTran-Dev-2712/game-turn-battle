@@ -1,0 +1,550 @@
+{
+  "format_version": 1,
+  "name": "vector_10_heal",
+  "description": "Skill heal (§23): u_healer (slot 1) dùng skill single_ally hồi máu đồng minh slot nhỏ nhất còn sống (u_tank slot 0) sau khi tank bị địch đánh — phát sự kiện Healed với lượng hồi thực (kẹp max_hp). u_tank auto-attack hạ địch ⇒ VICTORY. Năng lượng TẮT.",
+  "input": {
+    "config_version": "config@v1",
+    "seed": 12345,
+    "stage": {
+      "id": "stage_skill_heal",
+      "max_rounds": 30
+    },
+    "team_snapshot": {
+      "ally": [
+        {
+          "actor_id": "u_tank",
+          "hero_id": "hero_tank",
+          "team": "ally",
+          "slot": 0,
+          "stats": {
+            "hp": 800,
+            "atk": 120,
+            "def": 60,
+            "spd": 100
+          },
+          "skills": {
+            "basic": "skill_tank_hit"
+          }
+        },
+        {
+          "actor_id": "u_healer",
+          "hero_id": "hero_healer",
+          "team": "ally",
+          "slot": 1,
+          "stats": {
+            "hp": 600,
+            "atk": 0,
+            "def": 50,
+            "spd": 90
+          },
+          "skills": {
+            "basic": "skill_heal"
+          }
+        }
+      ],
+      "enemy": [
+        {
+          "actor_id": "u_enemy",
+          "hero_id": "hero_enemy",
+          "team": "enemy",
+          "slot": 0,
+          "stats": {
+            "hp": 300,
+            "atk": 150,
+            "def": 80,
+            "spd": 95
+          }
+        }
+      ]
+    },
+    "config_excerpt": {
+      "skill_basic": {
+        "coeff_fixed": 1000
+      },
+      "skills": {
+        "skill_tank_hit": {
+          "coeff_fixed": 1000,
+          "target_rule": "single_enemy",
+          "effects": [
+            {
+              "effect_type": "damage"
+            }
+          ]
+        },
+        "skill_heal": {
+          "target_rule": "single_ally",
+          "effects": [
+            {
+              "effect_type": "heal",
+              "params": {
+                "amount_fixed": 150000
+              }
+            }
+          ]
+        }
+      },
+      "combat_rules": {
+        "def_constant_k": 300,
+        "min_damage": 1,
+        "crit_multiplier_fixed": 1500,
+        "accuracy_bp": 10000,
+        "crit_rate_bp": 0,
+        "max_rounds": 30,
+        "energy": {
+          "initial": 0,
+          "on_attack": 0,
+          "on_hit": 0,
+          "ultimate_cost": 100,
+          "max": 100
+        }
+      }
+    }
+  },
+  "expected": {
+    "event_log": [
+      {
+        "seq": 0,
+        "type": "RoundStarted",
+        "round": 1
+      },
+      {
+        "seq": 1,
+        "type": "ActionStarted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 2,
+        "type": "TargetSelected",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 3,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7329
+      },
+      {
+        "seq": 4,
+        "type": "Hit",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 5,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 4605
+      },
+      {
+        "seq": 6,
+        "type": "DamageApplied",
+        "actor": "u_tank",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 205,
+        "crit": false
+      },
+      {
+        "seq": 7,
+        "type": "ActionCompleted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 8,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 9,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_tank"
+      },
+      {
+        "seq": 10,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 1261
+      },
+      {
+        "seq": 11,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_tank"
+      },
+      {
+        "seq": 12,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2745
+      },
+      {
+        "seq": 13,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_tank",
+        "amount": 125,
+        "target_hp_after": 675,
+        "crit": false
+      },
+      {
+        "seq": 14,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 15,
+        "type": "ActionStarted",
+        "actor": "u_healer"
+      },
+      {
+        "seq": 16,
+        "type": "TargetSelected",
+        "actor": "u_healer",
+        "target": "u_tank"
+      },
+      {
+        "seq": 17,
+        "type": "Healed",
+        "unit": "u_tank",
+        "amount": 125,
+        "target_hp_after": 800
+      },
+      {
+        "seq": 18,
+        "type": "ActionCompleted",
+        "actor": "u_healer"
+      },
+      {
+        "seq": 19,
+        "type": "RoundEnded",
+        "round": 1
+      },
+      {
+        "seq": 20,
+        "type": "RoundStarted",
+        "round": 2
+      },
+      {
+        "seq": 21,
+        "type": "ActionStarted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 22,
+        "type": "TargetSelected",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 23,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 9865
+      },
+      {
+        "seq": 24,
+        "type": "Hit",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 25,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 3338
+      },
+      {
+        "seq": 26,
+        "type": "DamageApplied",
+        "actor": "u_tank",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 110,
+        "crit": false
+      },
+      {
+        "seq": 27,
+        "type": "ActionCompleted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 28,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 29,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_tank"
+      },
+      {
+        "seq": 30,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6274
+      },
+      {
+        "seq": 31,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_tank"
+      },
+      {
+        "seq": 32,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 211
+      },
+      {
+        "seq": 33,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_tank",
+        "amount": 125,
+        "target_hp_after": 675,
+        "crit": false
+      },
+      {
+        "seq": 34,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 35,
+        "type": "ActionStarted",
+        "actor": "u_healer"
+      },
+      {
+        "seq": 36,
+        "type": "TargetSelected",
+        "actor": "u_healer",
+        "target": "u_tank"
+      },
+      {
+        "seq": 37,
+        "type": "Healed",
+        "unit": "u_tank",
+        "amount": 125,
+        "target_hp_after": 800
+      },
+      {
+        "seq": 38,
+        "type": "ActionCompleted",
+        "actor": "u_healer"
+      },
+      {
+        "seq": 39,
+        "type": "RoundEnded",
+        "round": 2
+      },
+      {
+        "seq": 40,
+        "type": "RoundStarted",
+        "round": 3
+      },
+      {
+        "seq": 41,
+        "type": "ActionStarted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 42,
+        "type": "TargetSelected",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 43,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 8135
+      },
+      {
+        "seq": 44,
+        "type": "Hit",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 45,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 327
+      },
+      {
+        "seq": 46,
+        "type": "DamageApplied",
+        "actor": "u_tank",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 15,
+        "crit": false
+      },
+      {
+        "seq": 47,
+        "type": "ActionCompleted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 48,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 49,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_tank"
+      },
+      {
+        "seq": 50,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 8515
+      },
+      {
+        "seq": 51,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_tank"
+      },
+      {
+        "seq": 52,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 3258
+      },
+      {
+        "seq": 53,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_tank",
+        "amount": 125,
+        "target_hp_after": 675,
+        "crit": false
+      },
+      {
+        "seq": 54,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 55,
+        "type": "ActionStarted",
+        "actor": "u_healer"
+      },
+      {
+        "seq": 56,
+        "type": "TargetSelected",
+        "actor": "u_healer",
+        "target": "u_tank"
+      },
+      {
+        "seq": 57,
+        "type": "Healed",
+        "unit": "u_tank",
+        "amount": 125,
+        "target_hp_after": 800
+      },
+      {
+        "seq": 58,
+        "type": "ActionCompleted",
+        "actor": "u_healer"
+      },
+      {
+        "seq": 59,
+        "type": "RoundEnded",
+        "round": 3
+      },
+      {
+        "seq": 60,
+        "type": "RoundStarted",
+        "round": 4
+      },
+      {
+        "seq": 61,
+        "type": "ActionStarted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 62,
+        "type": "TargetSelected",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 63,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 1968
+      },
+      {
+        "seq": 64,
+        "type": "Hit",
+        "actor": "u_tank",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 65,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 4992
+      },
+      {
+        "seq": 66,
+        "type": "DamageApplied",
+        "actor": "u_tank",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 0,
+        "crit": false
+      },
+      {
+        "seq": 67,
+        "type": "Death",
+        "unit": "u_enemy"
+      },
+      {
+        "seq": 68,
+        "type": "ActionCompleted",
+        "actor": "u_tank"
+      },
+      {
+        "seq": 69,
+        "type": "RoundEnded",
+        "round": 4
+      },
+      {
+        "seq": 70,
+        "type": "BattleEnded"
+      }
+    ],
+    "result": {
+      "outcome": "VICTORY",
+      "winner_team": "ally",
+      "rounds": 4,
+      "final_hp": {
+        "u_tank": 800,
+        "u_healer": 600,
+        "u_enemy": 0
+      }
+    }
+  }
+}

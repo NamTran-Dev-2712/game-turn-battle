@@ -41,14 +41,14 @@ ADR-004 cấm `switch/if` để mở rộng gameplay; skill phải là data + re
 
 # Công việc cần thực hiện
 
-- [ ] Hoàn thiện `skill.schema.json` (effect-data: type/target/magnitude/energy/cooldown/điều kiện).
-- [ ] Server: registry effect handler (`IEffectHandler` theo type) — thêm không `switch` mở rộng.
-- [ ] Client: registry effect handler GDScript tương ứng (khớp quy tắc server).
-- [ ] Hiện thực effect nền: damage, heal, buff/debuff, ultimate (energy-triggered).
-- [ ] Tích hợp registry vào sim (24/25): sim gọi handler theo effect-data.
-- [ ] Mở rộng golden vector (26) phủ các skill → gate xanh hai phía.
-- [ ] Test: skill từ config chạy đúng; thêm skill mới bằng config không sửa lõi.
-- [ ] Cập nhật `../gameplay/skill-framework.md`.
+- [x] Hoàn thiện `skill.schema.json` (effect-data: type/target/magnitude/energy/cooldown/điều kiện). — `params` typed (coeff_fixed/amount_fixed/atk/def/spd/duration) + `cooldown`, additive (không bump `schema_version`); validator exit 0 (8 file).
+- [x] Server: registry effect handler (`IEffectHandler` theo type) — thêm không `switch` mở rộng. — `EffectRegistry.CreateDefault` = damage/heal/apply_buff/apply_debuff; grep sạch (không dispatch switch).
+- [x] Client: registry effect handler GDScript tương ứng (khớp quy tắc server). — `effect_registry.gd` 4 handler + `stat_modifier_core.gd`; song ánh server; golden khớp.
+- [x] Hiện thực effect nền: damage, heal, buff/debuff, ultimate (energy-triggered). — Healed/BuffApplied/BuffExpired/EnergyChanged; §15 energy/ultimate config-gated (mặc định tắt).
+- [x] Tích hợp registry vào sim (24/25): sim gọi handler theo effect-data. — `BattleSimulator` chọn basic/ultimate + per-effect target + energy/cooldown/buff-tick; 9 vector cũ byte-identical.
+- [x] Mở rộng golden vector (26) phủ các skill → gate xanh hai phía. — `vector_10..14`; `run.sh check` exit 0 (14/14); client golden xanh; **server ≡ client ≡ baseline**. *(CI Actions pending)*
+- [x] Test: skill từ config chạy đúng; thêm skill mới bằng config không sửa lõi. — `New_skill_via_config_only_runs_without_core_change` (server) + `test_new_skill_via_config_only_runs` (client); negative `+1` buff ⇒ đỏ hai phía ⇒ revert xanh.
+- [x] Cập nhật `../gameplay/skill-framework.md`. — viết lại từ stub thành spec cụ thể + `combat-framework.md` §23.
 
 # Tiêu chí hoàn thành
 
@@ -83,7 +83,23 @@ Skill mới = thêm effect-data (config) + (nếu loại effect mới) thêm han
 
 # Phase Review
 
-Đóng khi skill data-driven + registry hai phía chạy khớp golden, thêm skill bằng config không sửa lõi, test/gate xanh.
+**Trạng thái: ĐÓNG (local PASS 2026-09-05).** Skill = effect-data + handler registry hai phía (server `GameTeam.Domain/Combat/Effects/*`
++ client `client/src/combat/effects/*`), dispatch theo `effect_type` (KHÔNG `switch`). Effect nền: damage/heal (Healed)/apply_buff/
+apply_debuff (modifier chỉ số, refresh-on-reapply) + ultimate theo năng lượng (§15, config-gated, mặc định TẮT ⇒ 9 vector Phase 26
+byte-identical). Golden mở rộng `vector_10..14` (heal/buff/debuff/ultimate-energy/multi-effect), baseline sinh từ server ⇒ **server ≡
+client ≡ baseline**. Thêm skill dùng effect có sẵn = chỉ config (test chứng minh hai phía). Doc: `skill-framework.md` (rewrite) +
+`combat-framework.md` §23 + `shared/combat-vectors/README.md` + `.memory/0026`.
+
+**Bằng chứng verify (local):** config-validator exit 0 (8 file); server `dotnet test` Domain 97 / Application 52 / Contracts 36 (gồm
+registry/buff/debuff/heal-event/refresh + config-only-new-skill + purity/architecture); `tools/combat-baseline/run.sh check` exit 0
+(14/14); Godot 4.7.1 `--import` exit 0; gdUnit4 full **114/114, 0 orphan** (golden auto-discover 14 + config-only resolver); negative
+`+1` buff magnitude ⇒ drift vector_11/12/14 + golden đỏ hai phía ⇒ revert xanh; grep sạch (không switch dispatch, không float/wall-clock/
+RNG global trong combat); không drift `openapi.json`/`client/src/data/generated`.
+
+**Nợ (out-of-scope, ghi rõ):** `shield` handler + hệ điều kiện tổng quát (Post-MVP; `trigger` là cơ chế điều kiện hiện tại); số liệu
+balance ultimate/energy (CB4 `[OPEN]`); battle endpoint + wiring `config/skills` thật theo `hero.skills[]` + nội dung skill đầy đủ = phase 30+.
+
+**CI-verification pending:** gate `golden-vector` (`ci-server.yml` + `ci-client.yml`) chạy trên GitHub Actions — chờ kết quả Actions.
 
 ---
 

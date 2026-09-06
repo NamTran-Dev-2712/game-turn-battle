@@ -39,6 +39,11 @@ public sealed class DamageEffectHandler : IEffectHandler
         {
             context.Emit(new Death(context.Target.ActorId));
         }
+        else if (context.Target.AddEnergy(context.Rules.Energy.OnHit, context.Rules.Energy.Max))
+        {
+            // §15: bị đánh trúng và còn sống ⇒ nạp on_hit; chỉ phát khi năng lượng đổi (tắt ⇒ không phát).
+            context.Emit(new EnergyChanged(context.Target.ActorId, context.Target.Energy));
+        }
     }
 
     /// <summary>

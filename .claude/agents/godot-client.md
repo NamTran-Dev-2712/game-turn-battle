@@ -16,7 +16,7 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
 - **Features never import each other.** Cross-feature communication goes through the EventBus / signals (ADR-002). Layout scaffold: `.templates/godot-feature/`.
 - **No God autoload.** Core services (`net/`, `config/`, `events/`, `state/`, `scene/`) stay small and single-purpose.
 - **Client has no authority.** No economy/result/reward decisions client-side — request the server (ADR-007/011).
-- **Combat sim is pure:** decoupled from nodes, integer/fixed-point, seeded RNG. Must reproduce the server golden vector (ADR-011).
+- **Combat sim is pure:** decoupled from nodes, integer/fixed-point, seeded RNG. Must reproduce the server golden vector (ADR-011). **Skill framework (Phase 28):** `client/src/combat/effects/*` mirrors the server `EffectRegistry` (damage/heal/apply_buff/apply_debuff + `stat_modifier_core.gd`) bit-for-bit — `heal` emits `Healed`, buff/debuff = flat stat modifier + `duration` (refresh-on-reapply), energy-ultimate (§15) config-gated default-OFF. Extend via a handler mirroring server + config; never fork a second sim, use `float`/global RNG, or `switch(effect_type)`. Canon: `docs/gameplay/skill-framework.md`.
 - **Static typing everywhere.** `snake_case` funcs/vars, `PascalCase` `class_name`, `CONSTANT_CASE` consts, `##` doc comments, **tab** indentation (per `.editorconfig`).
 
 ## Established infrastructure (closed & verified — reuse, don't reinvent)

@@ -38,6 +38,25 @@ func test_atk_400_yields_damage_316_data_driven() -> void:
 	assert_int(_first_damage(out["event_log"])).is_equal(316)
 
 
+func test_new_skill_via_config_only_runs() -> void:
+	# Criterion C (ADR-004): thêm skill mới HOÀN TOÀN bằng config (damage + apply_buff self) gán cho hero
+	# qua basic_skill_id ⇒ chạy đúng phía client, KHÔNG sửa code lõi (song ánh server).
+	var provider := _make_provider(_bundle_with_config_skill())
+	var input := CombatInputResolver.new().resolve(_request(), provider)
+	var out := BattleSimulator.new().simulate(input)
+	var has_damage := false
+	var has_self_buff := false
+	for e in out["event_log"]:
+		var t := str(e.get("type", ""))
+		if t == "DamageApplied":
+			has_damage = true
+		elif t == "BuffApplied" and str(e.get("unit", "")) == "u_ally_01" \
+				and str(e.get("stat", "")) == "atk" and int(e.get("amount", 0)) == 50:
+			has_self_buff = true
+	assert_bool(has_damage).is_true()
+	assert_bool(has_self_buff).is_true()
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
 
 func _make_provider(bundle: Dictionary) -> Node:
@@ -77,6 +96,49 @@ func _bundle(version: int, ally_atk: int) -> Dictionary:
 			},
 			"skill": {
 				"skill_basic": {"id": "skill_basic", "coeff_fixed": 1000, "target_rule": "default", "effects": ["damage"]},
+			},
+			"stage": {
+				"stage_01": {
+					"id": "stage_01",
+					"max_rounds": 30,
+					"basic_skill_id": "skill_basic",
+					"combat_rules": {
+						"def_constant_k": 300,
+						"min_damage": 1,
+						"crit_multiplier_fixed": 1500,
+						"accuracy_bp": 10000,
+						"crit_rate_bp": 0,
+						"max_rounds": 30,
+						"energy": {"initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100},
+					},
+					"enemies": [{"actor_id": "u_enemy_01", "hero_id": "hero_enemy", "slot": 0}],
+				},
+			},
+		},
+	}
+
+
+# Bundle: hero_ally gán basic_skill_id = skill_warblade (khai báo CHỈ trong config) = damage + apply_buff self.
+func _bundle_with_config_skill() -> Dictionary:
+	return {
+		"config_version": "config@v1",
+		"schema_version": 1,
+		"data": {
+			"hero": {
+				"hero_ally": {"id": "hero_ally", "base_stats": {"hp": 1000, "atk": 200, "def": 100, "spd": 120}, "basic_skill_id": "skill_warblade"},
+				"hero_enemy": {"id": "hero_enemy", "base_stats": {"hp": 500, "atk": 150, "def": 80, "spd": 90}},
+			},
+			"skill": {
+				"skill_basic": {"id": "skill_basic", "coeff_fixed": 1000, "target_rule": "default", "effects": ["damage"]},
+				"skill_warblade": {
+					"id": "skill_warblade",
+					"coeff_fixed": 1000,
+					"target_rule": "single_enemy",
+					"effects": [
+						{"effect_type": "damage"},
+						{"effect_type": "apply_buff", "target": "self", "params": {"atk": 50, "duration": 3}},
+					],
+				},
 			},
 			"stage": {
 				"stage_01": {

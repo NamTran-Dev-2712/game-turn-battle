@@ -3,5 +3,5 @@
   "id": "skill_aqua_heal",
   "target": "single_ally",
   "trigger": { "type": "cooldown", "value": 0 },
-  "effects": [ { "effect_type": "heal", "params": {} } ]
+  "effects": [ { "effect_type": "heal", "params": { "amount_fixed": 200000 } } ]
 }

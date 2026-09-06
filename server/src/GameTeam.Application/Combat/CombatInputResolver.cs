@@ -40,11 +40,13 @@ public sealed class CombatInputResolver
             return Result.Failure<BattleInput>(CombatErrors.StageNotFound(request.StageId));
         }
 
-        SkillCombatConfig? skill = _config.Get<SkillCombatConfig>(SkillType, stage.BasicSkillId);
-        if (skill is null)
+        Result<SkillDef> basicSkillResult = ResolveSkill(stage.BasicSkillId);
+        if (basicSkillResult.IsFailure)
         {
-            return Result.Failure<BattleInput>(CombatErrors.SkillNotFound(stage.BasicSkillId));
+            return Result.Failure<BattleInput>(basicSkillResult.Error);
         }
+
+        SkillDef basicSkill = basicSkillResult.Value;
 
         var ally = new List<UnitSnapshot>(request.Ally.Count);
         foreach (CombatTeamMember member in request.Ally)
@@ -85,12 +87,6 @@ public sealed class CombatInputResolver
                 rulesConfig.Energy.UltimateCost,
                 rulesConfig.Energy.Max));
 
-        IReadOnlyList<EffectDef> effects = skill.Effects.Count > 0
-            ? skill.Effects.Select(type => new EffectDef(type)).ToList()
-            : new List<EffectDef> { new(DamageEffectHandler.TypeName) };
-
-        var basicSkill = new SkillDef(stage.BasicSkillId, skill.CoeffFixed, skill.TargetRule, effects);
-
         string configVersion = $"config@v{_config.CurrentVersion.Bundle}";
         var input = new BattleInput(
             configVersion,
@@ -112,7 +108,57 @@ public sealed class CombatInputResolver
             return Result.Failure<UnitSnapshot>(CombatErrors.HeroNotFound(heroId));
         }
 
-        var snapshot = new UnitSnapshot(actorId, heroId, team, slot, new UnitStats(hero.Hp, hero.Atk, hero.Def, hero.Spd));
+        UnitSkillSet? skills = null;
+        if (hero.BasicSkillId is not null)
+        {
+            Result<SkillDef> basic = ResolveSkill(hero.BasicSkillId);
+            if (basic.IsFailure)
+            {
+                return Result.Failure<UnitSnapshot>(basic.Error);
+            }
+
+            SkillDef? ultimate = null;
+            if (hero.UltimateSkillId is not null)
+            {
+                Result<SkillDef> ult = ResolveSkill(hero.UltimateSkillId);
+                if (ult.IsFailure)
+                {
+                    return Result.Failure<UnitSnapshot>(ult.Error);
+                }
+
+                ultimate = ult.Value;
+            }
+
+            skills = new UnitSkillSet(basic.Value, ultimate);
+        }
+
+        var snapshot = new UnitSnapshot(
+            actorId,
+            heroId,
+            team,
+            slot,
+            new UnitStats(hero.Hp, hero.Atk, hero.Def, hero.Spd),
+            skills);
         return Result.Success(snapshot);
+    }
+
+    private Result<SkillDef> ResolveSkill(string skillId)
+    {
+        SkillCombatConfig? cfg = _config.Get<SkillCombatConfig>(SkillType, skillId);
+        if (cfg is null)
+        {
+            return Result.Failure<SkillDef>(CombatErrors.SkillNotFound(skillId));
+        }
+
+        return Result.Success(BuildSkill(skillId, cfg));
+    }
+
+    private static SkillDef BuildSkill(string id, SkillCombatConfig cfg)
+    {
+        IReadOnlyList<EffectDef> effects = cfg.Effects.Count > 0
+            ? cfg.Effects.Select(e => new EffectDef(e.EffectType, e.Params, e.Target)).ToList()
+            : new List<EffectDef> { new(DamageEffectHandler.TypeName) };
+
+        return new SkillDef(id, cfg.CoeffFixed, cfg.TargetRule, effects, cfg.EnergyCost, cfg.CooldownRounds);
     }
 }

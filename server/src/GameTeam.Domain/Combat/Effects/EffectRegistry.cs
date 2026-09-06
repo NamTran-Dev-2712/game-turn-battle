@@ -22,9 +22,18 @@ public sealed class EffectRegistry
         }
     }
 
-    /// <summary>Registry mặc định của phase 24: <c>damage</c> + <c>heal</c> (mẫu).</summary>
+    /// <summary>
+    /// Registry mặc định (§23): <c>damage</c>, <c>heal</c>, <c>apply_buff</c>, <c>apply_debuff</c>.
+    /// Thêm loại effect mới = thêm handler ở đây + config (không sửa lõi/switch — OCP, ADR-004).
+    /// </summary>
     public static EffectRegistry CreateDefault() =>
-        new(new IEffectHandler[] { new DamageEffectHandler(), new HealEffectHandler() });
+        new(new IEffectHandler[]
+        {
+            new DamageEffectHandler(),
+            new HealEffectHandler(),
+            new ApplyBuffEffectHandler(),
+            new ApplyDebuffEffectHandler(),
+        });
 
     /// <summary>Có handler cho <paramref name="effectType"/> không?</summary>
     public bool Has(string effectType) => _handlers.ContainsKey(effectType);

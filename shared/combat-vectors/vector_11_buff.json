@@ -1,0 +1,1228 @@
+{
+  "format_version": 1,
+  "name": "vector_11_buff",
+  "description": "Skill buff (§23): u_buffer cast ultimate warcry (cooldown-gated, energy_cost 0) một lần ở vòng 1 → BuffApplied atk +120 (duration 2) lên u_striker; sát thương striker tăng khi còn buff rồi giảm sau BuffExpired ở đầu vòng 3. Chứng minh modifier chỉ số + hết hạn tất định. Năng lượng gain TẮT.",
+  "input": {
+    "config_version": "config@v1",
+    "seed": 777,
+    "stage": {
+      "id": "stage_skill_buff",
+      "max_rounds": 30
+    },
+    "team_snapshot": {
+      "ally": [
+        {
+          "actor_id": "u_striker",
+          "hero_id": "hero_striker",
+          "team": "ally",
+          "slot": 0,
+          "stats": {
+            "hp": 700,
+            "atk": 100,
+            "def": 60,
+            "spd": 90
+          },
+          "skills": {
+            "basic": "skill_striker_hit"
+          }
+        },
+        {
+          "actor_id": "u_buffer",
+          "hero_id": "hero_buffer",
+          "team": "ally",
+          "slot": 1,
+          "stats": {
+            "hp": 700,
+            "atk": 80,
+            "def": 60,
+            "spd": 120
+          },
+          "skills": {
+            "basic": "skill_buffer_hit",
+            "ultimate": "skill_warcry"
+          }
+        }
+      ],
+      "enemy": [
+        {
+          "actor_id": "u_enemy",
+          "hero_id": "hero_enemy",
+          "team": "enemy",
+          "slot": 0,
+          "stats": {
+            "hp": 1400,
+            "atk": 90,
+            "def": 70,
+            "spd": 50
+          }
+        }
+      ]
+    },
+    "config_excerpt": {
+      "skill_basic": {
+        "coeff_fixed": 1000
+      },
+      "skills": {
+        "skill_striker_hit": {
+          "coeff_fixed": 1000,
+          "target_rule": "single_enemy",
+          "effects": [
+            {
+              "effect_type": "damage"
+            }
+          ]
+        },
+        "skill_buffer_hit": {
+          "coeff_fixed": 1000,
+          "target_rule": "single_enemy",
+          "effects": [
+            {
+              "effect_type": "damage"
+            }
+          ]
+        },
+        "skill_warcry": {
+          "target_rule": "single_ally",
+          "energy_cost": 0,
+          "cooldown_rounds": 5,
+          "effects": [
+            {
+              "effect_type": "apply_buff",
+              "params": {
+                "atk": 120,
+                "duration": 2
+              }
+            }
+          ]
+        }
+      },
+      "combat_rules": {
+        "def_constant_k": 300,
+        "min_damage": 1,
+        "crit_multiplier_fixed": 1500,
+        "accuracy_bp": 10000,
+        "crit_rate_bp": 0,
+        "max_rounds": 30,
+        "energy": {
+          "initial": 0,
+          "on_attack": 0,
+          "on_hit": 0,
+          "ultimate_cost": 100,
+          "max": 100
+        }
+      }
+    }
+  },
+  "expected": {
+    "event_log": [
+      {
+        "seq": 0,
+        "type": "RoundStarted",
+        "round": 1
+      },
+      {
+        "seq": 1,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 2,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_striker"
+      },
+      {
+        "seq": 3,
+        "type": "BuffApplied",
+        "unit": "u_striker",
+        "source": "skill_warcry",
+        "stat": "atk",
+        "amount": 120,
+        "duration": 2
+      },
+      {
+        "seq": 4,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 5,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 6,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 7,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6395
+      },
+      {
+        "seq": 8,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 9,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 3876
+      },
+      {
+        "seq": 10,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 178,
+        "target_hp_after": 1222,
+        "crit": false
+      },
+      {
+        "seq": 11,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 12,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 13,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 14,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 8620
+      },
+      {
+        "seq": 15,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 16,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 8275
+      },
+      {
+        "seq": 17,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 625,
+        "crit": false
+      },
+      {
+        "seq": 18,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 19,
+        "type": "RoundEnded",
+        "round": 1
+      },
+      {
+        "seq": 20,
+        "type": "RoundStarted",
+        "round": 2
+      },
+      {
+        "seq": 21,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 22,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 23,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6154
+      },
+      {
+        "seq": 24,
+        "type": "Hit",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 25,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5010
+      },
+      {
+        "seq": 26,
+        "type": "DamageApplied",
+        "actor": "u_buffer",
+        "target": "u_enemy",
+        "amount": 65,
+        "target_hp_after": 1157,
+        "crit": false
+      },
+      {
+        "seq": 27,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 28,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 29,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 30,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 18
+      },
+      {
+        "seq": 31,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 32,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 3907
+      },
+      {
+        "seq": 33,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 178,
+        "target_hp_after": 979,
+        "crit": false
+      },
+      {
+        "seq": 34,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 35,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 36,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 37,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 5227
+      },
+      {
+        "seq": 38,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 39,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6605
+      },
+      {
+        "seq": 40,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 550,
+        "crit": false
+      },
+      {
+        "seq": 41,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 42,
+        "type": "RoundEnded",
+        "round": 2
+      },
+      {
+        "seq": 43,
+        "type": "RoundStarted",
+        "round": 3
+      },
+      {
+        "seq": 44,
+        "type": "BuffExpired",
+        "unit": "u_striker",
+        "source": "skill_warcry",
+        "stat": "atk"
+      },
+      {
+        "seq": 45,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 46,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 47,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 5839
+      },
+      {
+        "seq": 48,
+        "type": "Hit",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 49,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 1046
+      },
+      {
+        "seq": 50,
+        "type": "DamageApplied",
+        "actor": "u_buffer",
+        "target": "u_enemy",
+        "amount": 65,
+        "target_hp_after": 914,
+        "crit": false
+      },
+      {
+        "seq": 51,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 52,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 53,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 54,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7996
+      },
+      {
+        "seq": 55,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 56,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5018
+      },
+      {
+        "seq": 57,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 81,
+        "target_hp_after": 833,
+        "crit": false
+      },
+      {
+        "seq": 58,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 59,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 60,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 61,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6912
+      },
+      {
+        "seq": 62,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 63,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5425
+      },
+      {
+        "seq": 64,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 475,
+        "crit": false
+      },
+      {
+        "seq": 65,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 66,
+        "type": "RoundEnded",
+        "round": 3
+      },
+      {
+        "seq": 67,
+        "type": "RoundStarted",
+        "round": 4
+      },
+      {
+        "seq": 68,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 69,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 70,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7729
+      },
+      {
+        "seq": 71,
+        "type": "Hit",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 72,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9609
+      },
+      {
+        "seq": 73,
+        "type": "DamageApplied",
+        "actor": "u_buffer",
+        "target": "u_enemy",
+        "amount": 65,
+        "target_hp_after": 768,
+        "crit": false
+      },
+      {
+        "seq": 74,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 75,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 76,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 77,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 5529
+      },
+      {
+        "seq": 78,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 79,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7695
+      },
+      {
+        "seq": 80,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 81,
+        "target_hp_after": 687,
+        "crit": false
+      },
+      {
+        "seq": 81,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 82,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 83,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 84,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2597
+      },
+      {
+        "seq": 85,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 86,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2448
+      },
+      {
+        "seq": 87,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 400,
+        "crit": false
+      },
+      {
+        "seq": 88,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 89,
+        "type": "RoundEnded",
+        "round": 4
+      },
+      {
+        "seq": 90,
+        "type": "RoundStarted",
+        "round": 5
+      },
+      {
+        "seq": 91,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 92,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 93,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4056
+      },
+      {
+        "seq": 94,
+        "type": "Hit",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 95,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6338
+      },
+      {
+        "seq": 96,
+        "type": "DamageApplied",
+        "actor": "u_buffer",
+        "target": "u_enemy",
+        "amount": 65,
+        "target_hp_after": 622,
+        "crit": false
+      },
+      {
+        "seq": 97,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 98,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 99,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 100,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 9326
+      },
+      {
+        "seq": 101,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 102,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9480
+      },
+      {
+        "seq": 103,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 81,
+        "target_hp_after": 541,
+        "crit": false
+      },
+      {
+        "seq": 104,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 105,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 106,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 107,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 543
+      },
+      {
+        "seq": 108,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 109,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7762
+      },
+      {
+        "seq": 110,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 325,
+        "crit": false
+      },
+      {
+        "seq": 111,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 112,
+        "type": "RoundEnded",
+        "round": 5
+      },
+      {
+        "seq": 113,
+        "type": "RoundStarted",
+        "round": 6
+      },
+      {
+        "seq": 114,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 115,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_striker"
+      },
+      {
+        "seq": 116,
+        "type": "BuffApplied",
+        "unit": "u_striker",
+        "source": "skill_warcry",
+        "stat": "atk",
+        "amount": 120,
+        "duration": 2
+      },
+      {
+        "seq": 117,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 118,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 119,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 120,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4310
+      },
+      {
+        "seq": 121,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 122,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6984
+      },
+      {
+        "seq": 123,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 178,
+        "target_hp_after": 363,
+        "crit": false
+      },
+      {
+        "seq": 124,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 125,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 126,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 127,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6958
+      },
+      {
+        "seq": 128,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 129,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6244
+      },
+      {
+        "seq": 130,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 250,
+        "crit": false
+      },
+      {
+        "seq": 131,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 132,
+        "type": "RoundEnded",
+        "round": 6
+      },
+      {
+        "seq": 133,
+        "type": "RoundStarted",
+        "round": 7
+      },
+      {
+        "seq": 134,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 135,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 136,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7423
+      },
+      {
+        "seq": 137,
+        "type": "Hit",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 138,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2900
+      },
+      {
+        "seq": 139,
+        "type": "DamageApplied",
+        "actor": "u_buffer",
+        "target": "u_enemy",
+        "amount": 65,
+        "target_hp_after": 298,
+        "crit": false
+      },
+      {
+        "seq": 140,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 141,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 142,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 143,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2508
+      },
+      {
+        "seq": 144,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 145,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 8172
+      },
+      {
+        "seq": 146,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 178,
+        "target_hp_after": 120,
+        "crit": false
+      },
+      {
+        "seq": 147,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 148,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 149,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 150,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7400
+      },
+      {
+        "seq": 151,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_striker"
+      },
+      {
+        "seq": 152,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9625
+      },
+      {
+        "seq": 153,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_striker",
+        "amount": 75,
+        "target_hp_after": 175,
+        "crit": false
+      },
+      {
+        "seq": 154,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 155,
+        "type": "RoundEnded",
+        "round": 7
+      },
+      {
+        "seq": 156,
+        "type": "RoundStarted",
+        "round": 8
+      },
+      {
+        "seq": 157,
+        "type": "BuffExpired",
+        "unit": "u_striker",
+        "source": "skill_warcry",
+        "stat": "atk"
+      },
+      {
+        "seq": 158,
+        "type": "ActionStarted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 159,
+        "type": "TargetSelected",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 160,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 6730
+      },
+      {
+        "seq": 161,
+        "type": "Hit",
+        "actor": "u_buffer",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 162,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 4899
+      },
+      {
+        "seq": 163,
+        "type": "DamageApplied",
+        "actor": "u_buffer",
+        "target": "u_enemy",
+        "amount": 65,
+        "target_hp_after": 55,
+        "crit": false
+      },
+      {
+        "seq": 164,
+        "type": "ActionCompleted",
+        "actor": "u_buffer"
+      },
+      {
+        "seq": 165,
+        "type": "ActionStarted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 166,
+        "type": "TargetSelected",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 167,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2534
+      },
+      {
+        "seq": 168,
+        "type": "Hit",
+        "actor": "u_striker",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 169,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 97
+      },
+      {
+        "seq": 170,
+        "type": "DamageApplied",
+        "actor": "u_striker",
+        "target": "u_enemy",
+        "amount": 81,
+        "target_hp_after": 0,
+        "crit": false
+      },
+      {
+        "seq": 171,
+        "type": "Death",
+        "unit": "u_enemy"
+      },
+      {
+        "seq": 172,
+        "type": "ActionCompleted",
+        "actor": "u_striker"
+      },
+      {
+        "seq": 173,
+        "type": "RoundEnded",
+        "round": 8
+      },
+      {
+        "seq": 174,
+        "type": "BattleEnded"
+      }
+    ],
+    "result": {
+      "outcome": "VICTORY",
+      "winner_team": "ally",
+      "rounds": 8,
+      "final_hp": {
+        "u_striker": 175,
+        "u_buffer": 700,
+        "u_enemy": 0
+      }
+    }
+  }
+}

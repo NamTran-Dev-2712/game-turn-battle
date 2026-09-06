@@ -7,6 +7,8 @@ var hero_id: String = ""
 var team: String = ""
 var slot: int = 0
 var stats: UnitStats = null
+## Bộ skill riêng (§23) — `null` ⇒ dùng basic skill dùng chung của trận. Loader gán sau `from_dict`.
+var skills: UnitSkillSet = null
 
 
 static func from_dict(d: Dictionary) -> UnitSnapshot:

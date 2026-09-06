@@ -64,5 +64,24 @@ static func energy_changed(unit: String, energy_after: int) -> Dictionary:
 	return {"type": "EnergyChanged", "unit": unit, "energy_after": energy_after}
 
 
+static func healed(unit: String, amount: int, target_hp_after: int) -> Dictionary:
+	return {"type": "Healed", "unit": unit, "amount": amount, "target_hp_after": target_hp_after}
+
+
+static func buff_applied(unit: String, source: String, stat: String, amount: int, duration: int) -> Dictionary:
+	return {
+		"type": "BuffApplied",
+		"unit": unit,
+		"source": source,
+		"stat": stat,
+		"amount": amount,
+		"duration": duration,
+	}
+
+
+static func buff_expired(unit: String, source: String, stat: String) -> Dictionary:
+	return {"type": "BuffExpired", "unit": unit, "source": source, "stat": stat}
+
+
 static func battle_ended() -> Dictionary:
 	return {"type": "BattleEnded"}

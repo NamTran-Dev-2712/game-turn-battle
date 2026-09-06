@@ -7,6 +7,6 @@
   "role": "healer",
   "rarity": 4,
   "base_stats": { "hp": 1100, "atk": 90, "def": 80, "spd": 95 },
-  "skills": ["skill_aqua_heal"],
+  "skills": ["skill_aqua_heal", "skill_aqua_guard"],
   "art": "res://assets/heroes/hero_aqua.png"
 }

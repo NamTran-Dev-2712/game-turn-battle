@@ -32,7 +32,7 @@ public class CombatDataDrivenTests
             { "hp": 500, "atk": 150, "def": 80, "spd": 90 }
             """);
         config.Set("skill", "skill_basic", """
-            { "coeff_fixed": 1000, "target_rule": "default", "effects": ["damage"] }
+            { "coeff_fixed": 1000, "target_rule": "default", "effects": [ { "effect_type": "damage" } ] }
             """);
         config.Set("stage", StageId, """
             {
@@ -90,6 +90,59 @@ public class CombatDataDrivenTests
         // atk cao hơn ⇒ hạ địch nhanh hơn (ít vòng hơn) — kết quả đổi theo dữ liệu.
         highResult.Rounds.Should().BeLessThan(lowResult.Rounds);
         highResult.Outcome.Should().Be("VICTORY");
+    }
+
+    [Fact]
+    public void New_skill_via_config_only_runs_without_core_change()
+    {
+        // Criterion C (ADR-004): thêm MỘT skill mới HOÀN TOÀN bằng config (ghép effect có sẵn:
+        // damage + apply_buff self) gán cho hero qua basic_skill_id ⇒ chạy đúng, KHÔNG sửa code lõi.
+        var config = new FakeConfigProvider();
+        config.Set("hero", "hero_ally", """
+            { "hp": 1000, "atk": 200, "def": 100, "spd": 120, "basic_skill_id": "skill_warblade" }
+            """);
+        config.Set("hero", "hero_enemy", """
+            { "hp": 500, "atk": 150, "def": 80, "spd": 90 }
+            """);
+        config.Set("skill", "skill_basic", """
+            { "coeff_fixed": 1000, "target_rule": "default", "effects": [ { "effect_type": "damage" } ] }
+            """);
+        // Skill hoàn toàn MỚI, chỉ khai báo trong config — không handler/loại effect mới, không sửa lõi.
+        config.Set("skill", "skill_warblade", """
+            {
+              "coeff_fixed": 1000,
+              "target_rule": "single_enemy",
+              "effects": [
+                { "effect_type": "damage" },
+                { "effect_type": "apply_buff", "target": "self", "params": { "atk": 50, "duration": 3 } }
+              ]
+            }
+            """);
+        config.Set("stage", StageId, """
+            {
+              "max_rounds": 30,
+              "basic_skill_id": "skill_basic",
+              "combat_rules": {
+                "def_constant_k": 300,
+                "min_damage": 1,
+                "crit_multiplier_fixed": 1500,
+                "accuracy_bp": 10000,
+                "crit_rate_bp": 0,
+                "energy": { "initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100 }
+              },
+              "enemies": [ { "actor_id": "u_enemy_01", "hero_id": "hero_enemy", "slot": 0 } ]
+            }
+            """);
+
+        Result<BattleInput> resolved = new CombatInputResolver(config).Resolve(Request);
+        resolved.IsSuccess.Should().BeTrue();
+
+        BattleOutput output = new BattleSimulator().Simulate(resolved.Value);
+
+        // Skill config-only chạy: có sát thương VÀ buff atk lên chính mình (self), không cần đổi code.
+        output.EventLog.Should().Contain(e => e is DamageApplied);
+        output.EventLog.OfType<BuffApplied>()
+            .Should().Contain(b => b.Unit == "u_ally_01" && b.Stat == "atk" && b.Amount == 50);
     }
 
     [Fact]

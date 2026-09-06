@@ -11,8 +11,14 @@ authority = sim server, rồi commit làm baseline. Cả server test lẫn clien
 ⇒ transitively **server ≡ client ≡ baseline**. Tool này là chỗ DUY NHẤT tạo/kiểm baseline đó.
 
 Tool **ProjectReference `GameTeam.Domain`** ⇒ gọi đúng một `BattleSimulator` + `CombatEventSerializer`
-(KHÔNG fork sim thứ hai). Parser `input` của tool song ánh `GoldenVectorLoader` bên test server; nếu hai
-parser lệch nhau, `GoldenVectorTests` tự đỏ (tự kiểm chéo).
+(KHÔNG fork sim thứ hai). Parser `input` của tool (`VectorInputParser`) song ánh `GoldenVectorLoader` bên test
+server **và** `combat_vector_loader.gd` bên client; nếu **ba** parser lệch nhau, `GoldenVectorTests`/golden
+client tự đỏ (tự kiểm chéo) — sửa cả ba khi đổi định dạng `input`.
+
+**Định dạng skill (Phase 28):** `input` hỗ trợ (tuỳ chọn) skill riêng của unit — `config_excerpt.skills`
+(bảng skill: `{coeff_fixed?, target_rule, energy_cost?, cooldown_rounds?, effects:[{effect_type,target?,params}]}`) +
+`team_snapshot[].skills {basic, ultimate?}`. Vắng ⇒ dùng `skill_basic` (1 effect `damage`) như 9 vector cũ. Vector
+`vector_10..14` phủ heal/buff/debuff/ultimate-energy/multi-effect. Chi tiết: `shared/combat-vectors/README.md`.
 
 ## Dùng
 

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "skill_ignis_ultimate",
+  "target": "single_enemy",
+  "trigger": { "type": "energy", "value": 100 },
+  "cooldown": 2,
+  "effects": [ { "effect_type": "damage", "params": { "coeff_fixed": 2000 } } ]
+}

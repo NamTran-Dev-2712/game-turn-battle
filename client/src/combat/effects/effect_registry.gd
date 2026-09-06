@@ -23,9 +23,12 @@ func has(effect_type: String) -> bool:
 	return _handlers.has(effect_type)
 
 
-## Registry mặc định: `damage` + `heal` (khớp server `CreateDefault`).
+## Registry mặc định (§23): `damage` + `heal` + `apply_buff` + `apply_debuff` (khớp server `CreateDefault`).
+## Thêm loại effect mới = thêm handler ở đây + config (không sửa lõi/switch — OCP, ADR-004).
 static func create_default() -> EffectRegistry:
 	var registry := EffectRegistry.new()
 	registry.register(DamageEffectHandler.new())
 	registry.register(HealEffectHandler.new())
+	registry.register(ApplyBuffEffectHandler.new())
+	registry.register(ApplyDebuffEffectHandler.new())
 	return registry
