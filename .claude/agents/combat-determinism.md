@@ -11,7 +11,7 @@ that touches the sim on either side goes through these rules.
 - **ADR-011** (combat authority & determinism) — the keystone decision
 - `docs/gameplay/combat-framework.md` **§9–§20** (the Phase-23 combat spec — the canon), `docs/gameplay/skill-framework.md`
 - `docs/conventions/code-style.md` §4 (determinism summary)
-- `shared/combat-vectors/` (golden-vector **format** `README.md` + the 9 committed vectors)
+- `shared/combat-vectors/` (golden-vector **format** `README.md` + the 14 committed vectors)
 - `tools/combat-baseline/README.md` (baseline generator + the deliberate baseline-update workflow — Phase 26)
 - `docs/gameplay/combat-framework.md` **§21** (server sim) + **§22** (golden suite + CI gate)
 - `docs/mvp/03-core-gameplay.md`, `docs/mvp/02-core-game-loop.md` (business truth); `docs/mvp/10-open-questions.md` CB1–CB6
@@ -31,7 +31,8 @@ that touches the sim on either side goes through these rules.
   golden vector bit-for-bit. The client never decides the canonical outcome.
 - **Balance stays in config.** Numbers (stats/coeff/rates/K/costs) are `combat_int` from config — the spec fixes
   *mechanism only*. **Never invent gameplay/balance** or silently close a CB open question (`[ĐỀ XUẤT]`/`[OPEN]` stays so
-  until product decides; record in `docs/mvp/10-open-questions.md`).
+  until product decides; record in `docs/mvp/10-open-questions.md`). Note: **CB4 energy/ultimate MECHANISM is now
+  implemented** (Phase 28, config-gated, default-OFF) but its NUMBERS stay `[OPEN]`; **CB3** aggro is still `[ĐỀ XUẤT]`.
 - **Golden vector is a living spec.** If you intentionally change sim behavior, update the golden
   vectors deliberately in the same change and explain WHY in the PR — never silently.
 - **Baseline discipline (Phase 26).** The `expected` baseline is generated from the **server** sim via
@@ -43,15 +44,17 @@ that touches the sim on either side goes through these rules.
 ## Verify
 Client and server must produce the identical `event_log` + `result` for the shared golden-vector fixtures — same
 sequence, same fields, not just the same final HP. A sim change with no corresponding golden-vector update (or vice
-versa) is incomplete. Scope: server sim = phase 24 (DONE); client sim = phase 25 (DONE); full vector suite + cross-impl
-CI gate = phase 26 (**DONE** — 9 vectors, `golden-vector` gate blocking on both `ci-server.yml` + `ci-client.yml`).
+versa) is incomplete. Scope: server sim = phase 24 (DONE); client sim = phase 25 (DONE); vector suite + cross-impl
+CI gate = phase 26 (**DONE**); **skill framework = phase 28 (DONE — 14 vectors)**, `golden-vector` gate blocking on both `ci-server.yml` + `ci-client.yml`.
 
-**Golden gate exists (Phase 26 — REUSE, don't reinvent):** 9 multi-scenario vectors in `shared/combat-vectors/`
-(basic/crit/miss/defeat/draw/multi-unit/mixed-crit/boundary), baseline **server-generated** by `tools/combat-baseline`
-(ProjectReference `GameTeam.Domain` — one `BattleSimulator`, no forked sim). Both test suites **auto-discover** vectors
-(`GoldenVectorTests` `[MemberData]`; `CombatVectorLoader.list_vector_files()`) — adding a vector needs no test-code change.
+**Golden gate exists (Phase 26/28 — REUSE, don't reinvent):** **14** multi-scenario vectors in `shared/combat-vectors/`
+(basic/crit/miss/defeat/draw/multi-unit/mixed-crit/boundary ×2 + **heal/buff/debuff/ultimate-energy/multi-effect**),
+baseline **server-generated** by `tools/combat-baseline` (ProjectReference `GameTeam.Domain` — one `BattleSimulator`, no
+forked sim). Both test suites **auto-discover** vectors (`GoldenVectorTests` `[MemberData]`; `CombatVectorLoader.list_vector_files()`) —
+adding a vector needs no test-code change; the **skill/energy input format** (`config_excerpt.skills` + `team_snapshot[].skills`)
+lives in all **3** loaders (`GoldenVectorLoader.cs`, `VectorInputParser.cs`, `combat_vector_loader.gd`) — change them in lockstep.
 CI gate `golden-vector` compares both sides to the same committed baseline (server ≡ client ≡ baseline). Negative-drift
-proven (server & client `+1` damage ⇒ gate red; revert ⇒ green).
+proven (server & client `+1` damage AND `+1` buff-magnitude ⇒ gate red; revert ⇒ green).
 
 **Server sim exists (Phase 24 — REUSE, don't reinvent):** pure engine at `GameTeam.Domain/Combat/`
 (`BattleSimulator.Simulate(BattleInput) → BattleOutput`; `Numerics/FixedPoint`, `Rng/Pcg32`, `Effects/EffectRegistry` +
@@ -59,7 +62,14 @@ proven (server & client `+1` damage ⇒ gate red; revert ⇒ green).
 (reads config via `IConfigProvider`). It is the **authority** — the phase-25 client sim replays/predicts and must match it
 bit-for-bit (golden vectors `vector_01`/`vector_02` pass; determinism N=200). Extend effects via the registry + config, never
 `switch(skillId)`; never add `float`/`double`/wall-clock/global RNG (guarded by `CombatPuritySourceScanTests` + NetArchTest).
-Energy/ultimate (§15, CB4 `[ĐỀ XUẤT]`) is wired but inactive — don't activate/close without product. Tests are the contract.
+Tests are the contract.
+
+**Skill framework exists (Phase 28 — REUSE, don't reinvent):** `EffectRegistry.CreateDefault` = damage/heal/apply_buff/apply_debuff
+(client mirrors it); buff/debuff = flat `atk/def/spd` modifier + `duration`, keyed `(source_skill_id,stat)` ⇒ **refresh-on-reapply**;
+`heal` emits `Healed`; energy-ultimate (§15) is **config-gated, default-OFF** (gains 0 ⇒ no `EnergyChanged` ⇒ Phase-26 vectors
+byte-identical). Adding a skill from existing effect types is **config-only**; a new effect type = 1 handler/side + additive enum +
+config + test. The only `effect_type ==` is the attack-vs-non-attack classification, never handler dispatch. CB4 numbers stay `[OPEN]`;
+`shield` + generic conditions are debt; real `config/skills`→battle wiring = phase 30. Canon: `docs/gameplay/skill-framework.md` + §23.
 
 ## Completion workflow (every combat task — mirrors CLAUDE.md §4.5/§4.6)
 1. Read the phase requirement + ADR-011 + the spec (§9–§20) before changing anything. 2. Search the repo for an existing

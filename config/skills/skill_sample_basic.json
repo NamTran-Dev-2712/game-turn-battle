@@ -3,5 +3,5 @@
   "id": "skill_sample_basic",
   "target": "single_enemy",
   "trigger": { "type": "cooldown", "value": 0 },
-  "effects": [ { "effect_type": "damage", "params": {} } ]
+  "effects": [ { "effect_type": "damage", "params": { "coeff_fixed": 1000 } } ]
 }

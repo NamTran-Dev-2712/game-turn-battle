@@ -1,11 +1,12 @@
+using GameTeam.Domain.Combat.Events;
 using GameTeam.Domain.Combat.Numerics;
 
 namespace GameTeam.Domain.Combat.Effects;
 
 /// <summary>
-/// Effect hồi máu — <b>handler mẫu thứ hai</b> chứng minh registry mở rộng được (chưa dùng trong 2 golden
-/// vector phase 23). Lượng hồi lấy từ config (<c>amount_fixed</c>, fixed-point) — data-driven, không
-/// hardcode. Tất định (không RNG/wall-clock). Sự kiện hồi máu chuyên biệt là phần của phase 28.
+/// Effect hồi máu (§23). Lượng hồi lấy từ config (<c>amount_fixed</c>, fixed-point) — data-driven, không
+/// hardcode. Tất định (không RNG/wall-clock). Phát <see cref="Healed"/> với lượng hồi <b>thực</b> (sau kẹp
+/// MaxHp) và HP còn lại; mục tiêu (ally/self) do simulator giải quyết theo target rule trước khi gọi.
 /// </summary>
 public sealed class HealEffectHandler : IEffectHandler
 {
@@ -23,6 +24,9 @@ public sealed class HealEffectHandler : IEffectHandler
     {
         long amountFixed = context.Effect.Param(AmountFixedParam);
         int heal = (int)FixedPoint.FromFixed(amountFixed);
-        context.Target.Heal(heal);
+
+        int before = context.Target.Hp;
+        int hpAfter = context.Target.Heal(heal);
+        context.Emit(new Healed(context.Target.ActorId, hpAfter - before, hpAfter));
     }
 }

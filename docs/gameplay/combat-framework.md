@@ -424,3 +424,47 @@ compute_damage(attacker, target, skill, crit):
   doc-sync ("Combat sim change") → review `combat-determinism`/`reviewer` → merge. **Cấm** regenerate baseline để che drift/bug.
 - **Negative đã kiểm (Phase 26):** `+1` vào `DamageEffectHandler.ComputeDamage` (server) ⇒ `run.sh check` exit 1 + 9/9 golden
   đỏ; `+1` ở `damage_effect_handler.gd` (client) ⇒ golden client đỏ. Revert ⇒ cả hai xanh.
+
+## 23. Skill framework — effect-data + handler registry — Phase 28  [CHỐT cơ chế; số liệu config]
+
+> Phase 28 **hiện thực** khung skill data-driven (ADR-004) trên cả hai sim (§21/§21.6) mà **không đổi** spec §9–§20. Skill =
+> effect-data; dispatch qua **registry** (không `switch(effect/skill)`). Chi tiết đầy đủ + cách thêm skill/effect:
+> [`skill-framework.md`](skill-framework.md). Cơ chế energy/ultimate (§15) **config-gated, mặc định TẮT** ⇒ 9 vector Phase 26
+> byte-identical. Số liệu balance vẫn `[OPEN]` (CB4 — `../mvp/10`).
+
+### 23.1 Skill riêng của unit + chọn skill mỗi lượt  [CHỐT]
+- Mỗi unit có thể mang bộ skill `{ basic, ultimate? }` (vắng ⇒ dùng basic skill dùng chung của trận — tương thích ngược).
+  `SkillDef` thêm `energy_cost`/`cooldown_rounds` (mặc định 0). Wiring `config/skills` thật theo `hero.skills[]` là **phase 30**.
+- **Chọn skill (§15):** cast **ultimate** nếu `ultimate != null && energy ≥ energy_cost && ultimate_cooldown == 0`; ngược lại **basic**.
+- **Tấn công vs không tấn công:** skill là *attack* nếu có ≥1 effect `damage`. Attack roll `hit` rồi (nếu trúng) `crit` đúng §16
+  (miss ⇒ không effect nào áp). Skill thuần heal/buff **không roll** ⇒ luôn áp, không tiêu RNG (giữ stream tất định).
+
+### 23.2 Giải mục tiêu (tập tối thiểu, tất định)  [CHỐT cơ chế; aggro nâng cao = CB3]
+- `single_enemy` (mặc định, gồm `default`) → địch sống slot nhỏ nhất; `single_ally` → đồng minh sống slot nhỏ nhất (gồm bản thân);
+  `self` → chính actor. Effect có `target` riêng ghi đè target rule của skill. Tie-break luôn kết bằng `actor_id`. Mỗi effect
+  **re-resolve** mục tiêu sống (xử lý mục tiêu chết giữa action — §14). Aggro/policy nâng cao vẫn là CB3 (phase sau).
+
+### 23.3 Năng lượng / ultimate (§15 kích hoạt, config-gated)  [CHỐT cơ chế; số liệu OPEN]
+- Người đánh `+on_attack` sau **basic**; người bị `damage` trúng mà **còn sống** `+on_hit`; cast ultimate `−energy_cost` và đặt
+  `ultimate_cooldown = cooldown_rounds`. Kẹp `[0, max]`. Phát `EnergyChanged` **chỉ khi giá trị đổi** (gain=0 ⇒ không phát ⇒ vector cũ y nguyên).
+  Thứ tự §15: `DamageApplied → (nếu sống) EnergyChanged(bị đánh)`; người đánh `… → EnergyChanged(người đánh) → ActionCompleted`.
+  Hồi chiêu giảm 1 tại `RoundStarted`.
+
+### 23.4 Buff/debuff = modifier chỉ số  [CHỐT]
+- `apply_buff` cộng / `apply_debuff` trừ modifier chỉ số phẳng lên `atk`/`def`/`spd`; `params = { atk?/def?/spd?: <độ lớn>, duration: N }`.
+  Chỉ số **hiệu dụng** = `clamp(nền + Σ delta, 0, +∞)`. Modifier khoá `(source_skill_id, stat)` ⇒ áp lại **refresh** (thay
+  amount+duration, **không chồng vô hạn**). Giảm 1 tại `RoundStarted`, hết ở 0 ⇒ `BuffExpired` (thứ tự: stat atk,def,spd; rồi source).
+  Sự kiện `BuffApplied(unit, source, stat, amount(có dấu), duration)`.
+
+### 23.5 Sự kiện mới + heal  [CHỐT]
+- `heal` phát `Healed(unit, amount, target_hp_after)` (amount = lượng hồi thực sau kẹp MaxHp). Thêm `BuffApplied`/`BuffExpired`/
+  và kích hoạt `EnergyChanged`. **Không** thêm sự kiện per-action `SkillCast` (sẽ đổi 9 vector cũ) — ultimate quan sát qua `EnergyChanged` + hiệu ứng.
+
+### 23.6 Golden + xác định  [CHỐT]
+- 5 vector mới (`vector_10`..`vector_14`) phủ heal/buff/debuff/ultimate-energy/multi-effect; baseline sinh từ server, khớp
+  **server ≡ client ≡ baseline** (§22, gate `golden-vector`). Negative đã kiểm hai phía: `+1` vào buff magnitude
+  (`StatModifierCore`) ⇒ vector_11/12/14 drift + golden đỏ; revert ⇒ xanh. Mọi effect tuân fixed-point + thứ tự tất định (không float/RNG global/wall-clock).
+
+### 23.7 Ngoài phạm vi (nợ)  [ghi rõ]
+- `shield` (giữ trong enum schema, chưa có handler) + hệ điều kiện tổng quát = **nợ tài liệu**; `trigger` (energy/cooldown) là cơ chế điều kiện hiện tại.
+- Số liệu balance ultimate/energy (CB4); nội dung skill đầy đủ; battle endpoint + wiring `config/skills` thật = **phase 30**+.

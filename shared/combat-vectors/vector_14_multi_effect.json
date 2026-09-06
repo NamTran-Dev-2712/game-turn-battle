@@ -1,0 +1,488 @@
+{
+  "format_version": 1,
+  "name": "vector_14_multi_effect",
+  "description": "Skill nhiều effect trong một hành động (§23): skill_shatter = [damage, apply_debuff def] cùng nhắm địch. Thứ tự effect cố định ⇒ DamageApplied trước (theo def hiện tại) rồi BuffApplied (giảm def cho vòng sau). Debuff re-apply mỗi vòng (refresh, không hết hạn khi còn cast). Năng lượng TẮT. VICTORY.",
+  "input": {
+    "config_version": "config@v1",
+    "seed": 2024,
+    "stage": {
+      "id": "stage_skill_multi",
+      "max_rounds": 30
+    },
+    "team_snapshot": {
+      "ally": [
+        {
+          "actor_id": "u_hero",
+          "hero_id": "hero_shatter",
+          "team": "ally",
+          "slot": 0,
+          "stats": {
+            "hp": 800,
+            "atk": 130,
+            "def": 60,
+            "spd": 100
+          },
+          "skills": {
+            "basic": "skill_shatter"
+          }
+        }
+      ],
+      "enemy": [
+        {
+          "actor_id": "u_enemy",
+          "hero_id": "hero_enemy",
+          "team": "enemy",
+          "slot": 0,
+          "stats": {
+            "hp": 400,
+            "atk": 80,
+            "def": 90,
+            "spd": 50
+          }
+        }
+      ]
+    },
+    "config_excerpt": {
+      "skill_basic": {
+        "coeff_fixed": 1000
+      },
+      "skills": {
+        "skill_shatter": {
+          "coeff_fixed": 1000,
+          "target_rule": "single_enemy",
+          "effects": [
+            {
+              "effect_type": "damage"
+            },
+            {
+              "effect_type": "apply_debuff",
+              "params": {
+                "def": 30,
+                "duration": 2
+              }
+            }
+          ]
+        }
+      },
+      "combat_rules": {
+        "def_constant_k": 300,
+        "min_damage": 1,
+        "crit_multiplier_fixed": 1500,
+        "accuracy_bp": 10000,
+        "crit_rate_bp": 0,
+        "max_rounds": 30,
+        "energy": {
+          "initial": 0,
+          "on_attack": 0,
+          "on_hit": 0,
+          "ultimate_cost": 100,
+          "max": 100
+        }
+      }
+    }
+  },
+  "expected": {
+    "event_log": [
+      {
+        "seq": 0,
+        "type": "RoundStarted",
+        "round": 1
+      },
+      {
+        "seq": 1,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 2,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 3,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 5834
+      },
+      {
+        "seq": 4,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 5,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7970
+      },
+      {
+        "seq": 6,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 100,
+        "target_hp_after": 300,
+        "crit": false
+      },
+      {
+        "seq": 7,
+        "type": "BuffApplied",
+        "unit": "u_enemy",
+        "source": "skill_shatter",
+        "stat": "def",
+        "amount": -30,
+        "duration": 2
+      },
+      {
+        "seq": 8,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 9,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 10,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 11,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 5442
+      },
+      {
+        "seq": 12,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 13,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2275
+      },
+      {
+        "seq": 14,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 67,
+        "target_hp_after": 733,
+        "crit": false
+      },
+      {
+        "seq": 15,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 16,
+        "type": "RoundEnded",
+        "round": 1
+      },
+      {
+        "seq": 17,
+        "type": "RoundStarted",
+        "round": 2
+      },
+      {
+        "seq": 18,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 19,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 20,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 4457
+      },
+      {
+        "seq": 21,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 22,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5045
+      },
+      {
+        "seq": 23,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 108,
+        "target_hp_after": 192,
+        "crit": false
+      },
+      {
+        "seq": 24,
+        "type": "BuffApplied",
+        "unit": "u_enemy",
+        "source": "skill_shatter",
+        "stat": "def",
+        "amount": -30,
+        "duration": 2
+      },
+      {
+        "seq": 25,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 26,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 27,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 28,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2428
+      },
+      {
+        "seq": 29,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 30,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 8177
+      },
+      {
+        "seq": 31,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 67,
+        "target_hp_after": 666,
+        "crit": false
+      },
+      {
+        "seq": 32,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 33,
+        "type": "RoundEnded",
+        "round": 2
+      },
+      {
+        "seq": 34,
+        "type": "RoundStarted",
+        "round": 3
+      },
+      {
+        "seq": 35,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 36,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 37,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 202
+      },
+      {
+        "seq": 38,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 39,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5238
+      },
+      {
+        "seq": 40,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 108,
+        "target_hp_after": 84,
+        "crit": false
+      },
+      {
+        "seq": 41,
+        "type": "BuffApplied",
+        "unit": "u_enemy",
+        "source": "skill_shatter",
+        "stat": "def",
+        "amount": -30,
+        "duration": 2
+      },
+      {
+        "seq": 42,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 43,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 44,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 45,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 9802
+      },
+      {
+        "seq": 46,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 47,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 6889
+      },
+      {
+        "seq": 48,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 67,
+        "target_hp_after": 599,
+        "crit": false
+      },
+      {
+        "seq": 49,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 50,
+        "type": "RoundEnded",
+        "round": 3
+      },
+      {
+        "seq": 51,
+        "type": "RoundStarted",
+        "round": 4
+      },
+      {
+        "seq": 52,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 53,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 54,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 1268
+      },
+      {
+        "seq": 55,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 56,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2388
+      },
+      {
+        "seq": 57,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 108,
+        "target_hp_after": 0,
+        "crit": false
+      },
+      {
+        "seq": 58,
+        "type": "Death",
+        "unit": "u_enemy"
+      },
+      {
+        "seq": 59,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 60,
+        "type": "RoundEnded",
+        "round": 4
+      },
+      {
+        "seq": 61,
+        "type": "BattleEnded"
+      }
+    ],
+    "result": {
+      "outcome": "VICTORY",
+      "winner_team": "ally",
+      "rounds": 4,
+      "final_hp": {
+        "u_hero": 599,
+        "u_enemy": 0
+      }
+    }
+  }
+}

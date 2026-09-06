@@ -9,22 +9,25 @@ namespace GameTeam.Domain.Combat;
 
 /// <summary>
 /// Bộ mô phỏng combat <b>thuần, tất định</b> — nguồn chân lý kết quả trận (ADR-011, combat-framework.md
-/// §12–§19). Không I/O, không wall-clock, không float, không RNG global. Cùng <see cref="BattleInput"/> ⇒
+/// §12–§19, §23). Không I/O, không wall-clock, không float, không RNG global. Cùng <see cref="BattleInput"/> ⇒
 /// cùng <see cref="BattleOutput"/> bit-for-bit. Seed truyền tường minh; một <see cref="Pcg32"/> stream/trận.
-/// Effect định tuyến qua <see cref="EffectRegistry"/> (không switch skill trong lõi).
+/// Effect định tuyến qua <see cref="EffectRegistry"/> (không switch skill trong lõi). Skill/effect data-driven:
+/// mỗi đơn vị chọn basic/ultimate theo năng lượng+hồi chiêu (§15); buff/debuff áp qua modifier chỉ số (§23).
 /// </summary>
 public sealed class BattleSimulator
 {
     private const string TeamAlly = "ally";
     private const string TeamEnemy = "enemy";
     private const int RollBound = 10000; // basis points [0,10000)
+    private const string TargetSingleAlly = "single_ally";
+    private const string TargetSelf = "self";
 
     private readonly EffectRegistry _registry;
 
     /// <summary>Tạo simulator với registry effect tuỳ biến.</summary>
     public BattleSimulator(EffectRegistry registry) => _registry = Guard.NotNull(registry);
 
-    /// <summary>Tạo simulator với registry mặc định (<c>damage</c> + <c>heal</c>).</summary>
+    /// <summary>Tạo simulator với registry mặc định (§23: damage/heal/apply_buff/apply_debuff).</summary>
     public BattleSimulator()
         : this(EffectRegistry.CreateDefault())
     {
@@ -52,7 +55,7 @@ public sealed class BattleSimulator
         for (int round = 1; round <= maxRounds; round++)
         {
             roundsPlayed = round;
-            log.Add(new RoundStarted(round));
+            StartRound(allies, enemies, round, log);
 
             foreach (UnitState actor in BuildActionOrder(all))
             {
@@ -66,7 +69,7 @@ public sealed class BattleSimulator
                     break;
                 }
 
-                ExecuteAttack(actor, all, input.BasicSkill, rules, rng, log);
+                ExecuteAction(actor, all, input.BasicSkill, rules, rng, log);
 
                 if (IsEnded(allies, enemies))
                 {
@@ -99,58 +102,148 @@ public sealed class BattleSimulator
     private static bool HasLivingEnemy(List<UnitState> all, UnitState actor) =>
         all.Any(u => !string.Equals(u.Team, actor.Team, StringComparison.Ordinal) && u.IsAlive);
 
-    private static UnitState? ResolveTarget(List<UnitState> all, UnitState actor) =>
-        all.Where(u => !string.Equals(u.Team, actor.Team, StringComparison.Ordinal) && u.IsAlive)
+    /// <summary>
+    /// Đầu vòng (§23): phát <see cref="RoundStarted"/>, rồi giảm 1 vòng mọi buff/debuff (phát
+    /// <see cref="BuffExpired"/> theo thứ tự tất định) và giảm hồi chiêu ultimate. Chỉ tick đơn vị còn sống;
+    /// với vector không dùng buff/năng lượng (mặc định tắt) ⇒ không phát thêm sự kiện (byte-identical phase 24/26).
+    /// </summary>
+    private static void StartRound(List<UnitState> allies, List<UnitState> enemies, int round, List<CombatEvent> log)
+    {
+        log.Add(new RoundStarted(round));
+
+        foreach (UnitState unit in TickOrder(allies, enemies))
+        {
+            if (!unit.IsAlive)
+            {
+                continue;
+            }
+
+            foreach (StatModifier expired in unit.TickModifiers())
+            {
+                log.Add(new BuffExpired(unit.ActorId, expired.SourceSkillId, StatKinds.Name(expired.Stat)));
+            }
+
+            unit.TickUltimateCooldown();
+        }
+    }
+
+    private static IEnumerable<UnitState> TickOrder(List<UnitState> allies, List<UnitState> enemies) =>
+        allies.OrderBy(u => u.Slot).ThenBy(u => u.ActorId, StringComparer.Ordinal)
+            .Concat(enemies.OrderBy(u => u.Slot).ThenBy(u => u.ActorId, StringComparer.Ordinal));
+
+    /// <summary>Chọn skill lượt này (§15): ultimate nếu đủ năng lượng và hết hồi chiêu, ngược lại basic.</summary>
+    private static (SkillDef Skill, bool IsUltimate) SelectSkill(UnitState actor, SkillDef fallbackBasic)
+    {
+        SkillDef basic = actor.Skills?.Basic ?? fallbackBasic;
+        SkillDef? ultimate = actor.Skills?.Ultimate;
+        if (ultimate is not null && actor.Energy >= ultimate.EnergyCost && actor.UltimateCooldownRemaining == 0)
+        {
+            return (ultimate, true);
+        }
+
+        return (basic, false);
+    }
+
+    private static bool IsAttackSkill(SkillDef skill) =>
+        skill.Effects.Any(e => string.Equals(e.EffectType, DamageEffectHandler.TypeName, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Giải mục tiêu theo target rule (§23, tập tối thiểu tất định): <c>single_ally</c> = đồng minh sống slot
+    /// nhỏ nhất (gồm cả bản thân); <c>self</c> = chính actor; còn lại (kể cả <c>default</c>) = kẻ địch sống
+    /// slot nhỏ nhất — tie-break kết bằng <c>actor_id</c>. Aggro/target nâng cao (CB3) là phase sau.
+    /// </summary>
+    private static UnitState? ResolveByRule(List<UnitState> all, UnitState actor, string rule)
+    {
+        if (string.Equals(rule, TargetSelf, StringComparison.Ordinal))
+        {
+            return actor.IsAlive ? actor : null;
+        }
+
+        bool wantAlly = string.Equals(rule, TargetSingleAlly, StringComparison.Ordinal);
+        return all
+            .Where(u => u.IsAlive
+                && (string.Equals(u.Team, actor.Team, StringComparison.Ordinal) == wantAlly))
             .OrderBy(u => u.Slot)
             .ThenBy(u => u.ActorId, StringComparer.Ordinal)
             .FirstOrDefault();
+    }
 
-    private void ExecuteAttack(
+    private void ExecuteAction(
         UnitState actor,
         List<UnitState> all,
-        SkillDef skill,
+        SkillDef fallbackBasic,
         CombatRules rules,
         Pcg32 rng,
         List<CombatEvent> log)
     {
+        (SkillDef skill, bool isUltimate) = SelectSkill(actor, fallbackBasic);
         log.Add(new ActionStarted(actor.ActorId));
 
-        UnitState? target = ResolveTarget(all, actor);
-        if (target is null)
+        UnitState? primary = ResolveByRule(all, actor, skill.TargetRule);
+        if (primary is null)
         {
             log.Add(new ActionCompleted(actor.ActorId));
             return;
         }
 
-        log.Add(new TargetSelected(actor.ActorId, target.ActorId));
+        log.Add(new TargetSelected(actor.ActorId, primary.ActorId));
 
-        int hitRoll = (int)rng.Bounded(RollBound);
-        log.Add(new RandomRoll("hit", RollBound, hitRoll));
-        if (hitRoll >= rules.AccuracyBp)
+        bool crit = false;
+        if (IsAttackSkill(skill))
         {
-            log.Add(new Miss(actor.ActorId, target.ActorId));
-            log.Add(new ActionCompleted(actor.ActorId));
-            return;
-        }
+            int hitRoll = (int)rng.Bounded(RollBound);
+            log.Add(new RandomRoll("hit", RollBound, hitRoll));
+            if (hitRoll >= rules.AccuracyBp)
+            {
+                log.Add(new Miss(actor.ActorId, primary.ActorId));
+                log.Add(new ActionCompleted(actor.ActorId));
+                return;
+            }
 
-        log.Add(new Hit(actor.ActorId, target.ActorId));
+            log.Add(new Hit(actor.ActorId, primary.ActorId));
 
-        int critRoll = (int)rng.Bounded(RollBound); // luôn tiêu thụ sau Hit, kể cả crit_rate_bp==0
-        log.Add(new RandomRoll("crit", RollBound, critRoll));
-        bool crit = critRoll < rules.CritRateBp;
-        if (crit)
-        {
-            log.Add(new Crit(actor.ActorId, target.ActorId));
+            int critRoll = (int)rng.Bounded(RollBound); // luôn tiêu thụ sau Hit, kể cả crit_rate_bp==0
+            log.Add(new RandomRoll("crit", RollBound, critRoll));
+            crit = critRoll < rules.CritRateBp;
+            if (crit)
+            {
+                log.Add(new Crit(actor.ActorId, primary.ActorId));
+            }
         }
 
         foreach (EffectDef effect in skill.Effects)
         {
-            IEffectHandler handler = _registry.Resolve(effect.EffectType);
+            string rule = effect.Target ?? skill.TargetRule;
+            UnitState? target = ResolveByRule(all, actor, rule);
+            if (target is null)
+            {
+                continue; // không còn mục tiêu hợp lệ cho effect này ⇒ bỏ qua (vd không còn đồng minh để buff)
+            }
+
             var context = new EffectContext(actor, target, skill, effect, rules, crit, log);
-            handler.Apply(context);
+            _registry.Resolve(effect.EffectType).Apply(context);
         }
 
+        UpdateAttackerEnergy(actor, skill, isUltimate, rules, log);
         log.Add(new ActionCompleted(actor.ActorId));
+    }
+
+    /// <summary>§15: ultimate tiêu năng lượng + đặt hồi chiêu; đòn thường nạp on_attack. Phát <see cref="EnergyChanged"/> khi giá trị đổi.</summary>
+    private static void UpdateAttackerEnergy(UnitState actor, SkillDef skill, bool isUltimate, CombatRules rules, List<CombatEvent> log)
+    {
+        if (isUltimate)
+        {
+            if (actor.SpendEnergy(skill.EnergyCost))
+            {
+                log.Add(new EnergyChanged(actor.ActorId, actor.Energy));
+            }
+
+            actor.SetUltimateCooldown(skill.CooldownRounds);
+        }
+        else if (actor.AddEnergy(rules.Energy.OnAttack, rules.Energy.Max))
+        {
+            log.Add(new EnergyChanged(actor.ActorId, actor.Energy));
+        }
     }
 
     private static bool IsEnded(List<UnitState> allies, List<UnitState> enemies) =>

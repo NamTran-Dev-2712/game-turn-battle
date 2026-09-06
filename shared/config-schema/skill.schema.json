@@ -15,7 +15,7 @@
     },
     "trigger": {
       "type": "object",
-      "description": "Điều kiện kích hoạt (energy/cooldown). value là số cấu trúc, giá trị thật là tuning.",
+      "description": "Điều kiện kích hoạt (energy/cooldown). value là số cấu trúc, giá trị thật là tuning. Khi type=energy, value là energy_cost (chi phí năng lượng để cast ultimate — §15 combat-framework).",
       "required": ["type", "value"],
       "properties": {
         "type": {
@@ -26,6 +26,10 @@
         "value": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
       },
       "additionalProperties": false
+    },
+    "cooldown": {
+      "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+      "description": "Số vòng hồi chiêu sau khi cast (tuỳ chọn; mặc định 0 = không hồi chiêu). Số vòng thật là tuning. §15 combat-framework."
     },
     "effects": {
       "type": "array",
@@ -47,7 +51,33 @@
           },
           "params": {
             "type": "object",
-            "description": "Tham số riêng của effect_type (vd power, duration). Cấu trúc/giá trị chi tiết theo từng effect là phase feature — để mở ở phase 06."
+            "description": "Tham số riêng của effect_type (magnitude/duration...). Giá trị thật là tuning (ADR-004). Các key dưới là structural, ràng buộc kiểu khi có mặt; giữ mở cho loại effect tương lai. Ngữ nghĩa từng effect: ../../docs/gameplay/skill-framework.md.",
+            "properties": {
+              "coeff_fixed": {
+                "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+                "description": "damage: hệ số sát thương fixed-point (FIXED_SCALE=1000). Ghi đè coeff cấp skill nếu có."
+              },
+              "amount_fixed": {
+                "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+                "description": "heal: lượng hồi máu fixed-point (FIXED_SCALE=1000)."
+              },
+              "atk": {
+                "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+                "description": "apply_buff/apply_debuff: độ lớn (dương) thay đổi chỉ số atk. buff cộng, debuff trừ."
+              },
+              "def": {
+                "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+                "description": "apply_buff/apply_debuff: độ lớn (dương) thay đổi chỉ số def."
+              },
+              "spd": {
+                "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+                "description": "apply_buff/apply_debuff: độ lớn (dương) thay đổi chỉ số spd."
+              },
+              "duration": {
+                "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+                "description": "apply_buff/apply_debuff: số vòng hiệu lực; giảm 1 tại RoundStarted, hết ở 0."
+              }
+            }
           }
         },
         "additionalProperties": false

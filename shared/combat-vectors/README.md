@@ -5,8 +5,8 @@
 > phải sinh **cùng `event_log` + cùng `result`, từng bit**. Đây là **định dạng chuẩn**; canon cơ chế nằm ở
 > [`../../docs/gameplay/combat-framework.md`](../../docs/gameplay/combat-framework.md) (§9–§20) + [`ADR-011`](../../docs/adr/ADR-011-combat-authority-and-determinism.md).
 >
-> **Phạm vi Phase 23:** định dạng + **1–2 vector mẫu** (đã kiểm tham chiếu). **Bộ vector đầy đủ + CI gate cross-impl =
-> phase 26.** Không code sim ở đây.
+> **Lịch sử:** định dạng + vector mẫu = Phase 23; bộ 9 vector + CI gate cross-impl = Phase 26; **vector skill (heal/buff/
+> debuff/ultimate/multi-effect) + định dạng skill riêng của unit = Phase 28** (§23). Không code sim ở đây.
 
 ## Nội dung
 
@@ -39,6 +39,22 @@ Khoá `snake_case`. Thứ tự phần tử trong `event_log` là **có nghĩa** 
 | `stage` | object | ✔ | `{ id: string, max_rounds: int }`. |
 | `team_snapshot` | object | ✔ | `{ ally: Unit[], enemy: Unit[] }` (§9). |
 | `config_excerpt` | object | ✔ (ở mẫu) | **Lát cắt balance** cần để chạy vector **tự chứa** (không cần Config Service). Ở production các giá trị này đến từ `config_version`; ở đây nhúng để 24–25 kiểm sơ bộ. |
+
+**Skill riêng của unit (§23, tuỳ chọn — Phase 28):** một `Unit` có thể mang `"skills": { "basic": "<skill_id>", "ultimate": "<skill_id>"? }`
+tham chiếu vào `config_excerpt.skills` (bảng skill). **Vắng ⇒ dùng `skill_basic` dùng chung** (đòn thường 1 effect `damage`) —
+tương thích ngược 9 vector Phase 26. Mỗi entry trong `config_excerpt.skills` (lát cắt combat):
+
+```jsonc
+"skills": {
+  "skill_hero_ult": {
+    "coeff_fixed": 2500,          // hệ số damage (nếu có effect damage)
+    "target_rule": "single_enemy", // single_enemy(mặc định) | single_ally | self
+    "energy_cost": 100,            // §15: năng lượng cần để cast (ultimate); 0 = đòn thường
+    "cooldown_rounds": 3,          // §15: hồi chiêu sau cast; 0 = không
+    "effects": [ { "effect_type": "damage" } ]   // effect-data: { effect_type, target?, params? }
+  }
+}
+```
 
 **`Unit`** (một phần tử trong `ally`/`enemy`):
 
@@ -85,7 +101,10 @@ tỉ lệ lưu **basis points** (`[0..10000]`), còn lại integer:
 | `Crit` | `actor`, `target` | Chỉ phát khi crit (roll < `crit_rate_bp`). |
 | `DamageApplied` | `actor`, `target`, `amount:int`, `target_hp_after:int`, `crit:bool` | Damage integer cuối (§17). |
 | `Death` | `unit:actor_id` | Ngay sau `DamageApplied` khiến `hp==0`, trước `ActionCompleted`. |
-| `EnergyChanged` | `unit`, `energy_after:int` | (Khi energy bật — §15; mẫu tắt energy.) |
+| `EnergyChanged` | `unit`, `energy_after:int` | §15: nạp on_attack (người đánh)/on_hit (người trúng còn sống) hoặc spend khi cast ultimate. **Chỉ phát khi giá trị đổi** (gain=0 ⇒ không phát). |
+| `Healed` | `unit`, `amount:int`, `target_hp_after:int` | §23: hồi máu (`amount` = lượng thực sau kẹp MaxHp). |
+| `BuffApplied` | `unit`, `source`, `stat:"atk"\|"def"\|"spd"`, `amount:int` (có dấu), `duration:int` | §23: áp modifier chỉ số (buff dương / debuff âm). |
+| `BuffExpired` | `unit`, `source`, `stat` | §23: modifier hết hạn, phát tại `RoundStarted` theo thứ tự (stat: atk,def,spd; rồi source). |
 | `BattleEnded` | — | Sự kiện cuối, trước `result`. |
 
 ### `expected.result`
@@ -132,6 +151,11 @@ Baseline (`expected`) của MỌI vector sinh từ **sim server** bằng `tools/
 | `vector_07_mixed_crit` | crit_rate_bp=5000 ⇒ **crit lẫn thường** trong cùng trận |
 | `vector_08_boundary_lethal` | damage **==** HP ⇒ `target_hp_after=0` + Death (biên chết) |
 | `vector_09_boundary_survive` | damage **<** HP ⇒ `target_hp_after=1`, KHÔNG Death (biên sống) |
+| `vector_10_heal` | Skill **heal** (single_ally): healer hồi máu tank bị đánh ⇒ **Healed** (§28) |
+| `vector_11_buff` | Skill **buff** (apply_buff atk, ultimate cooldown-gated) ⇒ **BuffApplied**→sát thương tăng→**BuffExpired** (§28) |
+| `vector_12_debuff` | Skill **debuff** (apply_debuff def) ⇒ BuffApplied delta âm→xuyên def→BuffExpired (§28) |
+| `vector_13_ultimate_energy` | **Ultimate theo năng lượng** (§15): nạp `on_attack` tới ngưỡng ⇒ cast ultimate (**EnergyChanged** + hồi chiêu) (§28) |
+| `vector_14_multi_effect` | Một skill **nhiều effect** `[damage, apply_debuff]` cùng action — thứ tự effect cố định (§28) |
 
 Test hai phía **tự khám phá** mọi `*.json` (server `GoldenVectorTests` `[MemberData]`; client
 `CombatVectorLoader.list_vector_files()`) ⇒ thêm vector = KHÔNG sửa code test. Gate CI `golden-vector`
@@ -140,8 +164,16 @@ Test hai phía **tự khám phá** mọi `*.json` (server `GoldenVectorTests` `[
 **Cập nhật baseline CÓ CHỦ ĐÍCH:** xem `tools/combat-baseline/README.md` (đổi công thức → regenerate → review diff →
 ghi WHY → doc-sync). Không sửa baseline âm thầm.
 
+## Skill/effect vectors (Phase 28 — đã hiện thực)
+
+`vector_10`..`vector_14` phủ **skill framework** (§23): heal (Healed), buff/debuff (BuffApplied/BuffExpired + modifier chỉ số),
+ultimate theo năng lượng (§15: EnergyChanged + cooldown), và skill nhiều effect. Cơ chế energy/ultimate **config-gated, mặc
+định TẮT** (gain=0) ⇒ 9 vector cũ **byte-identical**; vector Phase 28 bật energy/buff bằng `config_excerpt.skills` + `team_snapshot[].skills`.
+Cơ chế canon ở [`combat-framework.md`](../../docs/gameplay/combat-framework.md) §23 + [`skill-framework.md`](../../docs/gameplay/skill-framework.md).
+
 ## Ngoài phạm vi
 
-- Vector cho **ultimate/energy** (CB4 `[ĐỀ XUẤT]`, chưa canon) + skill/effect mới = **phase 28** (mở rộng vector khi có).
+- `shield` handler + hệ điều kiện tổng quát (generic conditions) = **nợ tài liệu** (Post-MVP); `trigger` (energy/cooldown) là cơ chế điều kiện hiện tại.
+- Số liệu balance ultimate/energy (CB4) vẫn `[OPEN]` — cơ chế đã canon, giá trị production do product/tuning.
 - Signed/secure vector, nén, delta = Post-MVP.
-- Hiện thực sim (24/25), Hero/Skill thật (27/28) — không thuộc đây.
+- Battle endpoint + wiring `config/skills` thật theo `hero.skills[]` = **phase 30**; nội dung skill đầy đủ = phase sau.

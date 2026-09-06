@@ -940,6 +940,41 @@ Canonical: `docs/gameplay/hero-system.md` §7 + `docs/backend/domain-and-applica
   `.instructions/backend.md`/`client.md`/`config.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync**
   (doc-sync matrix, §5); the tests are the behavior contract — update them.
 
+**Skill framework is standardized (Phase 28 — closed & verified).** A skill is **effect-data + a handler registry** (ADR-004),
+implemented **bit-for-bit on both sims** (server `GameTeam.Domain/Combat/`, client `client/src/combat/`) and guarded by the
+two-sided golden gate (Phase 26). Dispatch is by **`effect_type` through `EffectRegistry`** — **never** a `switch(effect_type/skill)`.
+Base effects: **`damage`** (§17), **`heal`** (emits `Healed`), **`apply_buff`/`apply_debuff`** (flat integer `atk/def/spd` modifier +
+`duration` rounds, keyed `(source_skill_id, stat)` ⇒ **refresh-on-reapply, never stacks**; `BuffApplied`/`BuffExpired` ticked at
+`RoundStarted`), plus **energy-triggered ultimate** (§15: `on_attack`/`on_hit` accrual, `energy_cost`/`cooldown_rounds`, `EnergyChanged`).
+Energy/ultimate is **config-gated, default-OFF** (gains `0` ⇒ no `EnergyChanged` ⇒ the **9 Phase-26 vectors stay byte-identical**);
+`vector_10..14` exercise heal/buff/debuff/ultimate/multi-effect via `config_excerpt.skills` + `team_snapshot[].skills`. Each unit
+optionally carries a skill set `{basic, ultimate?}` (absent ⇒ shared basic skill); per-effect target resolution is a **minimal
+deterministic subset** (`single_enemy`(default)/`single_ally`/`self`) — richer aggro (CB3) is later. `skill.schema.json` gained typed
+`params` (`coeff_fixed/amount_fixed/atk/def/spd/duration`) + `cooldown` (**additive — no `schema_version` bump**). Canonical:
+`docs/gameplay/skill-framework.md` + `docs/gameplay/combat-framework.md` §23; decision log: `.memory/0026-skill-framework-standardized.md`.
+
+- Future agents **MUST reuse** `EffectRegistry`/`IEffectHandler` (server) + `EffectRegistry`/`EffectHandler` (client),
+  `StatModifierCore`, `UnitSkillSet`, `BattleSimulator` before adding any skill/effect; **MUST NOT** fork a second registry/sim,
+  add a `switch(effect_type)`/`switch(skillId)` dispatch, hardcode a special skill in the core, use `float`/wall-clock/global RNG in
+  the sim, or read config from the filesystem in the sim. The only `effect_type ==` allowed is the **attack-vs-non-attack**
+  classification (business logic deciding hit/crit rolls), never handler dispatch.
+- **Adding a skill that uses existing effect types is CONFIG-ONLY** (no core change — proven by
+  `New_skill_via_config_only_runs_without_core_change` + client `test_new_skill_via_config_only_runs`). A **new effect type** = one
+  handler per side registered in `create_default()`/`CreateDefault()` + additive enum in `skill.schema.json` + config + tests
+  (+ a golden vector if covered). Extend via the registry, never a central switch (OCP).
+- **Determinism & golden are binding (ADR-011):** every effect is integer/fixed-point with a fixed effect/target/turn order;
+  the baseline is **server-generated** and the client must match it — **never** hand-edit a vector's `expected` or regenerate to
+  hide drift (regenerate deliberately + explain WHY). Energy/ultimate NUMBERS stay `[OPEN]` (CB4); `shield` + generic conditions are
+  documented debt; real `config/skills`→battle wiring via `hero.skills[]` + a battle endpoint are **phase 30**.
+- When changing the skill framework, keep **`GameTeam.Domain/Combat/{Effects,Model,State,Events}/*` + `BattleSimulator` +
+  `GameTeam.Application/Combat/{SkillCombatConfig,HeroCombatConfig,CombatInputResolver}` + client `client/src/combat/**` +
+  `shared/config-schema/skill.schema.json` + `config/skills|heroes/*` + the 3 golden loaders (`GoldenVectorLoader.cs`,
+  `tools/combat-baseline/.../VectorInputParser.cs`, `client/tests/combat/support/combat_vector_loader.gd`) +
+  `shared/combat-vectors/{README.md,vector_10..14}` + all combat tests (behavior contract) + `docs/gameplay/skill-framework.md` +
+  `docs/gameplay/combat-framework.md` §23 + `docs/mvp/10-open-questions.md` (CB4) + `.instructions/combat.md`/`backend.md`/`client.md`/`config.md`
+  + `.claude/agents/combat-determinism.md`/`dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the golden vectors +
+  combat tests are the behavior contract — regenerate the baseline deliberately and update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

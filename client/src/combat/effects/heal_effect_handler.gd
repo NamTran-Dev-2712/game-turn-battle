@@ -1,7 +1,7 @@
 class_name HealEffectHandler
-## Effect `heal` — hồi máu theo `amount_fixed` (fixed-point). Khớp server `Effects/HealEffectHandler.cs`:
-## ở phase 25 **không phát sự kiện** (heal event là phase 28). Không dùng trong 2 golden vector nhưng
-## đăng ký sẵn để registry song ánh server.
+## Effect `heal` (§23) — hồi máu theo `amount_fixed` (fixed-point). Khớp server `Effects/HealEffectHandler.cs`:
+## phát `Healed` với lượng hồi **thực** (sau kẹp max_hp) + HP còn lại; mục tiêu (ally/self) do simulator giải
+## quyết theo target rule trước khi gọi.
 extends EffectHandler
 
 const TYPE_NAME: String = "heal"
@@ -14,4 +14,6 @@ func effect_type() -> String:
 
 func apply(ctx: EffectContext) -> void:
 	var heal_amount := FixedPoint.from_fixed(ctx.effect.param(AMOUNT_FIXED_PARAM))
-	ctx.target.heal(heal_amount)
+	var before := ctx.target.hp
+	var hp_after := ctx.target.heal(heal_amount)
+	ctx.emit(CombatEvents.healed(ctx.target.actor_id(), hp_after - before, hp_after))

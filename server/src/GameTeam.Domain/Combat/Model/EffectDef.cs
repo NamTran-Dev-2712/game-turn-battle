@@ -3,9 +3,10 @@ namespace GameTeam.Domain.Combat.Model;
 /// <summary>
 /// Dữ liệu một effect nguyên thủy trong một skill (skill-framework.md, ADR-004): <see cref="EffectType"/>
 /// định tuyến tới handler trong registry; <see cref="Params"/> là tham số tuỳ effect (đọc từ config —
-/// không hardcode). Mở rộng gameplay = thêm effect_type + handler + config, KHÔNG sửa lõi (OCP).
+/// không hardcode); <see cref="Target"/> (tuỳ chọn) ghi đè target rule của skill cho riêng effect này
+/// (§23, vd damage vào enemy + self-buff). Mở rộng gameplay = thêm effect_type + handler + config, KHÔNG sửa lõi (OCP).
 /// </summary>
-public sealed record EffectDef(string EffectType, IReadOnlyDictionary<string, long> Params)
+public sealed record EffectDef(string EffectType, IReadOnlyDictionary<string, long> Params, string? Target = null)
 {
     /// <summary>Tạo effect không tham số (ví dụ <c>damage</c> — hệ số lấy từ skill/combat rules).</summary>
     public EffectDef(string effectType)
@@ -26,4 +27,7 @@ public sealed record EffectDef(string EffectType, IReadOnlyDictionary<string, lo
 
         return value;
     }
+
+    /// <summary>Thử đọc tham số tuỳ chọn theo khoá (dùng cho buff/debuff nhiều chỉ số — key vắng ⇒ bỏ qua).</summary>
+    public bool TryParam(string key, out long value) => Params.TryGetValue(key, out value);
 }

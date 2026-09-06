@@ -25,12 +25,18 @@ static func build_input(input_dict: Dictionary) -> BattleInput:
 	var team: Dictionary = input_dict.get("team_snapshot", {})
 	var max_rounds := int(stage_dict.get("max_rounds", 0))
 
+	# §23: bảng skill tuỳ chọn (config_excerpt.skills) cho skill riêng của unit/ultimate — vắng ⇒ rỗng.
+	var skills_by_id: Dictionary = {}
+	var skills_src: Dictionary = excerpt.get("skills", {})
+	for skill_id in skills_src:
+		skills_by_id[skill_id] = _build_skill(str(skill_id), skills_src[skill_id])
+
 	var input := BattleInput.new()
 	input.config_version = str(input_dict.get("config_version", ""))
 	input.seed = int(input_dict.get("seed", 0))
 	input.stage = StageInfo.make(str(stage_dict.get("id", "")), max_rounds)
-	input.ally = _units(team.get("ally", []))
-	input.enemy = _units(team.get("enemy", []))
+	input.ally = _units(team.get("ally", []), skills_by_id)
+	input.enemy = _units(team.get("enemy", []), skills_by_id)
 	input.rules = CombatRules.from_dict(excerpt.get("combat_rules", {}), max_rounds)
 
 	var skill_basic: Dictionary = excerpt.get("skill_basic", {})
@@ -62,11 +68,38 @@ static func list_vector_files() -> PackedStringArray:
 	return names
 
 
-static func _units(arr: Array) -> Array[UnitSnapshot]:
+static func _units(arr: Array, skills_by_id: Dictionary) -> Array[UnitSnapshot]:
 	var out: Array[UnitSnapshot] = []
 	for u in arr:
-		out.append(UnitSnapshot.from_dict(u))
+		var snapshot := UnitSnapshot.from_dict(u)
+		var d := u as Dictionary
+		if d.has("skills"):
+			var s := d["skills"] as Dictionary
+			var basic: SkillDef = skills_by_id[str(s.get("basic", ""))]
+			var ultimate: SkillDef = null
+			if s.has("ultimate"):
+				ultimate = skills_by_id[str(s["ultimate"])]
+			snapshot.skills = UnitSkillSet.make(basic, ultimate)
+		out.append(snapshot)
 	return out
+
+
+# Dựng SkillDef từ một entry trong config_excerpt.skills (khớp server GoldenVectorLoader.ParseSkill).
+static func _build_skill(skill_id: String, el: Dictionary) -> SkillDef:
+	var effects: Array[EffectDef] = []
+	for e in el.get("effects", []):
+		var ed := e as Dictionary
+		effects.append(EffectDef.make(
+			str(ed.get("effect_type", "")), ed.get("params", {}), str(ed.get("target", ""))))
+	if effects.is_empty():
+		effects.append(EffectDef.make(DamageEffectHandler.TYPE_NAME))
+	return SkillDef.make(
+		skill_id,
+		int(el.get("coeff_fixed", 0)),
+		str(el.get("target_rule", "default")),
+		effects,
+		int(el.get("energy_cost", 0)),
+		int(el.get("cooldown_rounds", 0)))
 
 
 # Đường tuyệt đối tới file vector: <repo>/shared/combat-vectors/<file>. `res://` = thư mục client/.

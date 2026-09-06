@@ -40,8 +40,10 @@
 > - **CB3 — cơ chế ĐỀ XUẤT (chờ product 🟠):** resolve target tất định (ứng viên = địch còn sống, sắp `(slot, actor_id)`,
 >   aggro **policy = config**, mặc định slot nhỏ nhất; re-resolve khi mục tiêu chết giữa action). Chi tiết lưới front/back
 >   phụ thuộc **GP5** (còn mở). §14.
-> - **CB4 — cơ chế ĐỀ XUẤT (chờ product 🟠):** energy-bar (initial/gain/cost/cooldown/cap = **config**); ultimate thay
->   đòn thường khi đủ energy & hết cooldown. Bật ultimate ở MVP hay không **vẫn mở**. §15.
+> - **CB4 — cơ chế ĐÃ HIỆN THỰC (config-gated, số liệu vẫn 🟠):** energy-bar (initial/gain/cost/cooldown/cap = **config**);
+>   ultimate thay đòn thường khi đủ energy & hết cooldown. **Phase 28** hiện thực cơ chế §15 ở cả hai sim (server/client),
+>   **mặc định TẮT** (gain=0 ⇒ 9 golden vector cũ byte-identical); vector_13 bật để kiểm. **Số liệu balance production
+>   (initial/gain/cost/cooldown/cap) + có bật ultimate ở MVP hay không vẫn `[OPEN]`** (tuning, do product chốt). §15/§23.
 > - **CB5 — cơ chế ĐÃ CHỐT (số liệu config):** hit/crit qua seeded PRNG, ngưỡng `accuracy_bp`/`crit_rate_bp` (bp). Thứ tự
 >   roll cố định (hit→crit); crit chỉ khi Hit; miss = không damage. Tắt ngẫu nhiên = `accuracy_bp=10000`, `crit_rate_bp=0`. §16.
 > - **CB6 — cơ chế ĐÃ CHỐT, số liệu mở (🟢):** thắng/thua/hoà theo §19; `max_rounds` (config) chạm ⇒ **DRAW**. **Độ dài

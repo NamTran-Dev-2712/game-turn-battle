@@ -1,7 +1,8 @@
 class_name BattleSimulator
-## Sim combat **thuần, xác định** phía client (combat-framework.md §12–§19, ADR-011). Hiện thực đúng
-## spec phase 23 và song ánh bit-for-bit với server `GameTeam.Domain/Combat/BattleSimulator.cs`
-## (phase 24 = đáp án). Cùng `(config_version, team, stage, seed)` ⇒ **cùng** `event_log` + `result`.
+## Sim combat **thuần, xác định** phía client (combat-framework.md §12–§19, §23, ADR-011). Hiện thực đúng
+## spec và song ánh bit-for-bit với server `GameTeam.Domain/Combat/BattleSimulator.cs` (đáp án). Cùng
+## `(config_version, team, stage, seed)` ⇒ **cùng** `event_log` + `result`. Skill/effect data-driven: mỗi
+## unit chọn basic/ultimate theo năng lượng+hồi chiêu (§15); buff/debuff áp qua modifier chỉ số (§23).
 ##
 ## LƯU Ý (ADR-011): client sim CHỈ để **hiển thị/replay/dự đoán**, KHÔNG phải chân lý — không quyết
 ## kết quả/phần thưởng. Lõi thuần: không Node/scene/UI/network/wall-clock, không `float`, không RNG
@@ -11,6 +12,8 @@ extends RefCounted
 const TEAM_ALLY: String = "ally"
 const TEAM_ENEMY: String = "enemy"
 const ROLL_BOUND: int = 10000
+const TARGET_SINGLE_ALLY: String = "single_ally"
+const TARGET_SELF: String = "self"
 
 
 ## Chạy trận. Trả `{ "event_log": Array[Dictionary], "result": Dictionary }` đúng golden format.
@@ -30,14 +33,14 @@ func simulate(input: BattleInput) -> Dictionary:
 
 	for round_no in range(1, input.rules.max_rounds + 1):
 		rounds_played = round_no
-		log.append(CombatEvents.round_started(round_no))
+		_start_round(allies, enemies, round_no, log)
 
 		for actor in _build_action_order(all):
 			if not actor.is_alive():
 				continue # chết ở lượt trước trong vòng ⇒ bỏ lượt
 			if not _has_living_enemy(all, actor):
 				break # hết địch ⇒ ngừng duyệt
-			_execute_attack(actor, all, input.basic_skill, input.rules, rng, registry, log)
+			_execute_action(actor, all, input.basic_skill, input.rules, rng, registry, log)
 			if _is_ended(allies, enemies):
 				ended = true
 				break
@@ -60,10 +63,34 @@ func _build_units(snapshots: Array[UnitSnapshot], initial_energy: int) -> Array[
 	return states
 
 
-# ── Thứ tự lượt & mục tiêu (§13/§14) ────────────────────────────────────────────────────────────────
+# ── Đầu vòng: tick buff (BuffExpired) + hồi chiêu ultimate (§23) ─────────────────────────────────────
+
+func _start_round(allies: Array[CombatUnitState], enemies: Array[CombatUnitState], round_no: int, log: Array) -> void:
+	log.append(CombatEvents.round_started(round_no))
+	for unit in _tick_order(allies, enemies):
+		if not unit.is_alive():
+			continue
+		for expired in unit.tick_modifiers():
+			log.append(CombatEvents.buff_expired(unit.actor_id(), expired["source"], expired["stat"]))
+		unit.tick_ultimate_cooldown()
+
+
+# Thứ tự tick tất định: đồng minh (slot asc, actor_id asc) rồi địch (slot asc, actor_id asc).
+func _tick_order(allies: Array[CombatUnitState], enemies: Array[CombatUnitState]) -> Array:
+	var a := allies.duplicate()
+	a.sort_custom(_target_before)
+	var e := enemies.duplicate()
+	e.sort_custom(_target_before)
+	var order: Array = []
+	order.append_array(a)
+	order.append_array(e)
+	return order
+
+
+# ── Thứ tự lượt & mục tiêu (§13/§14/§23) ────────────────────────────────────────────────────────────
 
 # Sắp xếp toàn bộ unit theo (-spd, actor_id ordinal asc). Comparator là thứ tự toàn phần (actor_id
-# duy nhất) ⇒ kết quả xác định không phụ thuộc tính ổn định của sort.
+# duy nhất) ⇒ kết quả xác định không phụ thuộc tính ổn định của sort. spd() = hiệu dụng (gồm buff).
 func _build_action_order(all: Array[CombatUnitState]) -> Array[CombatUnitState]:
 	var order: Array[CombatUnitState] = all.duplicate()
 	order.sort_custom(_action_order_before)
@@ -74,18 +101,6 @@ func _action_order_before(a: CombatUnitState, b: CombatUnitState) -> bool:
 	if a.spd() != b.spd():
 		return a.spd() > b.spd() # spd cao đi trước
 	return a.actor_id() < b.actor_id() # tie-break: actor_id ordinal tăng dần
-
-
-# Mục tiêu: unit sống ở đội đối phương, sắp (slot asc, actor_id asc), lấy đầu tiên. null nếu không có.
-func _resolve_target(actor: CombatUnitState, all: Array[CombatUnitState]) -> CombatUnitState:
-	var candidates: Array[CombatUnitState] = []
-	for u in all:
-		if u.team() != actor.team() and u.is_alive():
-			candidates.append(u)
-	if candidates.is_empty():
-		return null
-	candidates.sort_custom(_target_before)
-	return candidates[0]
 
 
 func _target_before(a: CombatUnitState, b: CombatUnitState) -> bool:
@@ -101,47 +116,103 @@ func _has_living_enemy(all: Array[CombatUnitState], actor: CombatUnitState) -> b
 	return false
 
 
-# ── Thực thi hành động (§16/§17) ────────────────────────────────────────────────────────────────────
+# Giải mục tiêu theo target rule (§23, tập tối thiểu): single_ally = đồng minh sống slot nhỏ nhất (gồm bản
+# thân); self = chính actor; còn lại (kể cả default) = kẻ địch sống slot nhỏ nhất — tie-break kết bằng actor_id.
+func _resolve_by_rule(actor: CombatUnitState, all: Array[CombatUnitState], rule: String) -> CombatUnitState:
+	if rule == TARGET_SELF:
+		return actor if actor.is_alive() else null
+	var want_ally := rule == TARGET_SINGLE_ALLY
+	var candidates: Array[CombatUnitState] = []
+	for u in all:
+		if u.is_alive() and ((u.team() == actor.team()) == want_ally):
+			candidates.append(u)
+	if candidates.is_empty():
+		return null
+	candidates.sort_custom(_target_before)
+	return candidates[0]
 
-func _execute_attack(
+
+# ── Thực thi hành động (§15/§16/§17/§23) ─────────────────────────────────────────────────────────────
+
+func _execute_action(
 	actor: CombatUnitState,
 	all: Array[CombatUnitState],
-	skill: SkillDef,
+	fallback_basic: SkillDef,
 	rules: CombatRules,
 	rng: Pcg32,
 	registry: EffectRegistry,
 	log: Array,
 ) -> void:
+	var selection := _select_skill(actor, fallback_basic)
+	var skill: SkillDef = selection[0]
+	var is_ultimate: bool = selection[1]
+
 	log.append(CombatEvents.action_started(actor.actor_id()))
 
-	var target := _resolve_target(actor, all)
-	if target == null:
+	var primary := _resolve_by_rule(actor, all, skill.target_rule)
+	if primary == null:
 		log.append(CombatEvents.action_completed(actor.actor_id()))
 		return
-	log.append(CombatEvents.target_selected(actor.actor_id(), target.actor_id()))
+	log.append(CombatEvents.target_selected(actor.actor_id(), primary.actor_id()))
 
-	# Hit roll — LUÔN tiêu thụ đúng 1 lần (miss ⇒ dừng, KHÔNG roll crit).
-	var hit_roll := rng.bounded(ROLL_BOUND)
-	log.append(CombatEvents.random_roll("hit", ROLL_BOUND, hit_roll))
-	if hit_roll >= rules.accuracy_bp:
-		log.append(CombatEvents.miss(actor.actor_id(), target.actor_id()))
-		log.append(CombatEvents.action_completed(actor.actor_id()))
-		return
-	log.append(CombatEvents.hit(actor.actor_id(), target.actor_id()))
+	var is_crit := false
+	if _is_attack_skill(skill):
+		# Hit roll — LUÔN tiêu thụ đúng 1 lần (miss ⇒ dừng, KHÔNG roll crit).
+		var hit_roll := rng.bounded(ROLL_BOUND)
+		log.append(CombatEvents.random_roll("hit", ROLL_BOUND, hit_roll))
+		if hit_roll >= rules.accuracy_bp:
+			log.append(CombatEvents.miss(actor.actor_id(), primary.actor_id()))
+			log.append(CombatEvents.action_completed(actor.actor_id()))
+			return
+		log.append(CombatEvents.hit(actor.actor_id(), primary.actor_id()))
 
-	# Crit roll — LUÔN tiêu thụ đúng 1 lần khi đã Hit (kể cả crit_rate_bp==0) ⇒ không lệch stream.
-	var crit_roll := rng.bounded(ROLL_BOUND)
-	log.append(CombatEvents.random_roll("crit", ROLL_BOUND, crit_roll))
-	var is_crit := crit_roll < rules.crit_rate_bp
-	if is_crit:
-		log.append(CombatEvents.crit(actor.actor_id(), target.actor_id()))
+		# Crit roll — LUÔN tiêu thụ đúng 1 lần khi đã Hit (kể cả crit_rate_bp==0) ⇒ không lệch stream.
+		var crit_roll := rng.bounded(ROLL_BOUND)
+		log.append(CombatEvents.random_roll("crit", ROLL_BOUND, crit_roll))
+		is_crit = crit_roll < rules.crit_rate_bp
+		if is_crit:
+			log.append(CombatEvents.crit(actor.actor_id(), primary.actor_id()))
 
 	for effect_def in skill.effects:
-		var handler := registry.resolve(effect_def.effect_type)
+		var rule: String = effect_def.target if effect_def.target != "" else skill.target_rule
+		var target := _resolve_by_rule(actor, all, rule)
+		if target == null:
+			continue # không còn mục tiêu hợp lệ cho effect này ⇒ bỏ qua
 		var ctx := EffectContext.new(actor, target, skill, effect_def, rules, is_crit, log)
-		handler.apply(ctx)
+		registry.resolve(effect_def.effect_type).apply(ctx)
 
+	_update_attacker_energy(actor, skill, is_ultimate, rules, log)
 	log.append(CombatEvents.action_completed(actor.actor_id()))
+
+
+# Chọn skill lượt này (§15): ultimate nếu đủ năng lượng và hết hồi chiêu, ngược lại basic. Trả [skill, is_ultimate].
+func _select_skill(actor: CombatUnitState, fallback_basic: SkillDef) -> Array:
+	var skill_set := actor.skills()
+	var basic: SkillDef = fallback_basic
+	var ultimate: SkillDef = null
+	if skill_set != null:
+		basic = skill_set.basic
+		ultimate = skill_set.ultimate
+	if ultimate != null and actor.energy >= ultimate.energy_cost and actor.ultimate_cooldown_remaining == 0:
+		return [ultimate, true]
+	return [basic, false]
+
+
+func _is_attack_skill(skill: SkillDef) -> bool:
+	for effect_def in skill.effects:
+		if effect_def.effect_type == DamageEffectHandler.TYPE_NAME:
+			return true
+	return false
+
+
+# §15: ultimate tiêu năng lượng + đặt hồi chiêu; đòn thường nạp on_attack. Phát EnergyChanged khi giá trị đổi.
+func _update_attacker_energy(actor: CombatUnitState, skill: SkillDef, is_ultimate: bool, rules: CombatRules, log: Array) -> void:
+	if is_ultimate:
+		if actor.spend_energy(skill.energy_cost):
+			log.append(CombatEvents.energy_changed(actor.actor_id(), actor.energy))
+		actor.set_ultimate_cooldown(skill.cooldown_rounds)
+	elif actor.add_energy(rules.energy.on_attack, rules.energy.max):
+		log.append(CombatEvents.energy_changed(actor.actor_id(), actor.energy))
 
 
 # ── Điều kiện kết thúc & kết quả (§19) ───────────────────────────────────────────────────────────────

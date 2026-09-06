@@ -17,6 +17,9 @@ func apply(ctx: EffectContext) -> void:
 	ctx.emit(CombatEvents.damage_applied(ctx.attacker.actor_id(), ctx.target.actor_id(), amount, hp_after, ctx.is_crit))
 	if hp_after == 0:
 		ctx.emit(CombatEvents.death(ctx.target.actor_id()))
+	# §15: bị đánh trúng và còn sống ⇒ nạp on_hit; chỉ phát khi năng lượng đổi (tắt ⇒ không phát).
+	elif ctx.target.add_energy(ctx.rules.energy.on_hit, ctx.rules.energy.max):
+		ctx.emit(CombatEvents.energy_changed(ctx.target.actor_id(), ctx.target.energy))
 
 
 ## Tính sát thương (§17). Thuần integer/fixed-point — KHÔNG float.

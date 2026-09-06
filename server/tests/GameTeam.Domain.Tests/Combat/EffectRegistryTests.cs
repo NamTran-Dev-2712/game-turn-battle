@@ -23,11 +23,13 @@ public class EffectRegistryTests
         new(new UnitSnapshot(id, "hero_sample", team, 0, new UnitStats(hp, atk, def, 100)), 0);
 
     [Fact]
-    public void Default_registry_resolves_damage_and_heal()
+    public void Default_registry_resolves_all_base_effect_handlers()
     {
         EffectRegistry registry = EffectRegistry.CreateDefault();
         registry.Resolve(DamageEffectHandler.TypeName).Should().BeOfType<DamageEffectHandler>();
         registry.Resolve(HealEffectHandler.TypeName).Should().BeOfType<HealEffectHandler>();
+        registry.Resolve(ApplyBuffEffectHandler.TypeName).Should().BeOfType<ApplyBuffEffectHandler>();
+        registry.Resolve(ApplyDebuffEffectHandler.TypeName).Should().BeOfType<ApplyDebuffEffectHandler>();
         registry.Has("damage").Should().BeTrue();
     }
 
@@ -98,5 +100,72 @@ public class EffectRegistryTests
         new HealEffectHandler().Apply(ctx);
 
         target.Hp.Should().Be(700); // +100
+    }
+
+    [Fact]
+    public void Heal_handler_emits_healed_event_with_actual_amount()
+    {
+        UnitState target = Unit("b", "ally", 1000, 150, 80);
+        target.ApplyDamage(400); // hp = 600
+        var effect = new EffectDef(
+            HealEffectHandler.TypeName,
+            new Dictionary<string, long>(StringComparer.Ordinal) { [HealEffectHandler.AmountFixedParam] = 100_000 });
+        var skill = new SkillDef("skill_heal", 0, "single_ally", new[] { effect });
+        var log = new List<CombatEvent>();
+        var ctx = new EffectContext(target, target, skill, effect, Rules, isCrit: false, log);
+
+        new HealEffectHandler().Apply(ctx);
+
+        log.Should().ContainSingle(e => e is Healed).Which.Should().BeOfType<Healed>()
+            .Which.Amount.Should().Be(100);
+    }
+
+    [Fact]
+    public void Buff_handler_applies_positive_modifier_and_emits_signed_amount()
+    {
+        UnitState caster = Unit("a", "ally", 1000, 100, 100);
+        UnitState target = Unit("b", "ally", 1000, 100, 100);
+        var effect = new EffectDef(
+            ApplyBuffEffectHandler.TypeName,
+            new Dictionary<string, long>(StringComparer.Ordinal) { ["atk"] = 50, ["duration"] = 2 });
+        var skill = new SkillDef("skill_buff", 0, "single_ally", new[] { effect });
+        var log = new List<CombatEvent>();
+        var ctx = new EffectContext(caster, target, skill, effect, Rules, isCrit: false, log);
+
+        new ApplyBuffEffectHandler().Apply(ctx);
+
+        target.Atk.Should().Be(150); // 100 + 50 (hiệu dụng)
+        log.Should().ContainSingle(e => e is BuffApplied).Which.Should().BeOfType<BuffApplied>()
+            .Which.Amount.Should().Be(50);
+    }
+
+    [Fact]
+    public void Debuff_handler_applies_negative_modifier()
+    {
+        UnitState caster = Unit("a", "ally", 1000, 100, 100);
+        UnitState target = Unit("b", "enemy", 1000, 100, 100);
+        var effect = new EffectDef(
+            ApplyDebuffEffectHandler.TypeName,
+            new Dictionary<string, long>(StringComparer.Ordinal) { ["def"] = 40, ["duration"] = 2 });
+        var skill = new SkillDef("skill_debuff", 0, "single_enemy", new[] { effect });
+        var log = new List<CombatEvent>();
+        var ctx = new EffectContext(caster, target, skill, effect, Rules, isCrit: false, log);
+
+        new ApplyDebuffEffectHandler().Apply(ctx);
+
+        target.Def.Should().Be(60); // 100 - 40
+        log.Should().ContainSingle(e => e is BuffApplied).Which.Should().BeOfType<BuffApplied>()
+            .Which.Amount.Should().Be(-40);
+    }
+
+    [Fact]
+    public void Reapplying_same_source_and_stat_refreshes_instead_of_stacking()
+    {
+        UnitState u = Unit("a", "ally", 1000, 100, 100);
+
+        u.ApplyStatModifier("skill_x", StatKind.Atk, 50, 2);
+        u.ApplyStatModifier("skill_x", StatKind.Atk, 50, 2); // áp lại cùng khoá ⇒ refresh, KHÔNG chồng
+
+        u.Atk.Should().Be(150); // 100 + 50 (không phải 200)
     }
 }

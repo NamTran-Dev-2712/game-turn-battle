@@ -60,6 +60,7 @@ Runtime SSOT for config lives in `server/src/GameTeam.Infrastructure/Configurati
   unknown ⇒ 404 `CONFIG_BUNDLE_NOT_FOUND`).
 - **Out of scope:** client bundle caching/e2e = phase 22 (client `ConfigProvider` = phase 16); typed gameplay POCOs =
   phases 27+; live swap without deploy = Post-MVP; feature flags / A-B = phase 49. Canonical: `docs/backend/infrastructure.md` §3.1.
+- **Skill config (Phase 28):** `config/skills/*.json` (schema `skill.schema.json`) = `target` + `trigger`(energy/cooldown) + optional `cooldown` + `effects[]` (`{effect_type, target?, params}`). `params` typed tuỳ chọn: `coeff_fixed`/`amount_fixed`/`atk`/`def`/`spd`/`duration` (đều `combat_int`) — **additive, KHÔNG bump `schema_version`**; giá trị là tuning (KHÔNG balance ở schema). `effect_type` ∈ damage/heal/apply_buff/apply_debuff/shield (thêm loại = enum additive + handler 2 phía). Combat runtime đọc lát cắt `SkillCombatConfig` (Application); wiring `config/skills`→battle thật theo `hero.skills[]` = phase 30. Canon: `docs/gameplay/skill-framework.md`.
 - **Hero config (Phase 27):** `config/heroes/*.json` (schema `hero.schema.json`) mang faction/class/element/role/rarity/
   base_stats/skills + field **tuỳ chọn `art`** (path/atlas → client `AssetLoader` lazy, ADR-009 — thêm additive, KHÔNG bump
   `schema_version`). Server đọc definition qua **`IConfigProvider.Get<HeroConfig>("hero", id)`** (POCO Application, phase 27)

@@ -33,11 +33,7 @@ func resolve(request: Dictionary, config_provider: Node) -> BattleInput:
 	var ally := _build_ally(request.get("ally", []), config_provider)
 	var enemy := _build_enemies(stage.get("enemies", []), config_provider)
 
-	var basic_skill := SkillDef.make(
-		basic_skill_id,
-		int(skill.get("coeff_fixed", 0)),
-		str(skill.get("target_rule", "default")),
-		_build_effects(skill))
+	var basic_skill := _build_skill(basic_skill_id, skill)
 
 	var input := BattleInput.new()
 	input.config_version = "config@v%d" % config_provider.current_version()
@@ -79,11 +75,43 @@ func _build_unit(actor_id: String, hero_id: String, team: String, slot: int, con
 	u.team = team
 	u.slot = slot
 	u.stats = UnitStats.from_dict(stats_src)
+	u.skills = _build_unit_skills(hero, config_provider)
 	return u
 
 
+# Bộ skill riêng của unit (§23): hero có `basic_skill_id` ⇒ dựng UnitSkillSet (basic + ultimate tuỳ chọn);
+# không có ⇒ null (dùng basic skill dùng chung của trận). Ánh xạ từ gameplay hero.skills[] là phase 30.
+func _build_unit_skills(hero: Dictionary, config_provider: Node) -> UnitSkillSet:
+	var basic_id := str(hero.get("basic_skill_id", ""))
+	if basic_id == "":
+		return null
+	var basic := _resolve_skill(basic_id, config_provider)
+	var ultimate_id := str(hero.get("ultimate_skill_id", ""))
+	var ultimate: SkillDef = null
+	if ultimate_id != "":
+		ultimate = _resolve_skill(ultimate_id, config_provider)
+	return UnitSkillSet.make(basic, ultimate)
+
+
+func _resolve_skill(skill_id: String, config_provider: Node) -> SkillDef:
+	var skill: Dictionary = config_provider.get_entry(SKILL_TYPE, skill_id)
+	assert(not skill.is_empty(), "COMBAT_SKILL_CONFIG_NOT_FOUND: %s" % skill_id)
+	return _build_skill(skill_id, skill)
+
+
+# Dựng SkillDef từ lát cắt combat config (coeff_fixed/target_rule/effects/energy_cost/cooldown_rounds).
+func _build_skill(skill_id: String, skill: Dictionary) -> SkillDef:
+	return SkillDef.make(
+		skill_id,
+		int(skill.get("coeff_fixed", 0)),
+		str(skill.get("target_rule", "default")),
+		_build_effects(skill),
+		int(skill.get("energy_cost", 0)),
+		int(skill.get("cooldown_rounds", 0)))
+
+
 # effects của skill: list rỗng ⇒ mặc định một `damage` (khớp server). Mỗi phần tử là String
-# (effect_type) hoặc Dictionary { effect_type, params }.
+# (effect_type) hoặc Dictionary { effect_type, target?, params }.
 func _build_effects(skill: Dictionary) -> Array[EffectDef]:
 	var raw: Array = skill.get("effects", [])
 	var effects: Array[EffectDef] = []
@@ -95,5 +123,6 @@ func _build_effects(skill: Dictionary) -> Array[EffectDef]:
 			effects.append(EffectDef.make(t))
 		elif t is Dictionary:
 			var d := t as Dictionary
-			effects.append(EffectDef.make(str(d.get("effect_type", "")), d.get("params", {})))
+			effects.append(EffectDef.make(
+				str(d.get("effect_type", "")), d.get("params", {}), str(d.get("target", ""))))
 	return effects

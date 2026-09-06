@@ -24,12 +24,22 @@ public static class VectorInputParser
         JsonObject stageEl = RequireObject(input, "stage");
         var stage = new StageInfo(GetString(stageEl, "id"), GetInt(stageEl, "max_rounds"));
 
-        JsonObject team = RequireObject(input, "team_snapshot");
-        IReadOnlyList<UnitSnapshot> ally = ParseUnits(RequireArray(team, "ally"));
-        IReadOnlyList<UnitSnapshot> enemy = ParseUnits(RequireArray(team, "enemy"));
-
         JsonObject excerpt = RequireObject(input, "config_excerpt");
         int coeff = GetInt(RequireObject(excerpt, "skill_basic"), "coeff_fixed");
+
+        // §23: bang skill tuy chon (config_excerpt.skills) cho skill rieng cua unit/ultimate — vang => rong.
+        var skillsById = new Dictionary<string, SkillDef>(StringComparer.Ordinal);
+        if (excerpt["skills"] is JsonObject skillsObj)
+        {
+            foreach (KeyValuePair<string, JsonNode?> p in skillsObj)
+            {
+                skillsById[p.Key] = ParseSkill(p.Key, p.Value!.AsObject());
+            }
+        }
+
+        JsonObject team = RequireObject(input, "team_snapshot");
+        IReadOnlyList<UnitSnapshot> ally = ParseUnits(RequireArray(team, "ally"), skillsById);
+        IReadOnlyList<UnitSnapshot> enemy = ParseUnits(RequireArray(team, "enemy"), skillsById);
 
         JsonObject cr = RequireObject(excerpt, "combat_rules");
         JsonObject en = RequireObject(cr, "energy");
@@ -58,13 +68,24 @@ public static class VectorInputParser
         return new BattleInput(configVersion, seed, stage, ally, enemy, rules, basicSkill);
     }
 
-    private static List<UnitSnapshot> ParseUnits(JsonArray array)
+    private static List<UnitSnapshot> ParseUnits(JsonArray array, IReadOnlyDictionary<string, SkillDef> skillsById)
     {
         var list = new List<UnitSnapshot>();
         foreach (JsonNode? node in array)
         {
             JsonObject u = (node ?? throw new InvalidDataException("Unit null trong team_snapshot.")).AsObject();
             JsonObject stats = RequireObject(u, "stats");
+
+            UnitSkillSet? skills = null;
+            if (u["skills"] is JsonObject s)
+            {
+                SkillDef basic = skillsById[GetString(s, "basic")];
+                SkillDef? ultimate = s["ultimate"] is JsonNode ultNode
+                    ? skillsById[ultNode.GetValue<string>()]
+                    : null;
+                skills = new UnitSkillSet(basic, ultimate);
+            }
+
             list.Add(new UnitSnapshot(
                 GetString(u, "actor_id"),
                 GetString(u, "hero_id"),
@@ -74,10 +95,52 @@ public static class VectorInputParser
                     GetInt(stats, "hp"),
                     GetInt(stats, "atk"),
                     GetInt(stats, "def"),
-                    GetInt(stats, "spd"))));
+                    GetInt(stats, "spd")),
+                skills));
         }
 
         return list;
+    }
+
+    private static SkillDef ParseSkill(string id, JsonObject el)
+    {
+        int coeff = el["coeff_fixed"] is JsonNode c ? c.GetValue<int>() : 0;
+        string targetRule = el["target_rule"] is JsonNode tr ? tr.GetValue<string>() : "default";
+        int energyCost = el["energy_cost"] is JsonNode ec ? ec.GetValue<int>() : 0;
+        int cooldown = el["cooldown_rounds"] is JsonNode cd ? cd.GetValue<int>() : 0;
+
+        var effects = new List<EffectDef>();
+        if (el["effects"] is JsonArray effArr)
+        {
+            foreach (JsonNode? e in effArr)
+            {
+                effects.Add(ParseEffect(e!.AsObject()));
+            }
+        }
+
+        if (effects.Count == 0)
+        {
+            effects.Add(new EffectDef(DamageEffectHandler.TypeName));
+        }
+
+        return new SkillDef(id, coeff, targetRule, effects, energyCost, cooldown);
+    }
+
+    private static EffectDef ParseEffect(JsonObject e)
+    {
+        string type = GetString(e, "effect_type");
+        string? target = e["target"] is JsonNode t ? t.GetValue<string>() : null;
+
+        var pars = new Dictionary<string, long>(StringComparer.Ordinal);
+        if (e["params"] is JsonObject pObj)
+        {
+            foreach (KeyValuePair<string, JsonNode?> pp in pObj)
+            {
+                pars[pp.Key] = pp.Value!.GetValue<long>();
+            }
+        }
+
+        return new EffectDef(type, pars, target);
     }
 
     private static JsonNode Require(JsonObject obj, string key) =>

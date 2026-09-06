@@ -27,12 +27,22 @@ internal static class GoldenVectorLoader
             stageEl.GetProperty("id").GetString()!,
             stageEl.GetProperty("max_rounds").GetInt32());
 
-        JsonElement team = input.GetProperty("team_snapshot");
-        IReadOnlyList<UnitSnapshot> ally = ParseUnits(team.GetProperty("ally"));
-        IReadOnlyList<UnitSnapshot> enemy = ParseUnits(team.GetProperty("enemy"));
-
         JsonElement excerpt = input.GetProperty("config_excerpt");
         int coeff = excerpt.GetProperty("skill_basic").GetProperty("coeff_fixed").GetInt32();
+
+        // §23: bảng skill tuỳ chọn (config_excerpt.skills) cho skill riêng của unit/ultimate — vắng ⇒ rỗng.
+        var skillsById = new Dictionary<string, SkillDef>(StringComparer.Ordinal);
+        if (excerpt.TryGetProperty("skills", out JsonElement skillsEl))
+        {
+            foreach (JsonProperty p in skillsEl.EnumerateObject())
+            {
+                skillsById[p.Name] = ParseSkill(p.Name, p.Value);
+            }
+        }
+
+        JsonElement team = input.GetProperty("team_snapshot");
+        IReadOnlyList<UnitSnapshot> ally = ParseUnits(team.GetProperty("ally"), skillsById);
+        IReadOnlyList<UnitSnapshot> enemy = ParseUnits(team.GetProperty("enemy"), skillsById);
 
         JsonElement cr = excerpt.GetProperty("combat_rules");
         JsonElement en = cr.GetProperty("energy");
@@ -62,12 +72,23 @@ internal static class GoldenVectorLoader
         return new LoadedVector(battleInput, root.GetProperty("expected"));
     }
 
-    private static List<UnitSnapshot> ParseUnits(JsonElement array)
+    private static List<UnitSnapshot> ParseUnits(JsonElement array, IReadOnlyDictionary<string, SkillDef> skillsById)
     {
         var list = new List<UnitSnapshot>();
         foreach (JsonElement u in array.EnumerateArray())
         {
             JsonElement stats = u.GetProperty("stats");
+
+            UnitSkillSet? skills = null;
+            if (u.TryGetProperty("skills", out JsonElement s))
+            {
+                SkillDef basic = skillsById[s.GetProperty("basic").GetString()!];
+                SkillDef? ultimate = s.TryGetProperty("ultimate", out JsonElement ultEl)
+                    ? skillsById[ultEl.GetString()!]
+                    : null;
+                skills = new UnitSkillSet(basic, ultimate);
+            }
+
             list.Add(new UnitSnapshot(
                 u.GetProperty("actor_id").GetString()!,
                 u.GetProperty("hero_id").GetString()!,
@@ -77,10 +98,52 @@ internal static class GoldenVectorLoader
                     stats.GetProperty("hp").GetInt32(),
                     stats.GetProperty("atk").GetInt32(),
                     stats.GetProperty("def").GetInt32(),
-                    stats.GetProperty("spd").GetInt32())));
+                    stats.GetProperty("spd").GetInt32()),
+                skills));
         }
 
         return list;
+    }
+
+    private static SkillDef ParseSkill(string id, JsonElement el)
+    {
+        int coeff = el.TryGetProperty("coeff_fixed", out JsonElement c) ? c.GetInt32() : 0;
+        string targetRule = el.TryGetProperty("target_rule", out JsonElement tr) ? tr.GetString()! : "default";
+        int energyCost = el.TryGetProperty("energy_cost", out JsonElement ec) ? ec.GetInt32() : 0;
+        int cooldown = el.TryGetProperty("cooldown_rounds", out JsonElement cd) ? cd.GetInt32() : 0;
+
+        var effects = new List<EffectDef>();
+        if (el.TryGetProperty("effects", out JsonElement effEl))
+        {
+            foreach (JsonElement e in effEl.EnumerateArray())
+            {
+                effects.Add(ParseEffect(e));
+            }
+        }
+
+        if (effects.Count == 0)
+        {
+            effects.Add(new EffectDef(DamageEffectHandler.TypeName));
+        }
+
+        return new SkillDef(id, coeff, targetRule, effects, energyCost, cooldown);
+    }
+
+    private static EffectDef ParseEffect(JsonElement e)
+    {
+        string type = e.GetProperty("effect_type").GetString()!;
+        string? target = e.TryGetProperty("target", out JsonElement t) ? t.GetString() : null;
+
+        var pars = new Dictionary<string, long>(StringComparer.Ordinal);
+        if (e.TryGetProperty("params", out JsonElement pEl))
+        {
+            foreach (JsonProperty pp in pEl.EnumerateObject())
+            {
+                pars[pp.Name] = pp.Value.GetInt64();
+            }
+        }
+
+        return new EffectDef(type, pars, target);
     }
 }
 

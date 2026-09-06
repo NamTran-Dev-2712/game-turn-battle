@@ -1,0 +1,608 @@
+{
+  "format_version": 1,
+  "name": "vector_13_ultimate_energy",
+  "description": "Ultimate theo năng lượng (§15, cơ chế config-gated): energy on_attack=50, ultimate_cost=100 ⇒ u_hero nạp năng lượng qua 2 đòn thường (EnergyChanged 50→100) rồi cast ultimate ở vòng 3 (sát thương lớn coeff 2500, EnergyChanged spend về 0, đặt cooldown 3) và nạp lại sau đó. Chứng minh energy accrual + ngưỡng + spend + hồi chiêu, tất định.",
+  "input": {
+    "config_version": "config@v1",
+    "seed": 909,
+    "stage": {
+      "id": "stage_skill_ultimate",
+      "max_rounds": 30
+    },
+    "team_snapshot": {
+      "ally": [
+        {
+          "actor_id": "u_hero",
+          "hero_id": "hero_ult",
+          "team": "ally",
+          "slot": 0,
+          "stats": {
+            "hp": 900,
+            "atk": 120,
+            "def": 60,
+            "spd": 100
+          },
+          "skills": {
+            "basic": "skill_hero_hit",
+            "ultimate": "skill_hero_ult"
+          }
+        }
+      ],
+      "enemy": [
+        {
+          "actor_id": "u_enemy",
+          "hero_id": "hero_enemy",
+          "team": "enemy",
+          "slot": 0,
+          "stats": {
+            "hp": 600,
+            "atk": 70,
+            "def": 80,
+            "spd": 50
+          }
+        }
+      ]
+    },
+    "config_excerpt": {
+      "skill_basic": {
+        "coeff_fixed": 1000
+      },
+      "skills": {
+        "skill_hero_hit": {
+          "coeff_fixed": 1000,
+          "target_rule": "single_enemy",
+          "effects": [
+            {
+              "effect_type": "damage"
+            }
+          ]
+        },
+        "skill_hero_ult": {
+          "coeff_fixed": 2500,
+          "target_rule": "single_enemy",
+          "energy_cost": 100,
+          "cooldown_rounds": 3,
+          "effects": [
+            {
+              "effect_type": "damage"
+            }
+          ]
+        }
+      },
+      "combat_rules": {
+        "def_constant_k": 300,
+        "min_damage": 1,
+        "crit_multiplier_fixed": 1500,
+        "accuracy_bp": 10000,
+        "crit_rate_bp": 0,
+        "max_rounds": 30,
+        "energy": {
+          "initial": 0,
+          "on_attack": 50,
+          "on_hit": 0,
+          "ultimate_cost": 100,
+          "max": 100
+        }
+      }
+    }
+  },
+  "expected": {
+    "event_log": [
+      {
+        "seq": 0,
+        "type": "RoundStarted",
+        "round": 1
+      },
+      {
+        "seq": 1,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 2,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 3,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2878
+      },
+      {
+        "seq": 4,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 5,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7445
+      },
+      {
+        "seq": 6,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 505,
+        "crit": false
+      },
+      {
+        "seq": 7,
+        "type": "EnergyChanged",
+        "unit": "u_hero",
+        "energy_after": 50
+      },
+      {
+        "seq": 8,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 9,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 10,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 11,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 8415
+      },
+      {
+        "seq": 12,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 13,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 2791
+      },
+      {
+        "seq": 14,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 58,
+        "target_hp_after": 842,
+        "crit": false
+      },
+      {
+        "seq": 15,
+        "type": "EnergyChanged",
+        "unit": "u_enemy",
+        "energy_after": 50
+      },
+      {
+        "seq": 16,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 17,
+        "type": "RoundEnded",
+        "round": 1
+      },
+      {
+        "seq": 18,
+        "type": "RoundStarted",
+        "round": 2
+      },
+      {
+        "seq": 19,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 20,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 21,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 983
+      },
+      {
+        "seq": 22,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 23,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 7407
+      },
+      {
+        "seq": 24,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 410,
+        "crit": false
+      },
+      {
+        "seq": 25,
+        "type": "EnergyChanged",
+        "unit": "u_hero",
+        "energy_after": 100
+      },
+      {
+        "seq": 26,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 27,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 28,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 29,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 8192
+      },
+      {
+        "seq": 30,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 31,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 8431
+      },
+      {
+        "seq": 32,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 58,
+        "target_hp_after": 784,
+        "crit": false
+      },
+      {
+        "seq": 33,
+        "type": "EnergyChanged",
+        "unit": "u_enemy",
+        "energy_after": 100
+      },
+      {
+        "seq": 34,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 35,
+        "type": "RoundEnded",
+        "round": 2
+      },
+      {
+        "seq": 36,
+        "type": "RoundStarted",
+        "round": 3
+      },
+      {
+        "seq": 37,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 38,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 39,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 72
+      },
+      {
+        "seq": 40,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 41,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5305
+      },
+      {
+        "seq": 42,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 237,
+        "target_hp_after": 173,
+        "crit": false
+      },
+      {
+        "seq": 43,
+        "type": "EnergyChanged",
+        "unit": "u_hero",
+        "energy_after": 0
+      },
+      {
+        "seq": 44,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 45,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 46,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 47,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2379
+      },
+      {
+        "seq": 48,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 49,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 4970
+      },
+      {
+        "seq": 50,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 58,
+        "target_hp_after": 726,
+        "crit": false
+      },
+      {
+        "seq": 51,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 52,
+        "type": "RoundEnded",
+        "round": 3
+      },
+      {
+        "seq": 53,
+        "type": "RoundStarted",
+        "round": 4
+      },
+      {
+        "seq": 54,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 55,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 56,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7657
+      },
+      {
+        "seq": 57,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 58,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 5118
+      },
+      {
+        "seq": 59,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 78,
+        "crit": false
+      },
+      {
+        "seq": 60,
+        "type": "EnergyChanged",
+        "unit": "u_hero",
+        "energy_after": 50
+      },
+      {
+        "seq": 61,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 62,
+        "type": "ActionStarted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 63,
+        "type": "TargetSelected",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 64,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 2898
+      },
+      {
+        "seq": 65,
+        "type": "Hit",
+        "actor": "u_enemy",
+        "target": "u_hero"
+      },
+      {
+        "seq": 66,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9194
+      },
+      {
+        "seq": 67,
+        "type": "DamageApplied",
+        "actor": "u_enemy",
+        "target": "u_hero",
+        "amount": 58,
+        "target_hp_after": 668,
+        "crit": false
+      },
+      {
+        "seq": 68,
+        "type": "ActionCompleted",
+        "actor": "u_enemy"
+      },
+      {
+        "seq": 69,
+        "type": "RoundEnded",
+        "round": 4
+      },
+      {
+        "seq": 70,
+        "type": "RoundStarted",
+        "round": 5
+      },
+      {
+        "seq": 71,
+        "type": "ActionStarted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 72,
+        "type": "TargetSelected",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 73,
+        "type": "RandomRoll",
+        "purpose": "hit",
+        "bound": 10000,
+        "value": 7649
+      },
+      {
+        "seq": 74,
+        "type": "Hit",
+        "actor": "u_hero",
+        "target": "u_enemy"
+      },
+      {
+        "seq": 75,
+        "type": "RandomRoll",
+        "purpose": "crit",
+        "bound": 10000,
+        "value": 9211
+      },
+      {
+        "seq": 76,
+        "type": "DamageApplied",
+        "actor": "u_hero",
+        "target": "u_enemy",
+        "amount": 95,
+        "target_hp_after": 0,
+        "crit": false
+      },
+      {
+        "seq": 77,
+        "type": "Death",
+        "unit": "u_enemy"
+      },
+      {
+        "seq": 78,
+        "type": "EnergyChanged",
+        "unit": "u_hero",
+        "energy_after": 100
+      },
+      {
+        "seq": 79,
+        "type": "ActionCompleted",
+        "actor": "u_hero"
+      },
+      {
+        "seq": 80,
+        "type": "RoundEnded",
+        "round": 5
+      },
+      {
+        "seq": 81,
+        "type": "BattleEnded"
+      }
+    ],
+    "result": {
+      "outcome": "VICTORY",
+      "winner_team": "ally",
+      "rounds": 5,
+      "final_hp": {
+        "u_hero": 668,
+        "u_enemy": 0
+      }
+    }
+  }
+}
