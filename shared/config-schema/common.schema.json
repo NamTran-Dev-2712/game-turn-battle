@@ -85,6 +85,11 @@
       "pattern": "^quest_[a-z0-9_]+$",
       "description": "Id quest, prefix 'quest_'."
     },
+    "formation_id": {
+      "type": "string",
+      "pattern": "^formation_[a-z0-9_]+$",
+      "description": "Id cấu hình formation (lưới đội hình), prefix 'formation_' (vd formation_default)."
+    },
     "cost": {
       "type": "object",
       "description": "Chi phí tiền tệ (cấu trúc). amount là giá trị tuning, không đặt ở schema.",

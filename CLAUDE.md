@@ -975,6 +975,61 @@ deterministic subset** (`single_enemy`(default)/`single_ally`/`self`) — richer
   + `.claude/agents/combat-determinism.md`/`dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the golden vectors +
   combat tests are the behavior contract — regenerate the baseline deliberately and update them.
 
+**Team & Formation is standardized (Phase 29 — closed & verified).** The player's **team of 6 heroes + formation grid** —
+the only tactical choice in full-auto combat — is **server-authoritative** (ADR-007) and its **position drives the sim's
+target/aggro** (ADR-011). Home: **`GameTeam.Domain/Teams/`** — **`Team : AggregateRoot<Guid>`** (`ProfileId` unique FK →
+`player_profiles`, extends the Phase-19 save root; owns **`TeamSlot`** value objects = `SlotIndex` 0-based + `HeroId` config
+ref) + **`TeamSaved`** event. Domain guards **structural** invariants only (≥1 slot, no duplicate slot/hero); **config-dependent**
+rules (exactly `rows*cols`, slot in range, ownership) live in Application. The grid is **data-driven, NOT hardcoded**: a new
+config type **`formation`** (`shared/config-schema/formation.schema.json` + `config/formation/formation_default.json` = `rows`/`cols`;
+`ConfigType.Formation` in the shared validator enum drives BOTH the config-validator gate AND the runtime bundle) read via
+**`IConfigProvider.Get<FormationConfig>("formation","formation_default")`** — **team size = rows×cols**. Application
+(`GameTeam.Application/Features/Teams/`): **`SaveTeamCommand`** (`ITransactionalRequest`) validates **server-authoritative** —
+owner ONLY from token `sub` (`ICurrentUser`, IDOR-safe), count==slotCount (`TEAM_INVALID_SIZE`), slots in `[0,slotCount)` +
+unique (`TEAM_INVALID_SLOT`), heroes unique (`TEAM_DUPLICATE_HERO`), every hero ∈ `IOwnedHeroRepository` set
+(`TEAM_HERO_NOT_OWNED`) → upsert (`Create`/`Replace`); **`GetMyTeamQuery`** (empty team when none saved); **`TeamSnapshotFactory`**
+maps a persisted team → immutable `IReadOnlyList<CombatTeamMember>` (`SlotIndex`→combat `slot`, actor `ally_{i}`) feeding the
+existing `CombatInputResolver`/`BattleRequest.Ally` — **no mutable profile ref reaches the sim**. Persistence
+(`GameTeam.Infrastructure/Persistence/`): `ITeamRepository`/`TeamRepository` (GetByProfileIdAsync), `TeamConfiguration`
+(`teams` + owned collection `team_slots` PK `(team_id, slot_index)`, unique `profile_id`), migration `AddTeams`, `DbSet<Team> Teams`.
+API: `GET`+`POST /api/v1/team` in the version set (protected). Contracts `GameTeam.Contracts/Team/*`
+(`TeamDto`/`TeamSlotDto`/`SaveTeamRequest`) → regenerated `openapi.json` → GDScript generated. Client
+`client/src/ui/formation/` (`FormationView` network-free + `FormationPresenter`): reads grid from `ConfigProvider` + roster from
+`StateCache`, maintains a **local draft**, and on save POSTs the **intent** via `NetworkClient` then re-renders from the
+**server-returned team** (never a local authoritative save); parser `NetworkResponseParser.parse_team`. **Position→sim is proven**:
+same heroes/stats/seed, swapped ally slots ⇒ different `TargetSelected`/event log (the sim already targets the lowest slot,
+combat-framework §14 — Phase 29 wires the persisted formation in, does NOT invent a new aggro algorithm). Verified (local
+2026-09-06, Docker Desktop up): build Release 0 error; `dotnet test server/GameTeam.sln` all green — Domain 107 / Application 68 /
+Contracts 36 / Infrastructure 48 (Testcontainers `postgres:16-alpine` `TeamPersistenceTests`: save/get + unique `profile_id` +
+upsert + `TeamSaved` dispatch) / Api.IntegrationTests 64 (Testcontainers `TeamEndpointTests`: login→POST/GET, 5-hero→400,
+cross-owner isolation, 401; + `OpenApiContractTests` team paths/schemas); config-validator 48 + `run.sh` exit 0 (9 files);
+codegen 41 + idempotent, no generated/openapi drift beyond additive team; `has-pending-model-changes` clean; Godot import exit 0
++ gdUnit4 121/121 pass 0 orphan. Canonical: `docs/gameplay/hero-system.md` §8 +
+`docs/gameplay/combat-framework.md` §7/§14 + `docs/gameplay/configuration-and-data.md`; decision log: `.memory/0027-team-formation-standardized.md`.
+
+- Future agents **MUST reuse** `Team`/`TeamSlot`/`ITeamRepository`/`SaveTeamCommand`/`GetMyTeamQuery`/`TeamSnapshotFactory` +
+  the `formation` config type before adding any team/formation plumbing; **MUST NOT** create a second team save root, hardcode
+  team size / grid (read `FormationConfig`), read the owner from client input (body/route/query — IDOR), validate ownership/count
+  on the client, store hero stats in `team_slots`, or fork a second aggro algorithm (slot-order targeting is the existing sim
+  mechanism; CB3 advanced aggro stays `[OPEN]`).
+- **Server is authority (binding, ADR-007/011):** the client sends a `SaveTeamRequest` **intent**; the server validates ALL rules
+  and returns the authoritative team; the client re-renders from that (never a local save assumed accepted). The sim reads the
+  **immutable team snapshot** (config@vN stats), never a mutable profile/team reference.
+- **Adding a config type = the Phase-06/07 contract** (proven here): schema + `config/` file + `ConfigType` enum + `ConfigFileMapper`
+  + a mapper test + fixtures, all in one change — it flows to both the validator gate and `ConfigBundleBuilder` automatically.
+- **Contract/DTO change workflow (binding):** edit `GameTeam.Contracts/Team/*` → rebuild (regenerate `openapi.json`) →
+  `bash shared/codegen/run.sh` → commit the generated diff (`RealSpecTests` file-list is the codegen contract — update it) →
+  extend `Api.IntegrationTests`/`OpenApiContractTests` → doc-sync. Never hand-edit `client/src/data/generated/**` or `openapi.json`.
+- **Out of scope (leave as debt / future phases):** real battle flow (30), multiple teams/presets (Post-MVP), positional stat
+  bonuses (config/tuning), advanced aggro CB3, `stage.schema.json` enemy `slot` gap (stage phase). Do NOT implement future-phase scope.
+- When changing team/formation, keep **`GameTeam.Domain/Teams/*` + `GameTeam.Application/Features/Teams/*` +
+  `ITeamRepository`/`TeamRepository`/`TeamConfiguration`/migration + `AppDbContext`/`DependencyInjection` + `Contracts/Team/*` +
+  regenerated `openapi.json` + `client/src/data/generated/**` + `formation.schema.json`/`config/formation/*` + `ConfigType`/`ConfigFileMapper`
+  (+ their tests) + `client/src/ui/formation/*` + `response_parser.gd` + main-hub wiring + all the tests (behavior contract) +
+  `docs/gameplay/hero-system.md` §8 + `docs/gameplay/combat-framework.md` §7/§14 + `docs/gameplay/configuration-and-data.md` +
+  `.instructions/backend.md`/`client.md`/`config.md`/`combat.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync**
+  (doc-sync matrix, §5); the tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,
@@ -982,6 +1037,19 @@ criteria with real run evidence, and **synchronize all affected Vibe Code/agent 
 verification; never leave a finished checklist item unchecked; never silently skip a phase requirement or invent a
 missing one. If a requirement is blocked by a missing dependency, **report it explicitly and leave it unchecked** —
 do not mark it done. CI-only gates stay `[ ]` ("CI-verification pending") until the Actions result exists (§4.5).
+
+**Binding order for every phase/task (do NOT reorder — never "code first, remember docs later"):**
+**SPEC** (read the phase file + every doc/ADR it links) → **INSPECT** (read the existing implementation you will
+extend/reuse — Domain/Application/config/client patterns — BEFORE designing; reuse before inventing) → **IMPLEMENT**
+(smallest change fitting the existing architecture; extend a closed phase, never silently replace it — §4.6) →
+**TEST** (write/run the behavior tests; run the phase's negative/failure-path checks) → **VERIFY** (real run evidence:
+build/test/validate/codegen/migration; distinguish an environment limitation, e.g. Docker/Godot, from a code failure —
+never self-certify a gate you did not actually run) → **CHECKLIST `[x]`** (flip each item the moment it is implemented AND
+verified, one at a time — never batch at the end, never on intent) → **DOC-SYNC** (update every affected `docs/**` in the
+same change — doc must not contradict code) → **VIBE-CODE SYNC** (update this file §4.6, `.memory/*`, `.instructions/*`,
+`.claude/agents/*`, `.claude/workflows/documentation-sync.md`) → **FINAL AUDIT** (re-read the whole phase top-to-bottom;
+confirm every checklist item is `[x]` with evidence, no TODO/blocker remains, no client path bypasses server authority, and
+docs/vibe reflect reality). Discovering a doc/vibe gap at the end is a process failure — inspect and plan the sync up front.
 
 ## 5. Definition of Done & the update policy
 

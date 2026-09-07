@@ -9,11 +9,14 @@ using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
 using GameTeam.Application.Features.Heroes.Queries;
 using GameTeam.Application.Features.Profile.Commands;
+using GameTeam.Application.Features.Teams.Commands;
+using GameTeam.Application.Features.Teams.Queries;
 using GameTeam.Contracts.Auth;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
 using GameTeam.Contracts.Hero;
 using GameTeam.Contracts.Profile;
+using GameTeam.Contracts.Team;
 using GameTeam.Domain.Common;
 using GameTeam.Infrastructure;
 using GameTeam.Infrastructure.Configuration;
@@ -144,6 +147,27 @@ apiV1.MapGet("/heroes/{heroId}/definition", (string heroId, ISender sender, Http
     .AllowAnonymous()
     .Produces<HeroDefinitionDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
+
+// GET /api/v1/team (Phase 29): đội hình CHÍNH mình — chủ sở hữu suy từ token sub (GetMyTeamQuery →
+// ICurrentUser), KHÔNG nhận owner từ client (chống IDOR). Protected mặc định. Chưa lưu ⇒ đội rỗng (lưới
+// trống), không lỗi. Kích thước lưới đọc từ config bundle ở client (data-driven, ADR-004).
+apiV1.MapGet("/team", (ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new GetMyTeamQuery()), httpContext))
+    .WithName("GetMyTeam")
+    .MapToApiVersion(1)
+    .Produces<TeamDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// POST /api/v1/team (Phase 29): lưu (đè) đội hình — body là INTENT client (SaveTeamRequest). Server validate
+// server-authoritative (đúng số ô theo config, không trùng hero, hero thuộc sở hữu, slot hợp lệ) rồi persist;
+// sai ⇒ 400 ErrorEnvelope (TEAM_INVALID_SIZE/_SLOT/_DUPLICATE_HERO/_HERO_NOT_OWNED). Protected mặc định.
+apiV1.MapPost("/team", (SaveTeamRequest request, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new SaveTeamCommand(request.Slots)), httpContext))
+    .WithName("SaveTeam")
+    .MapToApiVersion(1)
+    .Produces<TeamDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC

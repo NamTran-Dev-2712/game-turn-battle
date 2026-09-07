@@ -60,6 +60,10 @@ sequenceDiagram
 
 ## 7. Formation
 - Formation (vị trí 6 hero) là **input snapshot** cho sim (ảnh hưởng target/aggro). Lưới đơn giản (`../mvp/13` A12); chi tiết `../mvp/10` GP5.
+- **Phase 29 (đã nối):** đội hình lưu server-authoritative (`hero-system.md` §8) → **team snapshot**
+  (`TeamSnapshotFactory` → `CombatTeamMember{slot}`) đưa `slot` vào sim. Vị trí đã tác động target/aggro qua cơ chế
+  slot có sẵn (§14: chọn slot nhỏ nhất) — Phase 29 chỉ **nối nguồn** đội-persisted→snapshot→sim, KHÔNG đổi thuật toán;
+  aggro nâng cao (CB3) vẫn `[OPEN]` (`../mvp/10`).
 
 ## 8. Liên kết
 - Skill: `skill-framework.md` · Hero: `hero-system.md`

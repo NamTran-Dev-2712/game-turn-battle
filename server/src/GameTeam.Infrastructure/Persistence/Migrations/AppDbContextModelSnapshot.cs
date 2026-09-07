@@ -120,6 +120,37 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("player_profiles", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Teams.Team", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_teams_profile_id");
+
+                    b.ToTable("teams", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Infrastructure.Persistence.ConfigBundleRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -211,6 +242,40 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Teams.Team", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Teams.TeamSlot", "Slots", b1 =>
+                        {
+                            b1.Property<Guid>("team_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("team_id");
+
+                            b1.Property<int>("SlotIndex")
+                                .HasColumnType("integer")
+                                .HasColumnName("slot_index");
+
+                            b1.Property<string>("HeroId")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasColumnName("hero_id");
+
+                            b1.HasKey("team_id", "SlotIndex");
+
+                            b1.ToTable("team_slots", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("team_id");
+                        });
+
+                    b.Navigation("Slots");
                 });
 #pragma warning restore 612, 618
         }

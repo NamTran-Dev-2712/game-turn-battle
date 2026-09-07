@@ -21,6 +21,7 @@
 | `rewards/` | Reward tables (AFK, quest, first-clear) | Economy, Quest |
 | `economy/` | Đường cong cost (level/sao), energy params | Progression, Economy |
 | `quests/` | Quest definition | Quest |
+| `formation/` | Lưới đội hình (rows×cols → team size) | Hero, Combat |
 | `liveops/` | Event/season/flag (schedule) — Post-MVP | LiveOps |
 
 ## 2b. Ánh xạ schema (phase 06)
@@ -37,6 +38,7 @@ Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/conf
 | shop | `shop.schema.json` | `progression-and-economy.md` | `items[].reward_ref` → reward; `cost.currency` | `cost.amount` integer |
 | economy | `economy.schema.json` | `progression-and-economy.md` | `cost_curves`, `energy` | bước đường cong integer, không cố định |
 | quest | `quest.schema.json` | `quest-system.md` | `reward_refs[]` → reward; `condition_type` | condition_type: battles_won/summons_done/login |
+| formation | `formation.schema.json` | `hero-system.md` §8 | — | `rows`/`cols` integer (≥1); **team size = rows×cols**; KHÔNG bonus vị trí (tuning/Post-MVP) — thêm Phase 29 |
 
 > **Cấp độ tham chiếu:** JSON Schema chỉ ràng buộc **định dạng/cấu trúc** của ref (prefix id, kiểu). **Kiểm tồn tại id chéo file** (hero→skill…) là việc của validator (phase 07 — §3, §6), không phải schema đơn. Fixture pass/fail ở `../../shared/config-schema/fixtures/`; quy tắc migration ở `../../shared/config-schema/_versions/`.
 

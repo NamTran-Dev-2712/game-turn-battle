@@ -104,6 +104,17 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   authority).** Out of scope: skill (28)/formation (29)/battle (30)/summon (33)/upgrade (35/39)/real art + atlas-pool (52).
   Canonical: `docs/gameplay/hero-system.md` §7 + `docs/godot/resources-and-assets.md` §2.1 +
   `docs/godot/scene-architecture.md` §4.1; decision log `.memory/0025-hero-system-standardized.md`.
+- **Team & Formation (Phase 29, closed):** feature `src/ui/formation/` (`FormationView` **network-free** + `FormationPresenter`).
+  Presenter reads grid rows×cols from `ConfigProvider.get_entry(&"formation","formation_default")` (data-driven — never a
+  hardcoded grid) + roster from `StateCache.get_heroes()`; keeps a **local draft** (select_hero → place_slot → change
+  position → clear_slot). On save it POSTs the **intent** via `NetworkClient.post_json("/team", …)` then re-renders from the
+  **server-returned team** — never a local save assumed accepted (ADR-007/011); opening the screen loads the saved team via
+  `get_json("/team")`. Parser `response_parser.parse_team` → generated `TeamDto`/`TeamSlotDto` (DO-NOT-EDIT). Hub button
+  "Đội hình" (`MainHubView.FEATURES` + `MainHubPresenter` `FORMATION_PATH`). **No new EventBus event** (reuse
+  `state_refreshed`). **Reuse `NetworkClient`/`ConfigProvider`/`StateCache` — never a view calling the net, a second
+  HTTP/config/state path, or client-side validation of ownership/count/duplicates (server is the authority).** Out of scope:
+  battle (30)/preset (Post-MVP)/positional bonus. Canonical: `docs/gameplay/hero-system.md` §8; decision log
+  `.memory/0027-team-formation-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

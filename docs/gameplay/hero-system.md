@@ -78,7 +78,42 @@ Nền tảng Hero data-driven đã hiện thực (ADR-004/007). Chi tiết vận
 **Ranh giới quyền:** client KHÔNG tự thêm hero / đổi owner / level / sao / chỉ số. Definition từ config; ownership
 từ server/profile. Ngoài phạm vi Phase 27: skill (28), formation (29), battle (30), summon (33), nâng cấp (35/39).
 
-## 8. Liên kết
+## 8. Formation & Team (Phase 29 — đã đóng)
+
+Đội hình **6 hero + vị trí (formation)** — lựa chọn tactical duy nhất trong combat full-auto (A02/A05/A12).
+Lưu **server-authoritative** (ADR-007); vị trí đi vào combat sim, ảnh hưởng target/aggro (ADR-011,
+`combat-framework.md` §7/§14). Client chỉ gửi **intent** — server validate + quyết định.
+
+**Server (chân lý):**
+- **`Team`** (`GameTeam.Domain/Teams/Team.cs`, `AggregateRoot<Guid>`): gắn **`ProfileId`** (khoá ngoại
+  `player_profiles`, **unique** — một đội/profile MVP) + các **`TeamSlot`** (`SlotIndex` 0-based, `HeroId` ref
+  config). Bảng `teams` + owned collection `team_slots` (PK `(team_id, slot_index)`), migration `AddTeams`.
+  Bất biến **cấu trúc** ở Domain (≥1 ô, không trùng ô, không trùng hero); ràng buộc **phụ thuộc config** ở Application.
+- **Lưới = config, KHÔNG hardcode.** Loại config **`formation`** (`shared/config-schema/formation.schema.json`,
+  `config/formation/formation_default.json`: `rows`/`cols`) đọc qua **`IConfigProvider.Get<FormationConfig>("formation",
+  "formation_default")`** — **số ô (team size) = rows×cols**. Client đọc lưới từ config bundle để dựng UI.
+- **`SaveTeamCommand`** (`Features/Teams/Commands/`, `ITransactionalRequest`): owner suy TỪ token `sub`
+  (`ICurrentUser` — chống IDOR), validate **server-authoritative**: đúng số ô (`TEAM_INVALID_SIZE`), slot trong lưới
+  không trùng (`TEAM_INVALID_SLOT`), không trùng hero (`TEAM_DUPLICATE_HERO`), **mọi hero thuộc sở hữu**
+  (`IOwnedHeroRepository`, `TEAM_HERO_NOT_OWNED`) → upsert (`Create`/`Replace`). **`GetMyTeamQuery`**: đọc đội theo
+  token; chưa lưu ⇒ đội rỗng (lưới trống). Endpoint: `GET`+`POST /api/v1/team` (protected).
+- **Team snapshot** (`Features/Teams/TeamSnapshotFactory.cs`): đội đã lưu → `IReadOnlyList<CombatTeamMember>` bất
+  biến (feed `CombatInputResolver`/`BattleRequest.Ally`, phase 30); `SlotIndex` → `slot` combat. Bản sao giá trị,
+  KHÔNG giữ tham chiếu profile/team mutable ⇒ sim tất định (ADR-011).
+
+**Client (hiển thị, không chân lý):**
+- **Formation** (`client/src/ui/formation/`): `FormationView` (BaseView, network-free) dựng lưới (rows×cols từ
+  `ConfigProvider`) + roster hero owned (`StateCache.get_heroes()`); `FormationPresenter` giữ **bản nháp cục bộ**
+  (chọn hero → đặt ô → đổi vị trí), khi Lưu → **`NetworkClient.post_json("/team", …)`** (intent) → hiển thị lại theo
+  **đội server trả về** (bản nháp bị thay). Mở màn → `GET /team` nạp đội đã lưu. KHÔNG lưu cục bộ rồi coi như server nhận.
+- Contract→codegen: DTO team ở `GameTeam.Contracts/Team/*` (`TeamDto`/`TeamSlotDto`/`SaveTeamRequest`) → `openapi.json`
+  → GDScript generated (DO-NOT-EDIT); parser `NetworkResponseParser.parse_team`.
+
+**Ranh giới quyền:** client KHÔNG tự quyết ownership / hợp lệ / trùng / slot / đội đã lưu — server validate tất cả.
+Ngoài phạm vi Phase 29: battle thật (30), nhiều đội/preset (Post-MVP), bonus vị trí (config/tuning), aggro nâng cao
+(CB3, `../mvp/10`).
+
+## 9. Liên kết
 - Combat: `combat-framework.md` · Skill: `skill-framework.md`
 - Progression: `progression-and-economy.md` · Config: `configuration-and-data.md` · Assets: `../godot/resources-and-assets.md`
 - Nguồn: `../mvp/03`, `../mvp/05` · Roadmap: `../roadmap/27-hero-system.md`

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/formation.schema.json",
+  "title": "Formation config",
+  "description": "Cấu hình lưới đội hình (ADR-004). Bám ../../docs/gameplay/hero-system.md (Formation & Team). Chỉ ràng buộc cấu trúc/kiểu: kích thước lưới hàng×cột — số ô (team size) = rows*cols. KHÔNG chứa bonus vị trí (tuning/Post-MVP). A12 ~2×3; giá trị thật là tuning.",
+  "type": "object",
+  "required": ["schema_version", "id", "rows", "cols"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/formation_id" },
+    "rows": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Số hàng của lưới (cấu trúc, ≥1). Giá trị thật là tuning (A12 ~2)."
+    },
+    "cols": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Số cột của lưới (cấu trúc, ≥1). Giá trị thật là tuning (A12 ~3). Số ô/team size = rows*cols."
+    }
+  },
+  "additionalProperties": false
+}
