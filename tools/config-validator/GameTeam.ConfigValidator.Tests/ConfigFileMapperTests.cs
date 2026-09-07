@@ -14,6 +14,7 @@ public sealed class ConfigFileMapperTests
     [InlineData("rewards", ConfigType.Reward)]
     [InlineData("economy", ConfigType.Economy)]
     [InlineData("quests", ConfigType.Quest)]
+    [InlineData("formation", ConfigType.Formation)]
     public void Plural_directory_maps_to_singular_type(string dir, ConfigType expected)
     {
         ConfigFileMapper.DirectoryToType[dir].Should().Be(expected);
@@ -29,7 +30,7 @@ public sealed class ConfigFileMapperTests
     }
 
     [Fact]
-    public void All_eight_config_types_have_a_directory_mapping()
+    public void All_config_types_have_a_directory_mapping()
     {
         ConfigFileMapper.DirectoryToType.Values.Distinct().Should()
             .BeEquivalentTo(Enum.GetValues<ConfigType>());

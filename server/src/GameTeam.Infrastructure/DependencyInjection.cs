@@ -60,6 +60,9 @@ public static class DependencyInjection
         // Repository đặc thù feature: hero owned (Phase 27) — lookup theo profile_id.
         services.AddScoped<IOwnedHeroRepository, OwnedHeroRepository>();
 
+        // Repository đặc thù feature: team/formation (Phase 29) — lookup theo profile_id (unique).
+        services.AddScoped<ITeamRepository, TeamRepository>();
+
         // ── Cache phân tán: Redis (ADR-003/005, Phase 12) ────────────────────────────────────────
         // Connection LẤY TỪ CONFIG (env ConnectionStrings__Redis) — không hardcode host/port/password.
         string? redisConnectionString = configuration.GetConnectionString(RedisConnectionName);

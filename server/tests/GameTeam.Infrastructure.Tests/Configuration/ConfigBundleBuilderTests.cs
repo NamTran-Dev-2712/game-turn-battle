@@ -74,7 +74,7 @@ public sealed class ConfigBundleBuilderTests
     }
 
     [Fact]
-    public void BuildData_always_includes_all_eight_type_keys()
+    public void BuildData_always_includes_all_type_keys()
     {
         JsonObject data = ConfigBundleBuilder.BuildData([Hero("hero_a", """{"id":"hero_a"}""")]);
 

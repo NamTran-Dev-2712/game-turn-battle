@@ -10,8 +10,12 @@ extends RefCounted
 const _EVENT_STATE_REFRESHED: StringName = &"state_refreshed"
 ## Màn danh sách hero sở hữu (Phase 27, Hero System) — điều hướng khi bấm nút "Anh hùng".
 const HERO_LIST_PATH: String = "res://src/ui/hero_list/hero_list.tscn"
+## Màn đội hình (Phase 29, Formation) — điều hướng khi bấm nút "Đội hình".
+const FORMATION_PATH: String = "res://src/ui/formation/formation.tscn"
 ## Id ý định nút "Anh hùng" (khớp MainHubView.FEATURES).
 const _INTENT_HEROES: StringName = &"heroes"
+## Id ý định nút "Đội hình" (khớp MainHubView.FEATURES).
+const _INTENT_FORMATION: StringName = &"formation"
 
 var _view: BaseView = null
 # Nguồn đọc (inject cho test; mặc định = autoload). CHỈ đọc-cache, không network.
@@ -80,5 +84,9 @@ func _on_intent(intent_name: StringName, _payload: Dictionary) -> void:
 	if intent_name == _INTENT_HEROES:
 		if _scene_router != null:
 			_scene_router.goto_scene(HERO_LIST_PATH)
+		return
+	if intent_name == _INTENT_FORMATION:
+		if _scene_router != null:
+			_scene_router.goto_scene(FORMATION_PATH)
 		return
 	print_verbose("MainHub: intent '%s' (placeholder — feature ở phase sau)." % intent_name)

@@ -23,7 +23,9 @@ public class RealSpecTests
             "error_envelope.gd", "error_response.gd", "health_response.gd", "profile_dto.gd",
             "server_time_response.gd",
             // Phase 27 — hero contract.
-            "owned_hero_dto.gd", "my_heroes_response.gd", "hero_definition_dto.gd", "hero_base_stats_dto.gd");
+            "owned_hero_dto.gd", "my_heroes_response.gd", "hero_definition_dto.gd", "hero_base_stats_dto.gd",
+            // Phase 29 — team/formation contract.
+            "team_dto.gd", "team_slot_dto.gd", "save_team_request.gd");
     }
 
     [Fact]

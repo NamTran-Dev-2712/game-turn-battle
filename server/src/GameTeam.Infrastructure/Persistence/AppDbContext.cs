@@ -3,6 +3,7 @@ using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
 using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
+using GameTeam.Domain.Teams;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameTeam.Infrastructure.Persistence;
@@ -49,6 +50,9 @@ public class AppDbContext : DbContext
 
     /// <summary>Hero người chơi sở hữu — instance gắn profile; definition đọc từ config (Phase 27, ADR-004/007).</summary>
     public DbSet<OwnedHero> OwnedHeroes => Set<OwnedHero>();
+
+    /// <summary>Đội hình người chơi — đội 6 hero + vị trí, gắn 1-1 profile (Phase 29, ADR-007).</summary>
+    public DbSet<Team> Teams => Set<Team>();
 
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();

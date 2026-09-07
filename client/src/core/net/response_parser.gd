@@ -84,6 +84,25 @@ static func parse_my_heroes(data: Dictionary) -> Variant:
 	return result
 
 
+## Parse `GET/POST /api/v1/team` → TeamDto (phase 29). Body bọc object `{ "slots": [ {slotIndex, heroId} ] }`
+## (không mảng trần — hợp NetworkClient chỉ nhận Dictionary). `null` nếu thiếu `slots` hoặc phần tử sai hình
+## dạng. Mảng rỗng là hợp lệ (chưa lưu đội — lưới trống). Định nghĩa hero ghép từ ConfigProvider ở client.
+static func parse_team(data: Dictionary) -> TeamDto:
+	if not data.has("slots") or not (data["slots"] is Array):
+		return null
+	var slots: Array[TeamSlotDto] = []
+	for item in data["slots"]:
+		if not (item is Dictionary) or not item.has("slotIndex") or not item.has("heroId"):
+			return null
+		var slot := TeamSlotDto.new()
+		slot.slot_index = int(item["slotIndex"])
+		slot.hero_id = str(item["heroId"])
+		slots.append(slot)
+	var model := TeamDto.new()
+	model.slots = slots
+	return model
+
+
 ## Parse metadata bundle `{ "version": { "bundle": int, "schema": int } }` → ConfigBundleDto.
 ## Dùng cho ConfigProvider so version (phase 16). `null` nếu thiếu `version`/`bundle`.
 static func parse_config_bundle(data: Dictionary) -> ConfigBundleDto:

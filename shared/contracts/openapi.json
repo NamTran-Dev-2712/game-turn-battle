@@ -197,6 +197,84 @@
         }
       }
     },
+    "/api/v1/team": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetMyTeam",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "SaveTeam",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTeamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -651,6 +729,20 @@
           4
         ]
       },
+      "SaveTeamRequest": {
+        "required": [
+          "slots"
+        ],
+        "type": "object",
+        "properties": {
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamSlotDto"
+            }
+          }
+        }
+      },
       "ServerTimeResponse": {
         "required": [
           "utcNow"
@@ -660,6 +752,36 @@
           "utcNow": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "TeamDto": {
+        "required": [
+          "slots"
+        ],
+        "type": "object",
+        "properties": {
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamSlotDto"
+            }
+          }
+        }
+      },
+      "TeamSlotDto": {
+        "required": [
+          "slotIndex",
+          "heroId"
+        ],
+        "type": "object",
+        "properties": {
+          "slotIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "heroId": {
+            "type": "string"
           }
         }
       }

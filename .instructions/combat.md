@@ -17,6 +17,7 @@ Golden-vector format + samples: `shared/combat-vectors/`. Agent: `.claude/agents
 - **RNG order:** `hit` roll then `crit` roll; **miss = 1 roll, hit = 2 rolls** (consume the crit roll even when `crit_rate_bp==0`).
 - **Damage:** divisive DEF-ratio `atk*coeff*K/(K+def)`, crit **after** mitigation, final `from_fixed`, floor `MIN_DMG`.
 - **Balance numbers = config** (`combat_int`) — never hardcode/invent. **CB3** (aggro) is `[ĐỀ XUẤT]`; **CB4** (energy/ultimate) MECHANISM is now implemented (Phase 28, config-gated) but its NUMBERS stay `[OPEN]` — never silently close a CB.
+- **Formation → sim (Phase 29):** the persisted team's slot feeds the sim via `TeamSnapshotFactory` → `CombatTeamMember{slot}`; the sim **already** targets the lowest living `slot` (§14) — Phase 29 wired the source, did **not** add a new aggro algorithm. **CB3 stays `[OPEN]`** (row/front-back/other policies). Position→sim is proven by `BattleSimulatorFormationTests` (swap slots → different `TargetSelected`/event log). Never fork a second aggro/target rule.
 - **Scope:** server sim = phase 24 (DONE); client sim = phase 25 (DONE); vector suite + cross-impl CI gate = phase 26 (DONE); **skill framework = phase 28 (DONE — 14 vectors, registry effects damage/heal/buff/debuff + energy-ultimate)**. See `combat-framework.md` §22/§23 + `docs/gameplay/skill-framework.md` + `tools/combat-baseline/README.md`.
 
 **Realized (Phase 24 — server .NET sim; REUSE, don't reinvent):**

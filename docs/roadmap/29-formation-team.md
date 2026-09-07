@@ -40,13 +40,13 @@ Formation là "lựa chọn tactical" duy nhất (A02/A05/A12) trong combat full
 
 # Công việc cần thực hiện
 
-- [ ] Server Domain: `Team` (6 slot, ref OwnedHero) + `Formation` (lưới vị trí cấu hình từ config).
-- [ ] Application: `SaveTeamCommand` (validate đúng 6, hero thuộc sở hữu, không trùng) + `GetMyTeamQuery`.
-- [ ] Tạo team snapshot (chỉ số tại thời điểm) để feed sim (phase 30).
-- [ ] Client feature `formation/`: UI chọn hero + đặt vị trí lưới; lưu qua command; hiển thị.
-- [ ] Contract DTO team/formation + codegen.
-- [ ] Test: lưu/đọc team; validate lỗi (thiếu hero/trùng/không sở hữu); đổi vị trí → sim input đổi.
-- [ ] Cập nhật `../gameplay/hero-system.md`.
+- [x] Server Domain: `Team` (6 slot, ref OwnedHero) + `Formation` (lưới vị trí cấu hình từ config). ✅ `Team`/`TeamSlot`/`TeamSaved` (`GameTeam.Domain/Teams/`); lưới = loại config `formation` (`formation.schema.json` + `config/formation/formation_default.json`, rows×cols).
+- [x] Application: `SaveTeamCommand` (validate đúng 6, hero thuộc sở hữu, không trùng) + `GetMyTeamQuery`. ✅ handler server-authoritative (owner từ token, `TEAM_INVALID_SIZE/_SLOT/_DUPLICATE_HERO/_HERO_NOT_OWNED`); endpoint `GET`+`POST /api/v1/team` (protected).
+- [x] Tạo team snapshot (chỉ số tại thời điểm) để feed sim (phase 30). ✅ `TeamSnapshotFactory` → `IReadOnlyList<CombatTeamMember>` bất biến (slot → combat slot); test bản-sao-giá-trị.
+- [x] Client feature `formation/`: UI chọn hero + đặt vị trí lưới; lưu qua command; hiển thị. ✅ `FormationView`/`FormationPresenter` + `formation.tscn`; POST intent → hiển thị lại theo server; hub wiring.
+- [x] Contract DTO team/formation + codegen. ✅ `Contracts/Team/*` → `openapi.json` (additive) → GDScript generated (`team_dto`/`team_slot_dto`/`save_team_request`); `parse_team`.
+- [x] Test: lưu/đọc team; validate lỗi (thiếu hero/trùng/không sở hữu); đổi vị trí → sim input đổi. ✅ Domain `BattleSimulatorFormationTests` (đổi slot → target/log khác), handler validate tests, snapshot tests, gdUnit4 formation flow; Testcontainers save/get + Api e2e (chạy local với Docker — xanh).
+- [x] Cập nhật `../gameplay/hero-system.md`. ✅ §8 "Formation & Team (Phase 29)" + `combat-framework.md` §7/§14 + `configuration-and-data.md` (loại `formation`).
 
 # Tiêu chí hoàn thành
 
@@ -81,7 +81,33 @@ Grid formation kích thước theo config (A12 ~2×3, chưa khoá cứng). Một
 
 # Phase Review
 
-Đóng khi team 6+formation lưu server-authoritative, validate, tác động sim, UI hoạt động, test xanh.
+**Trạng thái: ĐÓNG (local PASS 2026-09-06).** Đội hình 6 hero + vị trí lưu **server-authoritative** (ADR-007):
+`Team` aggregate (`teams` + owned `team_slots`, unique `profile_id`) mở rộng save-root `PlayerProfile`;
+`SaveTeamCommand` validate server (đúng số ô theo config, slot trong lưới không trùng, không trùng hero, **mọi hero
+thuộc sở hữu** — owner suy từ token, chống IDOR) → upsert; `GetMyTeamQuery` trả đội (rỗng nếu chưa lưu). Lưới
+**data-driven** qua loại config mới `formation` (rows×cols → team size, KHÔNG hardcode). **Vị trí ảnh hưởng sim** qua
+cơ chế slot có sẵn (combat-framework §14: nhắm slot nhỏ nhất) — `TeamSnapshotFactory` nối đội-persisted → snapshot bất
+biến `CombatTeamMember{slot}` (feed phase 30), KHÔNG đổi thuật toán. Client `formation/` (view/presenter, network-free
+view) gửi **intent** POST /team → hiển thị lại theo đội server (KHÔNG lưu cục bộ). Contract→codegen đồng bộ; doc + vibe-code sync.
+
+**Bằng chứng verify (local, Docker Desktop bật):** `dotnet build -c Release` 0 error; `dotnet test server/GameTeam.sln`
+**toàn bộ xanh** — **Domain 107** (gồm `BattleSimulatorFormationTests`: đổi slot → `TargetSelected`/event log khác;
+`TeamTests`), **Application 68** (`SaveTeamCommandHandlerTests` 9: valid/replace/size/dup/not-owned/bad-slot/unauth/no-profile/no-config;
+`GetMyTeamQueryHandlerTests`; `TeamSnapshotFactoryTests` bản-sao-giá-trị), **Contracts 36**, **Infrastructure 48**
+(Testcontainers `postgres:16-alpine` — `TeamPersistenceTests`: save/get + unique `profile_id` + upsert `Replace` + dispatch
+`TeamSaved`), **Api.IntegrationTests 64** (Testcontainers — `TeamEndpointTests`: login→POST/GET /team, sai-số-hero→400,
+cross-owner isolation, 401; + `OpenApiContractTests` team paths/schemas). `tools/config-validator` **48** +
+`run.sh config shared/config-schema` exit 0 (9 file, gồm formation). `shared/codegen` **41** + `run.sh` regenerate idempotent
+(team DTOs) — no `client/src/data/generated` drift; `openapi.json` additive (+team paths/schemas). EF
+`has-pending-model-changes` sạch; migration `AddTeams` (teams + team_slots). Godot 4.7.1 `--headless --import` exit 0; gdUnit4
+**toàn bộ 121/121 pass, 0 orphan** (formation 7: grid từ config, place/đổi vị trí, save→server, load, save-fail giữ nháp,
+back). Grep authority: view formation không chạm `NetworkClient`/`core/net`; client không tự tính chân lý.
+
+**CI-verification pending:** các gate trên GitHub Actions (`ci-server.yml` gồm golden-vector + Testcontainers; `ci-client.yml`
+gdUnit4 + import; `validate-config.yml`; `codegen-check.yml`) — chờ kết quả Actions cho lần chạy CI (đã xanh đầy đủ ở local).
+
+**Nợ (out-of-scope, ghi rõ):** battle thật (30), nhiều đội/preset (Post-MVP), bonus vị trí theo hàng/cột (config/tuning),
+aggro nâng cao CB3 (`../mvp/10` — vẫn `[OPEN]`), gap `stage.schema.json` thiếu `slot` cho enemy (thuộc phase stage sau).
 
 ---
 
