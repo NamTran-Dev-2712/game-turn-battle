@@ -47,6 +47,7 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("/api/v1/heroes")]                       // Phase 27: owned heroes (server-authoritative)
     [InlineData("/api/v1/heroes/{heroId}/definition")]  //           + hero definition from config
     [InlineData("/api/v1/team")]                         // Phase 29: team/formation (get + save)
+    [InlineData("/api/v1/battles")]                      // Phase 30: start battle (re-sim → BattleResult)
     public async Task OpenApi_document_exposes_foundation_paths(string path)
     {
         (OpenApiDocument doc, _) = await ReadDocumentAsync();
@@ -70,6 +71,9 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("TeamDto")]            // Phase 29
     [InlineData("TeamSlotDto")]        // Phase 29
     [InlineData("SaveTeamRequest")]    // Phase 29
+    [InlineData("StartBattleRequest")] // Phase 30
+    [InlineData("BattleResultDto")]    // Phase 30
+    [InlineData("RewardDto")]          // Phase 30
     public async Task OpenApi_document_exposes_foundation_dto_schemas(string schemaName)
     {
         (OpenApiDocument doc, _) = await ReadDocumentAsync();

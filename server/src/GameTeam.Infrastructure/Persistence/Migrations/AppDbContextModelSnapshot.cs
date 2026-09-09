@@ -41,6 +41,96 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("accounts", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Battles.BattleRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AttemptId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Log")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("log");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("Rounds")
+                        .HasColumnType("integer")
+                        .HasColumnName("rounds");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<long>("Seed")
+                        .HasColumnType("bigint")
+                        .HasColumnName("seed");
+
+                    b.Property<string>("StageId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("stage_id");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId", "AttemptId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_battle_records_profile_attempt");
+
+                    b.ToTable("battle_records", (string)null);
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Economy.Wallet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_wallets_profile_id");
+
+                    b.ToTable("wallets", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Domain.Heroes.OwnedHero", b =>
                 {
                     b.Property<Guid>("Id")
@@ -224,6 +314,89 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                             Id = (short)1,
                             Version = 1
                         });
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Battles.BattleRecord", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Battles.BattleReward", "Rewards", b1 =>
+                        {
+                            b1.Property<Guid>("BattleRecordId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<int>("Amount")
+                                .HasColumnType("integer")
+                                .HasAnnotation("Relational:JsonPropertyName", "amount");
+
+                            b1.Property<string>("RefId")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "ref_id");
+
+                            b1.Property<string>("RewardType")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "reward_type");
+
+                            b1.HasKey("BattleRecordId", "__synthesizedOrdinal");
+
+                            b1.ToTable("battle_records");
+
+                            b1.ToJson("rewards");
+
+                            b1.WithOwner()
+                                .HasForeignKey("BattleRecordId");
+                        });
+
+                    b.Navigation("Rewards");
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Economy.Wallet", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Economy.WalletBalance", "Balances", b1 =>
+                        {
+                            b1.Property<Guid>("WalletId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<long>("Amount")
+                                .HasColumnType("bigint")
+                                .HasAnnotation("Relational:JsonPropertyName", "amount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "currency");
+
+                            b1.HasKey("WalletId", "__synthesizedOrdinal");
+
+                            b1.ToTable("wallets");
+
+                            b1.ToJson("balances");
+
+                            b1.WithOwner()
+                                .HasForeignKey("WalletId");
+                        });
+
+                    b.Navigation("Balances");
                 });
 
             modelBuilder.Entity("GameTeam.Domain.Heroes.OwnedHero", b =>

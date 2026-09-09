@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "hero_umbra",
+  "faction": "none",
+  "class": "mage",
+  "element": "dark",
+  "role": "dps",
+  "rarity": 5,
+  "base_stats": { "hp": 560, "atk": 150, "def": 45, "spd": 105 },
+  "skills": ["skill_sample_basic"]
+}

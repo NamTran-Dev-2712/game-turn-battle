@@ -16,11 +16,13 @@ internal static class TeamMapping
     public const string DefaultFormationId = "formation_default";
 
     public static TeamDto ToDto(DomainTeam team)
-        => new(team.Slots
-            .OrderBy(s => s.SlotIndex)
-            .Select(s => new TeamSlotDto(s.SlotIndex, s.HeroId))
-            .ToList());
+        => new(
+            team.Id,
+            team.Slots
+                .OrderBy(s => s.SlotIndex)
+                .Select(s => new TeamSlotDto(s.SlotIndex, s.HeroId))
+                .ToList());
 
-    /// <summary>DTO đội rỗng (chưa lưu đội nào) — client dựng lưới trống.</summary>
-    public static TeamDto Empty() => new(Array.Empty<TeamSlotDto>());
+    /// <summary>DTO đội rỗng (chưa lưu đội nào) — client dựng lưới trống (Id = <see cref="Guid.Empty"/>).</summary>
+    public static TeamDto Empty() => new(Guid.Empty, Array.Empty<TeamSlotDto>());
 }

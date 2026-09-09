@@ -1,6 +1,8 @@
 using System.Reflection;
 using FluentValidation;
 using GameTeam.Application.Behaviors;
+using GameTeam.Application.Combat;
+using GameTeam.Domain.Combat;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -40,6 +42,11 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(assembly);
+
+        // Combat (phase 24/30): sim thuần tất định (stateless — singleton an toàn) + resolver data-driven
+        // (đọc config qua IConfigProvider). Registry effect mặc định (§23). Không phải port Infra ⇒ đăng ký ở đây.
+        services.AddSingleton<BattleSimulator>(_ => new BattleSimulator());
+        services.AddScoped<CombatInputResolver>();
 
         return services;
     }

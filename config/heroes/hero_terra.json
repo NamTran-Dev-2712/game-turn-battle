@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "hero_terra",
+  "faction": "none",
+  "class": "warrior",
+  "element": "earth",
+  "role": "dps",
+  "rarity": 4,
+  "base_stats": { "hp": 600, "atk": 120, "def": 50, "spd": 100 },
+  "skills": ["skill_sample_basic"]
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "hero_lux",
+  "faction": "none",
+  "class": "support",
+  "element": "light",
+  "role": "support",
+  "rarity": 3,
+  "base_stats": { "hp": 700, "atk": 80, "def": 60, "spd": 90 },
+  "skills": ["skill_sample_basic"]
+}

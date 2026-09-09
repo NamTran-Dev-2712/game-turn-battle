@@ -1,6 +1,8 @@
 using System.Reflection;
 using GameTeam.Domain.Accounts;
+using GameTeam.Domain.Battles;
 using GameTeam.Domain.Common;
+using GameTeam.Domain.Economy;
 using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
 using GameTeam.Domain.Teams;
@@ -53,6 +55,12 @@ public class AppDbContext : DbContext
 
     /// <summary>Đội hình người chơi — đội 6 hero + vị trí, gắn 1-1 profile (Phase 29, ADR-007).</summary>
     public DbSet<Team> Teams => Set<Team>();
+
+    /// <summary>Bản ghi kết quả trận — server-authoritative + idempotency (profile, attempt_id) unique (Phase 30).</summary>
+    public DbSet<BattleRecord> BattleRecords => Set<BattleRecord>();
+
+    /// <summary>Ví tiền tệ người chơi — nền tối giản cấp thưởng, gắn 1-1 profile (Phase 30; đầy đủ ở Phase 31).</summary>
+    public DbSet<Wallet> Wallets => Set<Wallet>();
 
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();

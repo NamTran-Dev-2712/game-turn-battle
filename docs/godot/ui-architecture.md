@@ -89,6 +89,17 @@ thật (không thêm event/nút — danh mục EventBus ĐÓNG, `state-and-signa
   boot **vào hub chế độ offline** (nhãn `[offline]`) thay vì màn lỗi — hiển thị cache có nhãn, KHÔNG bịa dữ liệu
   (ADR-007/011). Chỉ hiện màn lỗi khi không có cache dùng được.
 
+### 4.2 Battle feature (Phase 30 — đã chốt)
+
+- **`client/src/ui/battle`** (`BattleView` thuần + `BattlePresenter`): vào từ hub (nút "Chiến đấu" →
+  `SceneRouter.goto_scene(battle, {stage_id})`; chọn stage = phase 34). Presenter: `GET /team` → `POST /battles`
+  (`{teamId, stageId, attemptId}`) → nhận `BattleResult` → **replay** bằng seed server (`CombatInputResolver` +
+  `BattleSimulator` client, đọc `ConfigProvider`) để vẽ diễn biến. **View KHÔNG gọi network**; presenter là điểm chạm.
+- **Server là authority (ADR-011/007):** `outcome`/`rewards` HIỂN THỊ **theo server** (client không tự quyết/cấp);
+  nếu replay lệch server ⇒ hiện theo server + `push_warning` (KHÔNG bịa). `attemptId` (idempotency key) do client sinh
+  mỗi lần đánh — re-fight = trận mới; server chống double-grant. Ví/currency toàn cục ở hub = phase 31 (Phase 30 chỉ
+  hiện thưởng của trận từ response). Chi tiết `combat-framework.md` §24, `state-and-signals.md` §4.
+
 ## 5. Accessibility & localization
 - Text qua khoá i18n (`resources-and-assets.md`); tránh chữ nhúng trong ảnh.
 - Kích thước chạm tối thiểu; tương phản đủ.

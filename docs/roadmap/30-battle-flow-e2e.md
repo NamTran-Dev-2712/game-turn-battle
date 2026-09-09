@@ -41,14 +41,14 @@ ADR-011 flow chính: server-authoritative + re-sim + client replay bằng seed. 
 
 # Công việc cần thực hiện
 
-- [ ] Contract: `StartBattleRequest{teamId,stageId}` → `BattleResult{seed,outcome,rewards,log}` (mở rộng phase 05) + codegen.
-- [ ] Server `StartBattleCommand`: lấy team snapshot (29) + stage config (21) → sinh seed → re-sim (24) → xác định outcome/rewards.
-- [ ] Ghi kết quả + cấp thưởng trong **transaction** (11); idempotency key chống double-grant (nền 11, dùng đầy đủ 31).
-- [ ] Trả BattleResult (seed + log + rewards).
-- [ ] Client feature `battle/`: gửi intent → nhận result → replay bằng seed (25) → vẽ trận + màn kết quả/thưởng.
-- [ ] Kiểm khớp: assert client replay outcome ≡ server outcome (cùng seed) trong test.
-- [ ] Test integration server (re-sim, transaction, idempotent) + gdUnit4 client (replay khớp).
-- [ ] Cập nhật `../gameplay/combat-framework.md` + `../architecture/overview.md`.
+- [x] Contract: `StartBattleRequest{teamId,stageId,attemptId}` → `BattleResultDto{seed,outcome,rounds,rewards,log}` (mở rộng phase 05, `GameTeam.Contracts/Battle`) + codegen (`openapi.json` + GDScript `battle_result_dto`/`reward_dto`/`start_battle_request`; `RealSpecTests` 41 xanh, không drift).
+- [x] Server `StartBattleCommand`: snapshot đội (29 `TeamSnapshotFactory`) + config (21 `IConfigProvider`) → sinh seed server (`IBattleSeedSource`) → re-sim (24 `BattleSimulator`) → outcome/rewards. Reconcile combat-config↔gameplay-config (base_stats/skills[]/combat_rules). Verify: 8 handler unit test + `BattleEndpointTests` (Testcontainers).
+- [x] Ghi kết quả + cấp thưởng trong **transaction** (11 `ITransactionalRequest`/`IUnitOfWork`); idempotency key `attemptId` — unique `(profile_id, attempt_id)` chống double-grant (nền 11, đầy đủ 31). Verify: `BattleEndpointTests` (rollback + retry không double-grant), `BattlePersistenceTests` (unique index).
+- [x] Trả BattleResult (seed + log + rewards) — `BattleResultDto`; retry dựng lại từ record đã lưu.
+- [x] Client feature `battle/` (`BattleView`+`BattlePresenter`): gửi intent → nhận result → replay bằng seed (25) → vẽ trận + kết quả/thưởng. Verify: Godot import exit 0 + gdUnit4.
+- [x] Kiểm khớp: assert client replay outcome ≡ server outcome (cùng seed) — `battle_presenter_test` (`replay_matches`) + golden gate §22 (server≡client) + `Returned_seed_reproduces_the_server_outcome_for_replay` (handler).
+- [x] Test integration server (re-sim, transaction, idempotent — `BattleEndpointTests` 6, Testcontainers pg16) + gdUnit4 client (`battle_presenter_test` 6). Toàn bộ **127 gdUnit4** + server test xanh; golden gate xanh.
+- [x] Cập nhật `../gameplay/combat-framework.md` §24 + `../architecture/overview.md` §8 (+ backend/api/infra/config/godot docs, doc-sync matrix).
 
 # Tiêu chí hoàn thành
 
@@ -85,6 +85,8 @@ ADR-011 flow chính: server-authoritative + re-sim + client replay bằng seed. 
 # Phase Review
 
 Đóng khi battle e2e chạy (server re-sim + client replay khớp + thưởng atomic idempotent), test hai phía xanh. **Cột mốc P2 — game có lát cắt dọc chơi được.**
+
+**Đã đóng (2026-09-08).** Bằng chứng: `dotnet build -c Release` 0/0; `dotnet test` — Domain 107 / Application 76 / Contracts 36 / Infrastructure 52 (Testcontainers pg16, +4 `BattlePersistenceTests`) / Api 73 (Testcontainers, +6 `BattleEndpointTests` A–F) / Codegen 41 / Config-validator 48 / Combat-baseline 4; Godot 4.7.1 `--headless --import` exit 0 + gdUnit4 **127/127, 0 orphan** (+6 `battle_presenter_test`); golden gate `run.sh check` 14 vector khớp; migration `AddBattlesAndWallets` `has-pending-model-changes` sạch; không drift `openapi.json`/generated. Acceptance: server re-sim quyết outcome; client replay bằng seed khớp; thưởng cấp bởi server atomic + idempotent (retry không double-grant); reward tối giản config-driven. Decision log: `.memory/0028-battle-flow-standardized.md`.
 
 ---
 

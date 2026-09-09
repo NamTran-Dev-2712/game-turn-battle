@@ -22,17 +22,21 @@ public class CombatDataDrivenTests
         StageId: StageId,
         Ally: new[] { new CombatTeamMember("u_ally_01", "hero_ally", 0) });
 
+    // Config đọc theo hình dạng GAMEPLAY thật (phase 30): hero.base_stats + hero.skills[]; skill.target/
+    // trigger/effects[].params.coeff_fixed (không phải lát cắt phẳng cũ). Resolver nâng coeff của effect
+    // damage lên cấp skill + suy actor_id địch = "enemy_{i}".
     private static FakeConfigProvider SeedConfig(int allyAtk)
     {
         var config = new FakeConfigProvider();
         config.Set("hero", "hero_ally", $$"""
-            { "hp": 1000, "atk": {{allyAtk}}, "def": 100, "spd": 120 }
+            { "base_stats": { "hp": 1000, "atk": {{allyAtk}}, "def": 100, "spd": 120 }, "skills": ["skill_basic"] }
             """);
         config.Set("hero", "hero_enemy", """
-            { "hp": 500, "atk": 150, "def": 80, "spd": 90 }
+            { "base_stats": { "hp": 500, "atk": 150, "def": 80, "spd": 90 }, "skills": ["skill_basic"] }
             """);
         config.Set("skill", "skill_basic", """
-            { "coeff_fixed": 1000, "target_rule": "default", "effects": [ { "effect_type": "damage" } ] }
+            { "target": "single_enemy", "trigger": { "type": "cooldown", "value": 0 },
+              "effects": [ { "effect_type": "damage", "params": { "coeff_fixed": 1000 } } ] }
             """);
         config.Set("stage", StageId, """
             {
@@ -46,7 +50,7 @@ public class CombatDataDrivenTests
                 "crit_rate_bp": 0,
                 "energy": { "initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100 }
               },
-              "enemies": [ { "actor_id": "u_enemy_01", "hero_id": "hero_enemy", "slot": 0 } ]
+              "enemies": [ { "hero_id": "hero_enemy", "slot": 0 } ]
             }
             """);
         return config;
@@ -65,7 +69,7 @@ public class CombatDataDrivenTests
         resolved.IsSuccess.Should().BeTrue();
         resolved.Value.ConfigVersion.Should().Be("config@v1");
         resolved.Value.Ally.Should().ContainSingle().Which.Stats.Atk.Should().Be(200);
-        resolved.Value.Enemy.Should().ContainSingle().Which.ActorId.Should().Be("u_enemy_01");
+        resolved.Value.Enemy.Should().ContainSingle().Which.ActorId.Should().Be("enemy_0");
 
         // atk=200, def=80, K=300 ⇒ 158 (khớp toán §17).
         FirstDamage(resolved.Value).Should().Be(158);
@@ -99,21 +103,22 @@ public class CombatDataDrivenTests
         // damage + apply_buff self) gán cho hero qua basic_skill_id ⇒ chạy đúng, KHÔNG sửa code lõi.
         var config = new FakeConfigProvider();
         config.Set("hero", "hero_ally", """
-            { "hp": 1000, "atk": 200, "def": 100, "spd": 120, "basic_skill_id": "skill_warblade" }
+            { "base_stats": { "hp": 1000, "atk": 200, "def": 100, "spd": 120 }, "skills": ["skill_warblade"] }
             """);
         config.Set("hero", "hero_enemy", """
-            { "hp": 500, "atk": 150, "def": 80, "spd": 90 }
+            { "base_stats": { "hp": 500, "atk": 150, "def": 80, "spd": 90 }, "skills": ["skill_basic"] }
             """);
         config.Set("skill", "skill_basic", """
-            { "coeff_fixed": 1000, "target_rule": "default", "effects": [ { "effect_type": "damage" } ] }
+            { "target": "single_enemy", "trigger": { "type": "cooldown", "value": 0 },
+              "effects": [ { "effect_type": "damage", "params": { "coeff_fixed": 1000 } } ] }
             """);
         // Skill hoàn toàn MỚI, chỉ khai báo trong config — không handler/loại effect mới, không sửa lõi.
         config.Set("skill", "skill_warblade", """
             {
-              "coeff_fixed": 1000,
-              "target_rule": "single_enemy",
+              "target": "single_enemy",
+              "trigger": { "type": "cooldown", "value": 0 },
               "effects": [
-                { "effect_type": "damage" },
+                { "effect_type": "damage", "params": { "coeff_fixed": 1000 } },
                 { "effect_type": "apply_buff", "target": "self", "params": { "atk": 50, "duration": 3 } }
               ]
             }
@@ -130,7 +135,7 @@ public class CombatDataDrivenTests
                 "crit_rate_bp": 0,
                 "energy": { "initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100 }
               },
-              "enemies": [ { "actor_id": "u_enemy_01", "hero_id": "hero_enemy", "slot": 0 } ]
+              "enemies": [ { "hero_id": "hero_enemy", "slot": 0 } ]
             }
             """);
 

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using GameTeam.Domain.Accounts;
+using GameTeam.Domain.Battles;
 using GameTeam.Domain.Common;
 using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
@@ -104,6 +105,24 @@ public sealed class RecordingTeamSavedHandler
     public RecordingTeamSavedHandler(DispatchedEventsCollector collector) => _collector = collector;
 
     public Task Handle(DomainEventNotification<TeamSaved> notification, CancellationToken cancellationToken)
+    {
+        _collector.Add(notification.DomainEvent);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// Handler cho <see cref="DomainEventNotification{TDomainEvent}"/> của <see cref="BattleResolved"/> (Phase 30) —
+/// chứng minh event khi ghi kết quả trận cũng dispatch qua đúng kiểu cụ thể sau SaveChanges.
+/// </summary>
+public sealed class RecordingBattleResolvedHandler
+    : INotificationHandler<DomainEventNotification<BattleResolved>>
+{
+    private readonly DispatchedEventsCollector _collector;
+
+    public RecordingBattleResolvedHandler(DispatchedEventsCollector collector) => _collector = collector;
+
+    public Task Handle(DomainEventNotification<BattleResolved> notification, CancellationToken cancellationToken)
     {
         _collector.Add(notification.DomainEvent);
         return Task.CompletedTask;

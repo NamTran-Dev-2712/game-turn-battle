@@ -5,6 +5,7 @@ using GameTeam.Api.Http;
 using GameTeam.Application;
 using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Features.Auth.Commands;
+using GameTeam.Application.Features.Battles;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
 using GameTeam.Application.Features.Heroes.Queries;
@@ -12,6 +13,7 @@ using GameTeam.Application.Features.Profile.Commands;
 using GameTeam.Application.Features.Teams.Commands;
 using GameTeam.Application.Features.Teams.Queries;
 using GameTeam.Contracts.Auth;
+using GameTeam.Contracts.Battle;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
 using GameTeam.Contracts.Hero;
@@ -168,6 +170,20 @@ apiV1.MapPost("/team", (SaveTeamRequest request, ISender sender, HttpContext htt
     .Produces<TeamDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// POST /api/v1/battles (Phase 30): đánh một trận — luồng server-authoritative (ADR-011/007). Body là INTENT
+// (StartBattleRequest{teamId, stageId, attemptId}); server snapshot đội + sinh seed + re-sim (24) + cấp thưởng
+// atomic (transaction) rồi trả BattleResult{seed, outcome, rewards, log} để client replay bằng seed. attemptId
+// là idempotency key: retry cùng khoá ⇒ trả kết quả đã lưu, KHÔNG cấp thưởng lần hai. Protected mặc định.
+apiV1.MapPost("/battles", (StartBattleRequest request, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(
+            sender.Send(new StartBattleCommand(request.TeamId, request.StageId, request.AttemptId)), httpContext))
+    .WithName("StartBattle")
+    .MapToApiVersion(1)
+    .Produces<BattleResultDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC

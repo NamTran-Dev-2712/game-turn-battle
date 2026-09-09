@@ -71,6 +71,17 @@ byte-identical). Adding a skill from existing effect types is **config-only**; a
 config + test. The only `effect_type ==` is the attack-vs-non-attack classification, never handler dispatch. CB4 numbers stay `[OPEN]`;
 `shield` + generic conditions are debt; real `config/skills`→battle wiring = phase 30. Canon: `docs/gameplay/skill-framework.md` + §23.
 
+**Battle flow + config reconciliation (Phase 30, closed).** The battle endpoint now exists (`POST /api/v1/battles` →
+`StartBattleCommand` → server seed + re-sim + atomic idempotent reward). The Phase-24 combat readers were reconciled to the
+**real gameplay config** (`HeroCombatConfig` base_stats+skills[]; `SkillCombatConfig` target/trigger/effects[].params.coeff_fixed;
+`StageCombatConfig` combat_rules/max_rounds/enemy slot; `stage.schema.json` extended **additively**). **The two `CombatInputResolver`s
+(server `GameTeam.Application/Combat` + client `client/src/combat/combat_input_resolver.gd`) MUST map identically** — skills[]→
+basic(energy==0)/ultimate(energy>0), damage `coeff_fixed`→`SkillDef.CoeffFixed`, enemy actor `enemy_{i}` — or replay diverges. The
+resolver change does **not** touch the sim/golden vectors (vectors build `BattleInput` directly, bypassing the resolver), but ANY
+resolver change must be mirrored on both sides and re-verified (server ≡ client replay). The server sim is authority; the client
+replays by the **server-returned seed** and shows the server outcome even on mismatch (never fabricate). Canon: `combat-framework.md`
+§24 + `.memory/0028`.
+
 ## Completion workflow (every combat task — mirrors CLAUDE.md §4.5/§4.6)
 1. Read the phase requirement + ADR-011 + the spec (§9–§20) before changing anything. 2. Search the repo for an existing
 decision; prefer ADR/spec over a new invention. 3. Stay in scope — no future-phase work. 4. Keep the canon in sync

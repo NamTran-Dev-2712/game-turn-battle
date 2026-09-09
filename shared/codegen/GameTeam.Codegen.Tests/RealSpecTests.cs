@@ -25,7 +25,9 @@ public class RealSpecTests
             // Phase 27 — hero contract.
             "owned_hero_dto.gd", "my_heroes_response.gd", "hero_definition_dto.gd", "hero_base_stats_dto.gd",
             // Phase 29 — team/formation contract.
-            "team_dto.gd", "team_slot_dto.gd", "save_team_request.gd");
+            "team_dto.gd", "team_slot_dto.gd", "save_team_request.gd",
+            // Phase 30 — battle contract.
+            "start_battle_request.gd", "battle_result_dto.gd", "reward_dto.gd");
     }
 
     [Fact]
