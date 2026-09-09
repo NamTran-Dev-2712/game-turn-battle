@@ -17,4 +17,7 @@ public sealed class StageCombatConfig
 
     /// <summary>Đội hình địch của màn.</summary>
     public IReadOnlyList<StageEnemyConfig> Enemies { get; init; } = new List<StageEnemyConfig>();
+
+    /// <summary>Tham chiếu bảng thưởng (<c>stage.rewards[] → reward id</c>); server cấp khi thắng (phase 30).</summary>
+    public IReadOnlyList<string> Rewards { get; init; } = Array.Empty<string>();
 }

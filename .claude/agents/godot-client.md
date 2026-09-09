@@ -115,6 +115,19 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   HTTP/config/state path, or client-side validation of ownership/count/duplicates (server is the authority).** Out of scope:
   battle (30)/preset (Post-MVP)/positional bonus. Canonical: `docs/gameplay/hero-system.md` §8; decision log
   `.memory/0027-team-formation-standardized.md`.
+- **Battle flow (Phase 30, closed — CLOSES P2, first playable slice):** feature `src/ui/battle/` (`BattleView`
+  **network-free** + `BattlePresenter`). Reached from hub button "Chiến đấu" (`MainHubPresenter` `BATTLE_PATH` with
+  `{stage_id}`; stage-select = phase 34). Presenter: `get_json("/team")` → `post_json("/battles", {teamId, stageId,
+  attemptId})` → receives `BattleResultDto` → **replays** by the returned seed (client `CombatInputResolver` +
+  `BattleSimulator` + `ConfigProvider`) to render the sequence. **Server is authority (ADR-011/007):** `outcome`/`rewards`
+  displayed **from the server**; on replay mismatch show the server outcome + `push_warning` (**never fabricate**); the client
+  never chooses the seed nor grants reward; `attemptId` (idempotency key) is client-generated per fight (re-fight = new
+  battle; server prevents double-grant). Parser `parse_battle_result` → generated `BattleResultDto`/`RewardDto`; `parse_team`
+  reads `id` (client sends teamId). **Client resolver `src/combat/combat_input_resolver.gd` reads the REAL gameplay config**
+  (base_stats+skills[]; skill target/trigger/effects[].params.coeff_fixed; enemy actor `enemy_{i}`) — **identical to the
+  server** (bit-for-bit replay); never fork a second resolver/sim. **No new EventBus event.** Hub global wallet/currency =
+  phase 31 (Phase 30 shows only this battle's rewards from the response). Canonical: `docs/gameplay/combat-framework.md` §24 +
+  `docs/godot/ui-architecture.md` §4.2; decision log `.memory/0028-battle-flow-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

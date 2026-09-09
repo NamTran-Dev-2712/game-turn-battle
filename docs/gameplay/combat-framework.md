@@ -472,3 +472,47 @@ compute_damage(attacker, target, skill, crit):
 ### 23.7 Ngoài phạm vi (nợ)  [ghi rõ]
 - `shield` (giữ trong enum schema, chưa có handler) + hệ điều kiện tổng quát = **nợ tài liệu**; `trigger` (energy/cooldown) là cơ chế điều kiện hiện tại.
 - Số liệu balance ultimate/energy (CB4); nội dung skill đầy đủ; battle endpoint + wiring `config/skills` thật = **phase 30**+.
+
+## 24. Battle flow end-to-end — Phase 30  [CHỐT — P2, lát cắt dọc chơi được]
+
+> Phase 30 **nối trọn luồng trận** (hiện thực §3 + ADR-011/007): client gửi ý định → server re-sim quyết kết quả + cấp
+> thưởng (transaction, idempotent) → trả `BattleResult{seed}` → client **replay** bằng seed. Không đổi spec §9–§23; đây là
+> tầng **orchestration + persistence + endpoint** quanh sim đã đóng.
+
+### 24.1 Endpoint + contract  [CHỐT]
+- **`POST /api/v1/battles`** (versioned, protected mặc định). Body `StartBattleRequest{ teamId, stageId, attemptId }`
+  (mở rộng contract Phase 05, `GameTeam.Contracts/Battle`). Trả **`BattleResultDto{ seed, outcome, rounds, rewards[], log }`**:
+  - `seed` = **Int64 không âm** (server ép bit dấu) ⇒ round-trip số nguyên an toàn C# ↔ Godot `int`.
+  - `log` = chuỗi JSON tất định (`{event_log, result}` — cùng định dạng `shared/combat-vectors`, `CombatEventSerializer`), để
+    client vẽ + đối chiếu replay.
+  - `attemptId` = **idempotency key do client sinh** (một lần đánh); retry cùng khoá ⇒ trả kết quả đã lưu, KHÔNG cấp thưởng lần hai.
+
+### 24.2 `StartBattleCommand` (server-authoritative)  [CHỐT]
+`GameTeam.Application/Features/Battles`: chủ sở hữu từ token (`ICurrentUser`, chống IDOR) → profile → **idempotency check**
+(`IBattleRecordRepository.GetByProfileAndAttempt`) → snapshot đội (Phase 29 `TeamSnapshotFactory`; validate `teamId` khớp đội
+người gọi) → **server sinh seed** (`IBattleSeedSource`, RNG mật mã — client KHÔNG chọn seed) → `CombatInputResolver.Resolve`
+(đọc **gameplay config thật**: `hero.base_stats`+`hero.skills[]`, `skill.target/trigger/effects[].params.coeff_fixed`,
+`stage.combat_rules`) → **`BattleSimulator.Simulate`** (nguồn chân lý — Phase 24) → xác định outcome/rounds/log.
+
+### 24.3 Thưởng tối giản + transaction + idempotency  [CHỐT]
+- **Thưởng config-driven, server cấp:** chỉ khi **VICTORY**, đọc `stage.rewards[] → reward table` (`reward.schema.json`), cấp
+  entry loại **`currency`** vào **ví** (`Wallet`, credit-only — nền tối giản; currency/inventory đầy đủ = Phase 31–33). Loại
+  hero/fragment/item = nợ Phase 31+. Client **không tự cấp** — chỉ hiển thị `rewards` từ response.
+- **Atomic:** ghi `BattleRecord` + credit `Wallet` trong **một transaction** (`ITransactionalRequest` → `TransactionBehavior`
+  → `IUnitOfWork`). Lỗi giữa chừng ⇒ rollback toàn bộ (không partial state).
+- **Idempotency (ADR-007):** unique index **`(profile_id, attempt_id)`** trên `battle_records` là bảo đảm tầng DB; check-first
+  xử lý retry thường. Retry cùng `attemptId` ⇒ dựng lại `BattleResult` từ record đã lưu (không re-sim, không cấp thưởng lần hai).
+
+### 24.4 Client replay bằng seed  [CHỐT]
+- `client/src/ui/battle` (`BattleView` thuần + `BattlePresenter`): `GET /team` → `POST /battles` → nhận `BattleResult` →
+  **replay** bằng `CombatInputResolver` (client, đọc `ConfigProvider`) + `BattleSimulator` (Phase 25) với **cùng seed** ⇒ dựng
+  diễn biến để vẽ. `outcome`/`rewards` HIỂN THỊ **theo server** (authority); nếu replay lệch ⇒ hiện theo server + `push_warning`
+  (KHÔNG bịa). Đội ally khớp server (`actor_id = "ally_{slot}"`); địch `actor_id = "enemy_{i}"` suy từ stage (khớp hai phía).
+
+### 24.5 Kiểm khớp + gate  [CHỐT]
+- **Replay ≡ server** đảm bảo bởi golden gate §22 (server ≡ client cùng seed) + test presenter (`replay_matches`). Server:
+  `dotnet test` — `StartBattleCommandHandler` (re-sim/outcome/reward/idempotency/IDOR/defeat) + Testcontainers
+  (`BattleEndpointTests` A–F: re-sim, tx rollback, idempotent, seed re-sim khớp log; `BattlePersistenceTests`: JSON round-trip,
+  unique index, dispatch `BattleResolved`). Client: gdUnit4 `battle_presenter_test`.
+- **Ngoài phạm vi (nợ):** currency/inventory đầy đủ + ví UI (31–33); nhiều stage/campaign (34); sweep (43); refresh token; loại
+  thưởng hero/fragment/item. Reconcile combat-config↔gameplay-config (đọc `base_stats`/`skills[]`/`combat_rules`) hoàn tất ở đây.

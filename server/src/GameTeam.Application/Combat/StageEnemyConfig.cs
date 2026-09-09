@@ -1,14 +1,15 @@
 namespace GameTeam.Application.Combat;
 
-/// <summary>Một đơn vị địch trong stage config (định danh + hero + slot; chỉ số lấy từ hero config).</summary>
+/// <summary>
+/// Một đơn vị địch trong stage config (bám <c>stage.schema.json</c> enemies): <c>hero_id</c> (đọc chỉ số từ
+/// hero config) + <c>slot</c> tuỳ chọn (vị trí đội hình; vắng ⇒ suy theo thứ tự). Định danh trong trận
+/// (<c>actor_id</c>) do <see cref="CombatInputResolver"/> suy ra (<c>enemy_{i}</c>) — ổn định, tất định.
+/// </summary>
 public sealed class StageEnemyConfig
 {
-    /// <summary>Định danh ổn định trong trận.</summary>
-    public string ActorId { get; init; } = string.Empty;
-
     /// <summary>Hero tham chiếu (để đọc chỉ số).</summary>
     public string HeroId { get; init; } = string.Empty;
 
-    /// <summary>Vị trí đội hình.</summary>
-    public int Slot { get; init; }
+    /// <summary>Vị trí đội hình (tuỳ chọn; vắng ⇒ suy theo chỉ số thứ tự trong danh sách).</summary>
+    public int? Slot { get; init; }
 }

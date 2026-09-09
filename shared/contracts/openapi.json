@@ -275,6 +275,66 @@
         }
       }
     },
+    "/api/v1/battles": {
+      "post": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "StartBattle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartBattleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BattleResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -422,6 +482,38 @@
           "expiresInSeconds": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "BattleResultDto": {
+        "required": [
+          "seed",
+          "outcome",
+          "rounds",
+          "rewards",
+          "log"
+        ],
+        "type": "object",
+        "properties": {
+          "seed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "rounds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rewards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RewardDto"
+            }
+          },
+          "log": {
+            "type": "string"
           }
         }
       },
@@ -704,6 +796,26 @@
           5
         ]
       },
+      "RewardDto": {
+        "required": [
+          "rewardType",
+          "refId",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "rewardType": {
+            "type": "string"
+          },
+          "refId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "Role": {
         "enum": [
           "None",
@@ -755,12 +867,37 @@
           }
         }
       },
+      "StartBattleRequest": {
+        "required": [
+          "teamId",
+          "stageId",
+          "attemptId"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stageId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          }
+        }
+      },
       "TeamDto": {
         "required": [
+          "id",
           "slots"
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "slots": {
             "type": "array",
             "items": {

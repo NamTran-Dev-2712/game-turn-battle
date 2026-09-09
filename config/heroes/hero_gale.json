@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "hero_gale",
+  "faction": "none",
+  "class": "ranger",
+  "element": "light",
+  "role": "dps",
+  "rarity": 4,
+  "base_stats": { "hp": 520, "atk": 140, "def": 40, "spd": 130 },
+  "skills": ["skill_sample_basic"]
+}

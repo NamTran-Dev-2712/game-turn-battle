@@ -32,7 +32,7 @@ Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/conf
 |---|---|---|---|---|
 | hero | `hero.schema.json` | `hero-system.md` | `skills` → skill id | `base_stats` integer; `faction` chuỗi (GP2 chưa chốt); **`art`** tuỳ chọn (path/atlas → AssetLoader lazy, ADR-009 — thêm additive phase 27) |
 | skill | `skill.schema.json` | `skill-framework.md` | `effects[].effect_type` (registry) | effect_type: damage/heal/apply_buff/apply_debuff/shield; `params` typed tuỳ chọn (coeff_fixed/amount_fixed/atk/def/spd/duration) + `trigger`/`cooldown` (Phase 28) |
-| stage | `stage.schema.json` | `progression-and-economy.md` | `enemies[].hero_id` → hero; `rewards[]` → reward | `energy_cost` integer |
+| stage | `stage.schema.json` | `progression-and-economy.md` | `enemies[].hero_id` → hero; `rewards[]` → reward | `energy_cost` integer; **Phase 30 (additive, không bump version):** optional `max_rounds`/`basic_skill_id`/`combat_rules{…}` + enemy `slot` để nối sim thật (combat-framework §24) |
 | reward | `reward.schema.json` | `progression-and-economy.md` | `entries[].ref_id` (currency/hero/fragment/item) | `amount` integer |
 | gacha | `gacha.schema.json` | `progression-and-economy.md` | `pool[]` → hero; `rates[].rarity` | rate/pity **cấu trúc**, không giá trị |
 | shop | `shop.schema.json` | `progression-and-economy.md` | `items[].reward_ref` → reward; `cost.currency` | `cost.amount` integer |

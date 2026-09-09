@@ -12,10 +12,16 @@ const _EVENT_STATE_REFRESHED: StringName = &"state_refreshed"
 const HERO_LIST_PATH: String = "res://src/ui/hero_list/hero_list.tscn"
 ## Màn đội hình (Phase 29, Formation) — điều hướng khi bấm nút "Đội hình".
 const FORMATION_PATH: String = "res://src/ui/formation/formation.tscn"
+## Màn trận (Phase 30, Battle flow) — điều hướng khi bấm nút "Chiến đấu".
+const BATTLE_PATH: String = "res://src/ui/battle/battle.tscn"
+## Stage demo mặc định khi vào trận từ hub (khớp config/stages/stage_demo_01.json). Màn chọn stage = phase 34.
+const DEMO_STAGE_ID: String = "stage_demo_01"
 ## Id ý định nút "Anh hùng" (khớp MainHubView.FEATURES).
 const _INTENT_HEROES: StringName = &"heroes"
 ## Id ý định nút "Đội hình" (khớp MainHubView.FEATURES).
 const _INTENT_FORMATION: StringName = &"formation"
+## Id ý định nút "Chiến đấu" (khớp MainHubView.FEATURES).
+const _INTENT_BATTLE: StringName = &"battle"
 
 var _view: BaseView = null
 # Nguồn đọc (inject cho test; mặc định = autoload). CHỈ đọc-cache, không network.
@@ -88,5 +94,10 @@ func _on_intent(intent_name: StringName, _payload: Dictionary) -> void:
 	if intent_name == _INTENT_FORMATION:
 		if _scene_router != null:
 			_scene_router.goto_scene(FORMATION_PATH)
+		return
+	if intent_name == _INTENT_BATTLE:
+		# Vào trận với stage demo (phase 30). Presenter đọc stage_id từ route context. Chọn stage = phase 34.
+		if _scene_router != null:
+			_scene_router.goto_scene(BATTLE_PATH, {"stage_id": DEMO_STAGE_ID})
 		return
 	print_verbose("MainHub: intent '%s' (placeholder — feature ở phase sau)." % intent_name)

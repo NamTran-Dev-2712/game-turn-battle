@@ -17,10 +17,46 @@
         "required": ["hero_id"],
         "properties": {
           "hero_id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/hero_id" },
-          "level": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+          "level": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+          "slot": {
+            "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+            "description": "Vị trí đội hình địch (tuỳ chọn; vắng ⇒ suy theo thứ tự). Ảnh hưởng target/aggro (combat-framework §14)."
+          }
         },
         "additionalProperties": false
       }
+    },
+    "max_rounds": {
+      "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+      "description": "Số vòng tối đa của trận (đạt ⇒ DRAW — combat-framework §19). Tuỳ chọn; giá trị thật là tuning."
+    },
+    "basic_skill_id": {
+      "$ref": "https://game-team/schema/common.schema.json#/$defs/skill_id",
+      "description": "Skill đòn thường dùng chung của màn khi hero không có skill riêng (§23). Tuỳ chọn."
+    },
+    "combat_rules": {
+      "type": "object",
+      "description": "Luật/hằng số combat của màn (data-driven — §16/§17/§19). Toàn bộ là combat_int; giá trị thật là tuning (ADR-004).",
+      "properties": {
+        "def_constant_k": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int", "description": "Hằng K trong K/(K+def)." },
+        "min_damage": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int", "description": "Sàn sát thương tối thiểu." },
+        "crit_multiplier_fixed": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int", "description": "Hệ số chí mạng fixed-point (1.5 → 1500)." },
+        "accuracy_bp": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int", "description": "Tỉ lệ trúng (basis point)." },
+        "crit_rate_bp": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int", "description": "Tỉ lệ chí mạng (basis point)." },
+        "energy": {
+          "type": "object",
+          "description": "Config năng lượng (§15, CB4 [ĐỀ XUẤT]). Gain = 0 ⇒ tắt.",
+          "properties": {
+            "initial": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+            "on_attack": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+            "on_hit": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+            "ultimate_cost": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+            "max": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "rewards": {
       "type": "array",

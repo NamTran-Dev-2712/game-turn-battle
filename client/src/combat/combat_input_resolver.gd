@@ -55,12 +55,14 @@ func _build_ally(members: Array, config_provider: Node) -> Array[UnitSnapshot]:
 	return units
 
 
+# Địch bám stage config gameplay (chỉ hero_id + slot?): định danh actor_id suy ra "enemy_{i}" (khớp server
+# CombatInputResolver.cs — tất định), slot lấy từ config hoặc chỉ số thứ tự.
 func _build_enemies(enemies: Array, config_provider: Node) -> Array[UnitSnapshot]:
 	var units: Array[UnitSnapshot] = []
-	for enemy in enemies:
-		var e := enemy as Dictionary
+	for i in enemies.size():
+		var e := enemies[i] as Dictionary
 		units.append(_build_unit(
-			str(e.get("actor_id", "")), str(e.get("hero_id", "")), TEAM_ENEMY, int(e.get("slot", 0)), config_provider))
+			"enemy_%d" % i, str(e.get("hero_id", "")), TEAM_ENEMY, int(e.get("slot", i)), config_provider))
 	return units
 
 
@@ -79,17 +81,25 @@ func _build_unit(actor_id: String, hero_id: String, team: String, slot: int, con
 	return u
 
 
-# Bộ skill riêng của unit (§23): hero có `basic_skill_id` ⇒ dựng UnitSkillSet (basic + ultimate tuỳ chọn);
-# không có ⇒ null (dùng basic skill dùng chung của trận). Ánh xạ từ gameplay hero.skills[] là phase 30.
+# Bộ skill riêng của unit (§23) — ánh xạ từ gameplay `hero.skills[]` (phase 30, khớp server): resolve tất cả
+# skill; ULTIMATE = skill đầu tiên tốn năng lượng (trigger.type=energy ⇒ energy_cost>0); BASIC = skill đầu tiên
+# không tốn năng lượng (fallback: skill đầu). Không skill ⇒ null (dùng basic dùng chung của màn).
 func _build_unit_skills(hero: Dictionary, config_provider: Node) -> UnitSkillSet:
-	var basic_id := str(hero.get("basic_skill_id", ""))
-	if basic_id == "":
+	var skill_ids: Array = hero.get("skills", [])
+	if skill_ids.is_empty():
 		return null
-	var basic := _resolve_skill(basic_id, config_provider)
-	var ultimate_id := str(hero.get("ultimate_skill_id", ""))
+	var resolved: Array[SkillDef] = []
+	for sid in skill_ids:
+		resolved.append(_resolve_skill(str(sid), config_provider))
+	var basic: SkillDef = null
 	var ultimate: SkillDef = null
-	if ultimate_id != "":
-		ultimate = _resolve_skill(ultimate_id, config_provider)
+	for s in resolved:
+		if basic == null and s.energy_cost == 0:
+			basic = s
+		if ultimate == null and s.energy_cost > 0:
+			ultimate = s
+	if basic == null:
+		basic = resolved[0]
 	return UnitSkillSet.make(basic, ultimate)
 
 
@@ -99,15 +109,29 @@ func _resolve_skill(skill_id: String, config_provider: Node) -> SkillDef:
 	return _build_skill(skill_id, skill)
 
 
-# Dựng SkillDef từ lát cắt combat config (coeff_fixed/target_rule/effects/energy_cost/cooldown_rounds).
+# Dựng SkillDef từ gameplay skill config (khớp server): target→target_rule; trigger.type=energy ⇒
+# energy_cost=trigger.value; cooldown→cooldown_rounds; NÂNG coeff của effect `damage` (params.coeff_fixed) lên
+# cấp skill vì sim tiêu thụ coeff ở cấp skill (§17).
 func _build_skill(skill_id: String, skill: Dictionary) -> SkillDef:
+	var coeff := 0
+	var raw: Array = skill.get("effects", [])
+	for e in raw:
+		if e is Dictionary and str((e as Dictionary).get("effect_type", "")) == DamageEffectHandler.TYPE_NAME:
+			var params: Dictionary = (e as Dictionary).get("params", {})
+			if params.has("coeff_fixed"):
+				coeff = int(params["coeff_fixed"])
+				break
+	var trigger: Dictionary = skill.get("trigger", {})
+	var energy_cost := 0
+	if str(trigger.get("type", "")) == "energy":
+		energy_cost = int(trigger.get("value", 0))
 	return SkillDef.make(
 		skill_id,
-		int(skill.get("coeff_fixed", 0)),
-		str(skill.get("target_rule", "default")),
+		coeff,
+		str(skill.get("target", "single_enemy")),
 		_build_effects(skill),
-		int(skill.get("energy_cost", 0)),
-		int(skill.get("cooldown_rounds", 0)))
+		energy_cost,
+		int(skill.get("cooldown", 0)))
 
 
 # effects của skill: list rỗng ⇒ mặc định một `damage` (khớp server). Mỗi phần tử là String

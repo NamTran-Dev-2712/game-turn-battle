@@ -6,5 +6,8 @@
 class_name TeamDto
 extends Resource
 
+## wire: id
+var id: String
+
 ## wire: slots
 var slots: Array[TeamSlotDto]

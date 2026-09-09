@@ -1,11 +1,13 @@
 using System.Text;
 using GameTeam.Application.Abstractions.Caching;
+using GameTeam.Application.Abstractions.Combat;
 using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
 using GameTeam.Domain.Common;
 using GameTeam.Infrastructure.Auth;
 using GameTeam.Infrastructure.Caching;
+using GameTeam.Infrastructure.Combat;
 using GameTeam.Infrastructure.Configuration;
 using GameTeam.Infrastructure.Persistence;
 using GameTeam.Infrastructure.Persistence.Repositories;
@@ -62,6 +64,11 @@ public static class DependencyInjection
 
         // Repository đặc thù feature: team/formation (Phase 29) — lookup theo profile_id (unique).
         services.AddScoped<ITeamRepository, TeamRepository>();
+
+        // Repository + seed source cho luồng trận (Phase 30): battle record (idempotency) + ví (cấp thưởng).
+        services.AddScoped<IBattleRecordRepository, BattleRecordRepository>();
+        services.AddScoped<IWalletRepository, WalletRepository>();
+        services.AddSingleton<IBattleSeedSource, CryptoBattleSeedSource>();
 
         // ── Cache phân tán: Redis (ADR-003/005, Phase 12) ────────────────────────────────────────
         // Connection LẤY TỪ CONFIG (env ConnectionStrings__Redis) — không hardcode host/port/password.

@@ -78,6 +78,24 @@ Bảng **`owned_heroes`** — hero người chơi sở hữu, mở rộng gốc 
 - **Seed tạm (tới phase 33):** guest login cấp hero từ config **cùng transaction** account+profile (`CreateGuestAccountCommandHandler`).
 - Test: Testcontainers pg16 — round-trip theo `profile_id`, unique `(profile_id, hero_id)`, dispatch `OwnedHeroGranted` (§5.1).
 
+### 1.4 Battle + Wallet persistence (Phase 30 — đóng & verify)
+
+Hai bảng nền cho luồng trận (ADR-011/007), mở rộng gốc save `PlayerProfile`:
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| Battle record | `Persistence/Configurations/BattleRecordConfiguration.cs` | `ToTable("battle_records")`; cột `snake_case`: `id`(uuid PK), `profile_id`, `attempt_id`, `team_id`, `stage_id`, `seed`(bigint, Int64 không âm), `outcome`, `rounds`, `log`(text), `schema_version`, `created_at`; thưởng đã cấp = cột **JSON `rewards`** (EF9 `OwnsMany().ToJson()`). **Unique `(profile_id, attempt_id)`** = **idempotency tầng DB** (ADR-007, chống double-grant khi race) + FK → `player_profiles` (cascade). |
+| Wallet | `Persistence/Configurations/WalletConfiguration.cs` | `ToTable("wallets")`; `id`(uuid PK), `profile_id`, `schema_version`, `created_at`, `updated_at`; số dư = cột **JSON `balances`** (`OwnsMany().ToJson()`). **Unique `profile_id`** (1-1) + FK → `player_profiles` (cascade). Nền **tối giản credit-only** (Phase 30); currency/inventory đầy đủ = Phase 31–33. |
+| Repository | `Persistence/Repositories/{BattleRecordRepository,WalletRepository}.cs` | `IBattleRecordRepository` (`GetById`+`Add`+**`GetByProfileAndAttemptAsync`**), `IWalletRepository` (`GetById`+`Add`+**`GetByProfileIdAsync`** — trả thực thể được track để credit trong transaction). Không rò `IQueryable`/`DbContext`. |
+| Seed source | `Combat/CryptoBattleSeedSource.cs` | `IBattleSeedSource` — RNG mật mã (`RandomNumberGenerator`), ép bit dấu = 0 ⇒ Int64 không âm (server sinh seed — ADR-011; không RNG global/wall-clock). |
+| Migration | `Persistence/Migrations/*_AddBattlesAndWallets.cs` | Tạo 2 bảng + PK + FK + unique index. `has-pending-model-changes` sạch. |
+| DI | `DependencyInjection.cs` | `IBattleRecordRepository`/`IWalletRepository` (scoped) + `IBattleSeedSource` (singleton). `DbSet<BattleRecord>`/`DbSet<Wallet>` thêm vào `AppDbContext`. |
+
+- **Ghi kết quả + cấp thưởng ATOMIC**: `StartBattleCommand` (`ITransactionalRequest`) → `TransactionBehavior` bọc `IUnitOfWork`;
+  credit ví + ghi `BattleRecord` cùng một transaction (lỗi ⇒ rollback, không partial state). Dispatch `BattleResolved` ở `SaveChanges`.
+- Test: Testcontainers pg16 — round-trip JSON `rewards`/`balances`, **unique `(profile_id, attempt_id)`**, credit ví, dispatch
+  `BattleResolved` (`BattlePersistenceTests`); end-to-end HTTP re-sim/rollback/idempotent (`BattleEndpointTests`, §5.1).
+
 ---
 
 ## 2. Caching — Redis

@@ -196,18 +196,23 @@ sequenceDiagram
     participant DB as PostgreSQL/Redis
 
     P->>C: Chọn stage, bấm đánh
-    C->>API: POST /battles (teamId, stageId) + JWT
+    C->>API: POST /api/v1/battles (teamId, stageId, attemptId) + JWT
     API->>App: StartBattleCommand
-    App->>Sim: Re-sim deterministic (seed, snapshot)
-    Sim-->>App: Kết quả + log (thắng/thua, thưởng)
-    App->>DB: Ghi kết quả + cấp thưởng (transaction)
-    App-->>API: BattleResult (seed, outcome, rewards)
+    App->>App: Idempotency check (profile, attemptId) — retry ⇒ trả kết quả đã lưu
+    App->>App: Snapshot đội (29) + sinh seed server (ADR-011)
+    App->>Sim: Re-sim deterministic (seed, snapshot, config)
+    Sim-->>App: outcome + log (thắng/thua/hoà)
+    App->>DB: Ghi BattleRecord + credit ví (transaction, idempotent)
+    App-->>API: BattleResult (seed, outcome, rewards, log)
     API-->>C: BattleResult
-    C->>C: Phát lại trận bằng seed để hiển thị
-    C-->>P: Xem trận + nhận thưởng
+    C->>C: Replay bằng seed (sim client 25) để hiển thị + đối chiếu
+    C-->>P: Xem trận + nhận thưởng (server cấp)
 ```
 
-> Client mô phỏng **để hiển thị** dựa trên `seed` server trả; server là **nguồn sự thật** của kết quả & thưởng. Chi tiết `docs/gameplay/combat-framework.md`.
+> **Phase 30 (P2 — lát cắt dọc chơi được):** client gửi **ý định** (`attemptId` = idempotency key do client sinh); server
+> **sinh seed + re-sim** quyết kết quả và **cấp thưởng tối giản (currency) atomic + idempotent**; client mô phỏng **để hiển thị**
+> bằng `seed` server trả — server là **nguồn sự thật** của kết quả & thưởng (không tự quyết/không tự cấp). Chi tiết
+> `docs/gameplay/combat-framework.md` §24.
 
 ---
 

@@ -91,11 +91,11 @@ func _bundle(version: int, ally_atk: int) -> Dictionary:
 		"schema_version": 1,
 		"data": {
 			"hero": {
-				"hero_ally": {"id": "hero_ally", "base_stats": {"hp": 1000, "atk": ally_atk, "def": 100, "spd": 120}},
-				"hero_enemy": {"id": "hero_enemy", "base_stats": {"hp": 500, "atk": 150, "def": 80, "spd": 90}},
+				"hero_ally": {"id": "hero_ally", "base_stats": {"hp": 1000, "atk": ally_atk, "def": 100, "spd": 120}, "skills": ["skill_basic"]},
+				"hero_enemy": {"id": "hero_enemy", "base_stats": {"hp": 500, "atk": 150, "def": 80, "spd": 90}, "skills": ["skill_basic"]},
 			},
 			"skill": {
-				"skill_basic": {"id": "skill_basic", "coeff_fixed": 1000, "target_rule": "default", "effects": ["damage"]},
+				"skill_basic": {"id": "skill_basic", "target": "single_enemy", "trigger": {"type": "cooldown", "value": 0}, "effects": [{"effect_type": "damage", "params": {"coeff_fixed": 1000}}]},
 			},
 			"stage": {
 				"stage_01": {
@@ -111,7 +111,7 @@ func _bundle(version: int, ally_atk: int) -> Dictionary:
 						"max_rounds": 30,
 						"energy": {"initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100},
 					},
-					"enemies": [{"actor_id": "u_enemy_01", "hero_id": "hero_enemy", "slot": 0}],
+					"enemies": [{"hero_id": "hero_enemy", "slot": 0}],
 				},
 			},
 		},
@@ -125,17 +125,17 @@ func _bundle_with_config_skill() -> Dictionary:
 		"schema_version": 1,
 		"data": {
 			"hero": {
-				"hero_ally": {"id": "hero_ally", "base_stats": {"hp": 1000, "atk": 200, "def": 100, "spd": 120}, "basic_skill_id": "skill_warblade"},
-				"hero_enemy": {"id": "hero_enemy", "base_stats": {"hp": 500, "atk": 150, "def": 80, "spd": 90}},
+				"hero_ally": {"id": "hero_ally", "base_stats": {"hp": 1000, "atk": 200, "def": 100, "spd": 120}, "skills": ["skill_warblade"]},
+				"hero_enemy": {"id": "hero_enemy", "base_stats": {"hp": 500, "atk": 150, "def": 80, "spd": 90}, "skills": ["skill_basic"]},
 			},
 			"skill": {
-				"skill_basic": {"id": "skill_basic", "coeff_fixed": 1000, "target_rule": "default", "effects": ["damage"]},
+				"skill_basic": {"id": "skill_basic", "target": "single_enemy", "trigger": {"type": "cooldown", "value": 0}, "effects": [{"effect_type": "damage", "params": {"coeff_fixed": 1000}}]},
 				"skill_warblade": {
 					"id": "skill_warblade",
 					"coeff_fixed": 1000,
 					"target_rule": "single_enemy",
 					"effects": [
-						{"effect_type": "damage"},
+						{"effect_type": "damage", "params": {"coeff_fixed": 1000}},
 						{"effect_type": "apply_buff", "target": "self", "params": {"atk": 50, "duration": 3}},
 					],
 				},
@@ -154,7 +154,7 @@ func _bundle_with_config_skill() -> Dictionary:
 						"max_rounds": 30,
 						"energy": {"initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100},
 					},
-					"enemies": [{"actor_id": "u_enemy_01", "hero_id": "hero_enemy", "slot": 0}],
+					"enemies": [{"hero_id": "hero_enemy", "slot": 0}],
 				},
 			},
 		},

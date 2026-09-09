@@ -99,7 +99,35 @@ static func parse_team(data: Dictionary) -> TeamDto:
 		slot.hero_id = str(item["heroId"])
 		slots.append(slot)
 	var model := TeamDto.new()
+	model.id = str(data.get("id", ""))
 	model.slots = slots
+	return model
+
+
+## Parse `POST /api/v1/battles` → BattleResultDto (phase 30). Server-authoritative: seed để replay, outcome/
+## rewards do server quyết, log = event log tất định (JSON chuỗi) để vẽ + đối chiếu. `null` nếu thiếu key bắt
+## buộc (`outcome`/`log`) hoặc phần tử reward sai hình dạng — client KHÔNG bịa kết quả (ADR-011).
+static func parse_battle_result(data: Dictionary) -> BattleResultDto:
+	if not data.has("outcome") or not data.has("log"):
+		return null
+	var raw: Variant = data.get("rewards", [])
+	if not (raw is Array):
+		return null
+	var rewards: Array[RewardDto] = []
+	for item in raw:
+		if not (item is Dictionary) or not item.has("rewardType") or not item.has("refId"):
+			return null
+		var reward := RewardDto.new()
+		reward.reward_type = str(item["rewardType"])
+		reward.ref_id = str(item["refId"])
+		reward.amount = int(item.get("amount", 0))
+		rewards.append(reward)
+	var model := BattleResultDto.new()
+	model.seed = int(data.get("seed", 0))
+	model.outcome = str(data["outcome"])
+	model.rounds = int(data.get("rounds", 0))
+	model.rewards = rewards
+	model.log = str(data["log"])
 	return model
 
 

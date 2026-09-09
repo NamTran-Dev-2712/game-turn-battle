@@ -1030,6 +1030,55 @@ codegen 41 + idempotent, no generated/openapi drift beyond additive team; `has-p
   `.instructions/backend.md`/`client.md`/`config.md`/`combat.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync**
   (doc-sync matrix, §5); the tests are the behavior contract — update them.
 
+**Battle flow end-to-end is standardized (Phase 30 — closed & verified). CLOSES the P2 milestone — first playable vertical
+slice.** The full battle loop is server-authoritative + deterministic (ADR-011/007, combat-framework §3/§24): client sends an
+**intent**, the server snapshots the team (29), **generates the seed**, **re-simulates** (24), determines outcome + minimal
+config-driven rewards, and **persists result + credits reward atomically & idempotently** (11), returning
+`BattleResult{seed,outcome,rewards,log}`; the client **replays with the returned seed** (25) to display — it never decides the
+outcome nor grants reward. Home: **server** `GameTeam.Domain/{Battles,Economy}/` + `GameTeam.Application/Features/Battles/` +
+`GameTeam.Infrastructure/{Persistence,Combat}/`; **client** `client/src/ui/battle/`. Endpoint **`POST /api/v1/battles`** (version
+set, protected) → **`StartBattleCommand(teamId,stageId,attemptId) : ITransactionalRequest`**: owner from token (`ICurrentUser`,
+anti-IDOR) → **idempotency check** (`IBattleRecordRepository.GetByProfileAndAttempt`) → team snapshot (`TeamSnapshotFactory`,
+validate `teamId`) → **server seed** (`IBattleSeedSource`, crypto RNG, non-negative Int64) → **`CombatInputResolver` reads REAL
+gameplay config** → **`BattleSimulator.Simulate`** → rewards (VICTORY only, `currency` only → credit `Wallet`) → write
+`BattleRecord` + credit wallet **in one transaction**. **`BattleRecord`** (`AggregateRoot`, unique `(profile_id,attempt_id)` =
+DB idempotency, rewards JSON `OwnsMany().ToJson()`, event `BattleResolved`) + **`Wallet`** (1-1 profile, credit-only — full
+currency/inventory = 31–33). **Contracts** `GameTeam.Contracts/Battle/` (`StartBattleRequest`/`BattleResultDto`/`RewardDto`;
+`TeamDto` gained `Id`) → regenerated `openapi.json` + GDScript. **Combat-config reconciliation (the real Phase-30 work):** the
+Phase-24 combat readers now read the **real gameplay schemas** — `HeroCombatConfig`(`base_stats`+`skills[]`),
+`SkillCombatConfig`(`target`/`trigger`/`effects[].params.coeff_fixed`), `StageCombatConfig`(`combat_rules`/`max_rounds`/enemy
+`slot`; `stage.schema.json` extended **additively**) — mapped identically on **both** resolvers (server + client) so replay is
+bit-identical; `hero.skills[]` → basic(energy==0)/ultimate(energy>0), damage-effect `coeff_fixed` lifted to `SkillDef.CoeffFixed`,
+enemy actor `enemy_{i}` derived. **Client** `BattleView`(BaseView, network-free) + `BattlePresenter` (GET /team → POST /battles →
+replay via client `CombatInputResolver`+`BattleSimulator`; outcome/rewards shown **from server**). Verified (2026-09-08, Docker
+28.5.1 + Godot 4.7.1): build Release 0/0; `dotnet test` — Domain 107 / Application 76 / Contracts 36 / Infrastructure 52
+(Testcontainers `BattlePersistenceTests`) / Api 73 (Testcontainers `BattleEndpointTests` A–F) / Codegen 41 / Config-validator 48 /
+Combat-baseline 4; gdUnit4 **127/127, 0 orphan** (`battle_presenter_test` 6); golden gate 14 vectors match; `has-pending-model-changes`
+clean; no `openapi.json`/generated drift beyond additive battle. Canonical: `docs/gameplay/combat-framework.md` §24 +
+`docs/architecture/overview.md` §8 + `docs/backend/domain-and-application.md` (§3) + `docs/backend/infrastructure.md` §1.4; decision
+log: `.memory/0028-battle-flow-standardized.md`.
+
+- Future agents **MUST reuse** `BattleSimulator`/`CombatInputResolver`/`TeamSnapshotFactory`/`CombatEventSerializer` +
+  `StartBattleCommand`/`BattleRecord`/`Wallet`/`IBattleSeedSource` + `BattleResultDto` + client `BattlePresenter`/`parse_battle_result`
+  before adding any battle/reward plumbing; **MUST NOT** fork a second simulator/resolver/seed source/wallet, let the client decide
+  the outcome or grant reward, choose the seed on the client, bypass MediatR/`TransactionBehavior`, read the owner from client input
+  (IDOR), hand-edit `client/src/data/generated`/`openapi.json`, or revert the combat readers to the flat (non-gameplay) config shape.
+- **Server authority + idempotency are binding (ADR-011/007):** seed/outcome/reward are server-decided/persisted; the client replays
+  by seed **to display only** and shows the server outcome even on replay mismatch (never fabricate). Retry with the same `attemptId`
+  returns the stored result with **no second reward grant** (unique `(profile_id,attempt_id)`); result + reward persist **atomically**.
+- **Data-driven (ADR-004):** stats/rules/rewards come from config; the combat readers now read the **real gameplay config** — do not
+  reintroduce a second combat-config shape. Adding a stage/reward = config + validator (referential integrity) in the same change.
+- **Out of scope (leave as debt / future phases):** full currency/inventory + wallet UI (31–33), hero/fragment/item reward types,
+  multi-stage/campaign (34), sweep (43), refresh-token rotation, stage-select screen (34). Do NOT implement future-phase scope.
+- When changing the battle flow, keep **`GameTeam.Domain/{Battles,Economy}/*` + `GameTeam.Application/Features/Battles/*` +
+  `GameTeam.Application/Combat/*` (reconciled readers) + `IBattleSeedSource`/`IBattleRecordRepository`/`IWalletRepository` +
+  `Infrastructure/{Persistence/Configurations,Repositories,Combat}/*` + migration + `Contracts/Battle/*` + regenerated `openapi.json`
+  + `client/src/data/generated/**` + `client/src/ui/battle/*` + client `combat/combat_input_resolver.gd` + `response_parser.gd` +
+  main-hub wiring + `stage.schema.json` + `config/stages|rewards|heroes/*` + all the tests (behavior contract) +
+  `docs/gameplay/combat-framework.md` §24 + `docs/architecture/overview.md` §8 + `docs/backend/*` + `docs/godot/ui-architecture.md` +
+  `.instructions/backend.md`/`client.md`/`config.md`/`combat.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md`/`combat-determinism.md`
+  in sync** (doc-sync matrix, §5); the tests + golden vectors are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

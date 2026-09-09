@@ -168,16 +168,36 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 
 ---
 
-## 3. Ví dụ trách nhiệm: Start Battle (không phải code)
+### Battle feature: re-sim server-authoritative + thưởng atomic idempotent (Phase 30 — đã đóng)
+
+`GameTeam.Domain/Battles/` + `GameTeam.Domain/Economy/` + `GameTeam.Application/Features/Battles/`:
+
+- **`BattleRecord : AggregateRoot<Guid>`** — bản ghi kết quả + **idempotency** (unique `(profile_id, attempt_id)`); lưu đủ để
+  dựng lại `BattleResult` cho retry. Factory `Create(...)` raise **`BattleResolved`**. **`Wallet : AggregateRoot<Guid>`** (1-1
+  profile) — ví **credit-only** tối giản (Phase 31 đầy đủ). Chi tiết bảng: `infrastructure.md` §1.4.
+- **`StartBattleCommand(teamId, stageId, attemptId) : IRequest<Result<BattleResultDto>>, ITransactionalRequest`** →
+  `StartBattleCommandHandler`: owner từ token (chống IDOR) → **idempotency check** → snapshot đội (Phase 29
+  `TeamSnapshotFactory`, validate `teamId` khớp) → **server sinh seed** (`IBattleSeedSource`) →
+  **`CombatInputResolver` (đọc gameplay config thật)** → **`BattleSimulator.Simulate`** (Phase 24) → thưởng config-driven
+  (chỉ VICTORY, chỉ `currency` → credit ví) → ghi `BattleRecord` + credit ví **cùng transaction** → `BattleResultDto`.
+- Là **`POST /api/v1/battles`** (protected). Reconcile **combat-config ↔ gameplay-config** (hero `base_stats`+`skills[]`;
+  skill `target`/`trigger`/effect `params.coeff_fixed`; stage `combat_rules`) hoàn tất ở phase này — sim đọc config thật.
+
+> **Ranh giới (ADR-011/007):** seed + outcome + thưởng do **server** quyết/cấp; client replay **để hiển thị**, không tự
+> quyết/không tự cấp. `attemptId` idempotency chống double-grant. Ngoài scope: currency/inventory đầy đủ (31–33), nhiều stage
+> (34), sweep (43), loại thưởng hero/fragment/item.
+
+## 3. Ví dụ trách nhiệm: Start Battle (Phase 30 — đã hiện thực)
 
 | Bước | Ai làm |
 |---|---|
-| Nhận `StartBattleCommand(teamId, stageId)` | Api → MediatR |
-| Validate team hợp lệ (6 hero, sở hữu) | ValidationBehavior + Domain rule |
-| Lấy snapshot hero + stage config | Handler qua `IConfigProvider`, repo |
-| Sinh seed, gọi `ICombatSimulator.Simulate(...)` | Handler (server sim, deterministic — ADR-011) |
-| Ghi `BattleRecord` + cấp thưởng | Domain + repo trong TransactionBehavior |
-| Publish `BattleWon`/`BattleLost` | Domain Event → cập nhật quest/progression |
+| Nhận `StartBattleCommand(teamId, stageId, attemptId)` | Api → MediatR |
+| Idempotency check (profile, attemptId) — retry ⇒ trả kết quả đã lưu | Handler (`IBattleRecordRepository`) |
+| Snapshot đội (validate `teamId` thuộc người gọi) | Handler (`TeamSnapshotFactory`, `ICurrentUser` — chống IDOR) |
+| Lấy chỉ số hero + stage/skill từ config | `CombatInputResolver` qua `IConfigProvider` (data-driven) |
+| Sinh seed server, gọi `BattleSimulator.Simulate(...)` | Handler (server sim, deterministic — ADR-011) |
+| Ghi `BattleRecord` + credit ví (thưởng) | Domain + repo trong `TransactionBehavior` (atomic) |
+| Publish `BattleResolved` | Domain Event → nền quest/progression (phase sau) |
 | Trả `BattleResult{seed, outcome, rewards, log}` | Handler → Api |
 
 > Logic cân bằng/số liệu nằm ở **config** (ADR-004); handler chỉ điều phối cơ chế.

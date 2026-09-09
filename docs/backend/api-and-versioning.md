@@ -158,6 +158,12 @@ endpoint** về sau — không tự vẽ convention khác.
   KHÔNG body rỗng, KHÔNG shape khác. **Key JWT** từ secret/env `Jwt__SigningKey` (fail-fast, **không** hardcode/
   commit/log; appsettings chỉ chứa issuer/audience/expiry). Provider linking (Google/Apple/email) & refresh nâng
   cao = **Post-MVP**. Phase sau **tái dùng** hạ tầng auth này, không dựng cơ chế mới.
+- **Battle endpoint (Phase 30 — đã chốt, ĐÓNG P2):** `POST /api/v1/battles` (version set, **protected** mặc định) →
+  `StartBattleCommand(teamId,stageId,attemptId)` (`ITransactionalRequest`). Body `StartBattleRequest`; trả `BattleResultDto{seed,
+  outcome,rounds,rewards,log}` (200) / `ErrorEnvelope` (400/401/404). Server-authoritative + deterministic (ADR-011/007): server
+  snapshot đội (29) + **sinh seed** + **re-sim** (24) + cấp thưởng **atomic + idempotent** (`attemptId` = idempotency key, unique
+  `(profile_id,attempt_id)` chống double-grant); client replay bằng seed để hiển thị. Contract mở rộng Phase 05 (`Contracts/Battle/*`;
+  `TeamDto` **+`Id`** additive) → regenerate `openapi.json` → codegen. Chi tiết luồng: `combat-framework.md` §24, `overview.md` §8.
 - **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
   integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
   (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.
