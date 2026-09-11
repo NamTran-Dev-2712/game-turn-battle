@@ -11,4 +11,11 @@ public interface IWalletRepository : IRepository<Wallet, Guid>
 {
     /// <summary>Ví mà <paramref name="profileId"/> sở hữu (được track), hoặc <c>null</c> nếu chưa có.</summary>
     Task<Wallet?> GetByProfileIdAsync(Guid profileId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Như <see cref="GetByProfileIdAsync"/> nhưng <b>khoá dòng</b> (<c>SELECT … FOR UPDATE</c>) để tuần tự
+    /// hoá các thao tác cấp/tiêu đồng thời trên cùng ví (chống lost-update / số dư sai — Phase 31). Phải gọi
+    /// <b>bên trong</b> một transaction đang mở (<c>TransactionBehavior</c>). Trả thực thể được track.
+    /// </summary>
+    Task<Wallet?> GetByProfileIdForUpdateAsync(Guid profileId, CancellationToken cancellationToken);
 }

@@ -41,20 +41,33 @@ class _StubConfig extends Node:
 		return 1
 
 
-# NetworkClient giả: trả NetResult đã xếp cho get(/team)/post(/battles); ghi lại body + số lần post.
+# NetworkClient giả: trả NetResult đã xếp cho get(/team | /wallet)/post(/battles); ghi lại body + số lần post.
 class _StubNet extends Node:
 	var get_result: Variant = null
+	var wallet_result: Variant = null  # phase 31: refresh ví sau trận (null ⇒ refresh no-op)
 	var post_result: Variant = null
 	var posted_body: Dictionary = {}
 	var post_calls: int = 0
 
-	func get_json(_path: String, _parser := Callable()) -> Variant:
+	func get_json(path: String, _parser := Callable()) -> Variant:
+		if path.ends_with("/wallet"):
+			return wallet_result
 		return get_result
 
 	func post_json(_path: String, body: Dictionary, _parser := Callable()) -> Variant:
 		post_calls += 1
 		posted_body = body.duplicate(true)
 		return post_result
+
+
+# StateCache giả — bắt apply_wallet (refresh số dư server sau trận, phase 31).
+class _StubStateCache extends Node:
+	var applied_wallet: Dictionary = {}
+	var wallet_calls: int = 0
+
+	func apply_wallet(balances: Dictionary) -> void:
+		wallet_calls += 1
+		applied_wallet = balances.duplicate(true)
 
 
 func _node(n: Node) -> Node:
@@ -95,6 +108,18 @@ func _battle_result(seed: int, outcome: String, rewards: Array) -> BattleResultD
 
 func _ok(value) -> NetResult:
 	return NetResult.success(value, 200)
+
+
+func _wallet(balances: Dictionary) -> WalletDto:
+	var dto := WalletDto.new()
+	var list: Array[CurrencyBalanceDto] = []
+	for code in balances:
+		var b := CurrencyBalanceDto.new()
+		b.currency = Currency.GOLD if code == "gold" else (Currency.GEM if code == "gem" else Currency.TICKET)
+		b.amount = int(balances[code])
+		list.append(b)
+	dto.balances = list
+	return dto
 
 
 # Config demo: đội 2 hero mạnh (hero_a/hero_b) vs 1 địch yếu (hero_dummy) ⇒ client sim → VICTORY tất định.
@@ -151,6 +176,25 @@ func test_posts_intent_and_displays_server_outcome_and_rewards() -> void:
 	# Outcome + rewards HIỂN THỊ theo server (authority).
 	assert_str(str(view.last.get("outcome"))).is_equal("VICTORY")
 	assert_array(view.last.get("rewards")).contains(["gold +100"])
+	presenter.dispose()
+
+
+func test_successful_battle_refreshes_wallet_from_server_into_state_cache() -> void:
+	# Phase 31: sau khi server cấp thưởng, presenter đọc lại số dư ví server → StateCache (client KHÔNG tự cộng).
+	var net := _StubNet.new()
+	net.get_result = _ok(_team("team-1", [[0, "hero_a"], [1, "hero_b"]]))
+	net.post_result = _ok(_battle_result(42, "VICTORY", [["gold", 100]]))
+	net.wallet_result = _ok(_wallet({"gold": 100}))
+	_node(net)
+	var config := _demo_config(); _node(config)
+	var router := _StubRouter.new(); _node(router)
+	var view := _SpyView.new(); _node(view)
+	var sc := _StubStateCache.new(); _node(sc)
+
+	var presenter = _PRESENTER.new(view, sc, config, router, net)
+
+	assert_int(sc.wallet_calls).is_equal(1)
+	assert_int(int(sc.applied_wallet.get("gold", 0))).is_equal(100)
 	presenter.dispose()
 
 

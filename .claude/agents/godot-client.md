@@ -128,6 +128,17 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   server** (bit-for-bit replay); never fork a second resolver/sim. **No new EventBus event.** Hub global wallet/currency =
   phase 31 (Phase 30 shows only this battle's rewards from the response). Canonical: `docs/gameplay/combat-framework.md` §24 +
   `docs/godot/ui-architecture.md` §4.2; decision log `.memory/0028-battle-flow-standardized.md`.
+- **Currency display (Phase 31, closed):** wallet balances (Gold/Gem/Ticket) are **server-authoritative** — the client only
+  DISPLAYS, never adds/subtracts (ADR-007). `NetworkResponseParser.parse_wallet` (wraps `{balances:[{currency,amount}]}`;
+  `currency` wire is a STRING enum → mapped by `NetworkResponseParser.currency_code` to code `gold`/`gem`/`ticket`) → generated
+  `WalletDto`/`CurrencyBalanceDto` (DO-NOT-EDIT). `AuthProfileFlow._fetch_balances` (`GET /api/v1/wallet`, best-effort) folds
+  `currencies` into the single boot snapshot with profile+heroes. `StateCache.apply_wallet(balances)` = a server-sourced
+  balance-only refresh (keeps profile/hero/progress; emits `state_refreshed`) — NOT a truth mutator (still no
+  `add_currency`/`spend_currency`/`set_currency`; the forbidden-mutator guard test stays green). `BattlePresenter._refresh_wallet`
+  refreshes the balance after a battle (server already granted — the client never adds it). Hub shows real balances. **No new
+  EventBus event** (reuse `state_refreshed`). **Reuse `StateCache`/`NetworkClient`/generated DTO — no second wallet/parser/cache,
+  no client currency math, no grant/spend call (read-only `/wallet`).** Out of scope: Fragment/Material/Energy, a dedicated wallet
+  screen. Canonical: `docs/godot/state-and-signals.md` §1.1; decision log `.memory/0029-currencies-transactions-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

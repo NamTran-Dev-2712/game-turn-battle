@@ -31,11 +31,15 @@ flowchart LR
 | Trách nhiệm | Chi tiết |
 |---|---|
 | Read-cache | Giữ bản sao đọc của `profile`/`currencies`/`heroes`/`progress` để UI hiển thị + offline-view. `const IS_DISPLAY_ONLY = true`. |
-| Đường ghi DUY NHẤT | `apply_snapshot(snapshot: Dictionary)` — thay **toàn bộ** cache bằng snapshot từ **server response** (invalidate dữ liệu cũ). **KHÔNG** có mutator chân lý (không `add_currency`/`spend_currency`/`set_progress`…). |
-| API đọc | `get_currency(code)`, `get_currencies()`, `get_heroes()`, `get_hero(id)`, `get_progress(key)`, `get_all_progress()`, `get_profile()` — **trả BẢN SAO** ⇒ caller không sửa được cache. |
+| Đường ghi từ server | `apply_snapshot(snapshot)` — thay **toàn bộ** cache bằng snapshot từ **server response**. `apply_wallet(balances)` (Phase 31) — thay **riêng** số dư ví từ `GET /api/v1/wallet` (giữ profile/hero/progress), dùng khi refresh ví sau một hành động (vd đánh trận). Cả hai đều là **phản chiếu server response**, KHÔNG phải mutator chân lý — **KHÔNG** có `add_currency`/`spend_currency`/`set_currency`/`set_progress`… (client không phải chân lý kinh tế). |
+| API đọc | `get_currency(code)`, `get_currencies()`, `get_heroes()`, `get_hero(id)`, `get_progress(key)`, `get_all_progress()`, `get_profile()` — **trả BẢN SAO** ⇒ caller không sửa được cache. Số dư ví (`gold`/`gem`/`ticket`) là **server-authoritative** — client chỉ hiển thị. |
 | Nhãn nguồn | `source()` = `"empty"｜"server"｜"cache"`; `is_offline()` (nguồn=cache ⇒ UI gắn nhãn "offline/cached"); ưu tiên server khi online. |
 | Cache đĩa | Lưu snapshot xuống `user://state_cache/snapshot.json`; boot nạp lại với nhãn `"cache"` (offline-view dữ liệu cũ) tới khi server refresh lật về `"server"`. Chỉ dữ liệu hiển thị — **không bí mật**. |
-| Sự kiện | Phát `state_refreshed` (§3.1) sau mỗi `apply_snapshot`. |
+| Sự kiện | Phát `state_refreshed` (§3.1) sau mỗi `apply_snapshot`/`apply_wallet`. |
+
+**Số dư ví (Phase 31):** boot đổ số dư vào snapshot qua `AuthProfileFlow._fetch_balances` (`GET /api/v1/wallet` →
+`NetworkResponseParser.parse_wallet`, map enum `Currency`→mã `gold`/`gem`/`ticket`); sau đánh trận, `BattlePresenter`
+refresh `GET /wallet` → `StateCache.apply_wallet` để hub hiện số dư mới. Client **không tự cộng thưởng** (ADR-007).
 
 **Luồng thay đổi state (bắt buộc):** `Feature/UI → NetworkClient → Server (command) → response → StateCache.apply_snapshot`.
 Client **không** tự cộng/trừ currency, **không** tự tính reward/kết quả/progress (ADR-007/011). StateCache

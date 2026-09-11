@@ -2,8 +2,9 @@
 # presenter của hợp đồng UI: ĐỌC dữ liệu hiển thị từ StateCache/ConfigProvider (đọc-cache, KHÔNG network) →
 # đẩy vào view qua `set_data`; nghe `intent` của view → dịch thành hành động.
 # Phase 20: hiển thị profile server-authoritative từ StateCache (tên/level) + nhãn offline/cached; tự
-# refresh khi có snapshot mới qua EventBus `state_refreshed`. Currency = PLACEHOLDER (profile chưa mang
-# currency — feature phase 31). KHÔNG gọi NetworkClient, KHÔNG tự tính chân lý. Chi tiết: ui-architecture.md.
+# refresh khi có snapshot mới qua EventBus `state_refreshed`. Phase 31: hiển thị số dư ví (gold/gem/ticket)
+# từ StateCache — server-authoritative, client CHỈ đọc (KHÔNG tự cộng/trừ). KHÔNG gọi NetworkClient, KHÔNG
+# tự tính chân lý. Chi tiết: ui-architecture.md.
 class_name MainHubPresenter
 extends RefCounted
 
@@ -74,7 +75,8 @@ func _on_state_refreshed(_payload) -> void:
 	refresh()
 
 
-# Nhãn currency: profile CHƯA mang currency (feature phase 31) ⇒ placeholder khi rỗng. Chỉ đọc, không tính.
+# Nhãn currency: số dư ví server-authoritative từ StateCache (Phase 31); "—" khi rỗng (chưa có giao dịch).
+# Chỉ ĐỌC + định dạng chuỗi — KHÔNG cộng/trừ (client không phải chân lý kinh tế, ADR-007).
 func _format_currency(currencies: Dictionary) -> String:
 	if currencies.is_empty():
 		return "—"

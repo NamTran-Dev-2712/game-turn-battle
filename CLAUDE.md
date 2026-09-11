@@ -1079,6 +1079,53 @@ log: `.memory/0028-battle-flow-standardized.md`.
   `.instructions/backend.md`/`client.md`/`config.md`/`combat.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md`/`combat-determinism.md`
   in sync** (doc-sync matrix, §5); the tests + golden vectors are the behavior contract — update them.
 
+**Currencies + atomic transaction + idempotency are standardized (Phase 31 — closed & verified).** The economy foundation: **3
+base currencies (Gold/Gem/Ticket)** bound 1-1 to `PlayerProfile`, **server-authoritative** (ADR-007); every balance change goes
+through ONE **reusable, atomic, idempotent, concurrency-safe** transaction mechanism; the client only DISPLAYS balances. Currency
+is the `GameTeam.Contracts.Currency` enum (Phase 05) at the boundary, stored as a string code (`gold`/`gem`/`ticket`) in the
+wallet/ledger, mapped by **`CurrencyCode`** (Application). **`Wallet`** (`GameTeam.Domain/Economy/`) now supports **credit + spend**
+with a **non-negative** invariant (`WalletBalance.Subtract`); **`CurrencyTransaction : AggregateRoot<Guid>`** is an **append-only
+ledger** = audit + idempotency (**unique `idempotency_key`**; generalizes the Phase-30 `BattleRecord` precedent). The single
+mechanism is **`CurrencyWalletService`** (`GameTeam.Application/Features/Economy/`, scoped): idempotency check (key seen ⇒ return
+the stored result, never re-apply) → **row-lock the wallet** (`IWalletRepository.GetByProfileIdForUpdateAsync` = `SELECT … FOR
+UPDATE`, serializes concurrent grant/spend ⇒ no lost-update / no negative) → credit/spend (insufficient ⇒ `Result` failure
+`CURRENCY_INSUFFICIENT_FUNDS`, **no mutation**) → append one ledger row — all in the ambient transaction (the service **never opens
+its own transaction**, so nested-transaction is never triggered). **`GrantCurrencyCommand`/`SpendCurrencyCommand`**
+(`ITransactionalRequest` + idempotency key + source; owner from token `sub` — anti-IDOR) are **thin** wrappers over the service and
+have **NO public HTTP endpoint** (a player-facing "grant me gold" route is an economy exploit); the only endpoint is **`GET
+/api/v1/wallet`** (`GetWalletQuery`, protected, read-only). **Battle reward (Phase 30) now credits Gold through
+`CurrencyWalletService`** (writes a ledger row, same transaction). Persistence: table **`currency_transactions`** (snake_case,
+unique `idempotency_key`, index `profile_id`, FK→`player_profiles` cascade), migration `AddCurrencyTransactions`. Client: generated
+`WalletDto`/`CurrencyBalanceDto`; `NetworkResponseParser.parse_wallet`+`currency_code`; `AuthProfileFlow._fetch_balances` (boot);
+`StateCache.apply_wallet` (server-sourced balance refresh); `BattlePresenter._refresh_wallet` (post-battle); hub shows real
+balances — **no client currency math**, no new EventBus event. Verified (2026-09-10, Docker 28.5.1 + Godot 4.7.1): build Release
+0/0; `dotnet test` Domain 117 / Application 91 / Contracts 36 / Infrastructure 60 (Testcontainers pg16 `CurrencyTransactionPersistenceTests`
+8: atomic/idempotent/insufficient/**concurrency**/rollback) / Api 80 (`WalletEndpointTests` 4); gdUnit4 **133/133, 0 orphan**;
+codegen 41 + drift clean (additive); config-validator 15 OK; `has-pending-model-changes` clean; `openapi.json` additive. Canonical:
+`docs/gameplay/progression-and-economy.md` + `docs/backend/infrastructure.md` §1.5 + `docs/backend/domain-and-application.md`
+(Economy feature) + `docs/backend/api-and-versioning.md`; decision log: `.memory/0029-currencies-transactions-standardized.md`.
+
+- Future agents **MUST reuse** `CurrencyWalletService` / `Wallet` / `CurrencyTransaction` / `ICurrencyTransactionRepository` /
+  `IWalletRepository.GetByProfileIdForUpdateAsync` / `CurrencyCode` / `GetWalletQuery` before adding any currency plumbing; **MUST
+  NOT** create a second wallet/ledger/transaction/idempotency mechanism, duplicate the `Currency` enum, add a public grant/spend
+  endpoint, let the client add/subtract currency, read the owner from client input (IDOR), hardcode economy balance numbers (they
+  are config — ADR-004), or hand-edit `client/src/data/generated`/`openapi.json`.
+- **Server-authoritative + atomic + idempotent + concurrency-safe are binding (ADR-007/011):** every balance change is a server
+  transaction (balance + ledger commit/rollback together); `idempotency_key` is unique (retry ⇒ stored result, never double);
+  concurrent mutations serialize via the wallet **row lock**; balances never go negative; insufficient funds is a clean `Result`
+  failure with no mutation. The client shows server balances only (`GET /wallet` → `StateCache`), never fabricated.
+- **Reuse for every source/sink:** gacha (33), AFK (37), shop (40), mail (42) go through `CurrencyWalletService` (idempotency key +
+  ledger) — never a parallel path. Out of scope (leave as debt): Fragment/Material/Energy currencies (33/36/39); a transaction-history
+  query/endpoint (ledger is written, queryable later); a generic `IdempotencyBehavior` pipeline (the ledger-key mechanism covers 31).
+- When changing the economy, keep **`GameTeam.Domain/Economy/*` + `GameTeam.Application/Features/Economy/*` +
+  `ICurrencyTransactionRepository`/`IWalletRepository` + `Infrastructure/Persistence/{Configurations,Repositories}/*` + migration +
+  `Contracts/Economy/*` + regenerated `openapi.json` + `client/src/data/generated/**` + `StartBattleCommandHandler` (reward via service)
+  + `Program.cs` (`/wallet`) + client `response_parser.gd`/`state_cache.gd`/`auth_profile_flow.gd`/`battle_presenter.gd`/`main_hub_presenter.gd`
+  + all the tests (behavior contract) + `docs/gameplay/progression-and-economy.md` + `docs/backend/infrastructure.md` §1.5 +
+  `docs/backend/domain-and-application.md` + `docs/backend/api-and-versioning.md` + `docs/godot/state-and-signals.md` §1.1 +
+  `.instructions/backend.md`/`client.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the
+  integration tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

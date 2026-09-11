@@ -149,5 +149,30 @@ func test_parse_health_shape_validation() -> void:
 	assert_str(degraded.status).is_equal("degraded")
 
 
+func test_parse_wallet_shape_and_currency_mapping() -> void:
+	# Thiếu `balances` ⇒ null (không bịa). Có ⇒ map currency chuỗi wire → enum; loại lạ bị bỏ qua.
+	assert_object(NetworkResponseParser.parse_wallet({"x": 1})).is_null()
+	var wallet := NetworkResponseParser.parse_wallet({"balances": [
+		{"currency": "Gold", "amount": 250},
+		{"currency": "Ticket", "amount": 3},
+		{"currency": "Unknown", "amount": 99},  # loại không nhận diện — bỏ qua an toàn
+	]})
+	assert_object(wallet).is_not_null()
+	assert_int(wallet.balances.size()).is_equal(2)
+	assert_int(wallet.balances[0].currency).is_equal(Currency.GOLD)
+	assert_int(wallet.balances[0].amount).is_equal(250)
+	assert_int(wallet.balances[1].currency).is_equal(Currency.TICKET)
+	# Mã StateCache khớp enum (dùng để đổ vào snapshot currencies).
+	assert_str(NetworkResponseParser.currency_code(Currency.GOLD)).is_equal("gold")
+	assert_str(NetworkResponseParser.currency_code(Currency.GEM)).is_equal("gem")
+	assert_str(NetworkResponseParser.currency_code(Currency.NONE)).is_equal("")
+
+
+func test_parse_wallet_empty_balances_is_valid() -> void:
+	var wallet := NetworkResponseParser.parse_wallet({"balances": []})
+	assert_object(wallet).is_not_null()
+	assert_int(wallet.balances.size()).is_equal(0)
+
+
 func test_networkclient_autoload_present() -> void:
 	assert_object(get_node_or_null(^"/root/NetworkClient")).is_not_null()

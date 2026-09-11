@@ -27,6 +27,7 @@
 | Heroes | `GET /api/v1/heroes` (owned, protected — owner từ token), `GET /api/v1/heroes/{heroId}/definition` (config, public) | query (Phase 27) |
 | Formation | `PUT /api/v1/teams/{id}` | command |
 | Battle | `POST /api/v1/battles` | command (re-sim) |
+| Wallet | `GET /api/v1/wallet` (số dư, protected — owner từ token) | query (Phase 31) |
 | Summon | `POST /api/v1/summons` | command (idempotent) |
 | Campaign | `GET /api/v1/campaign`, `POST /api/v1/campaign/{stage}/sweep` | query/command |
 | Economy | `POST /api/v1/afk/claim`, `POST /api/v1/shop/purchase` | command (idempotent) |
@@ -164,6 +165,11 @@ endpoint** về sau — không tự vẽ convention khác.
   snapshot đội (29) + **sinh seed** + **re-sim** (24) + cấp thưởng **atomic + idempotent** (`attemptId` = idempotency key, unique
   `(profile_id,attempt_id)` chống double-grant); client replay bằng seed để hiển thị. Contract mở rộng Phase 05 (`Contracts/Battle/*`;
   `TeamDto` **+`Id`** additive) → regenerate `openapi.json` → codegen. Chi tiết luồng: `combat-framework.md` §24, `overview.md` §8.
+- **Wallet endpoint (Phase 31 — đã chốt):** `GET /api/v1/wallet` (version set, **protected**) → `GetWalletQuery` → `WalletDto{balances[]}`
+  (mỗi dòng `CurrencyBalanceDto{currency: Currency, amount}`). Owner suy từ token `sub` (chống IDOR); chưa có ví ⇒ ví rỗng (200), không lỗi.
+  Client CHỈ đọc. **Không có endpoint cấp/tiêu công khai** — `GrantCurrencyCommand`/`SpendCurrencyCommand` là command nội bộ (atomic +
+  idempotency key), dùng bởi feature khác (battle/gacha/AFK/shop). Contract additive (`Contracts/Economy/*`) → regenerate `openapi.json`
+  → codegen. Chi tiết: `infrastructure.md` §1.5, `progression-and-economy.md`.
 - **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
   integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
   (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.

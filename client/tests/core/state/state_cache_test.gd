@@ -96,6 +96,21 @@ func test_reads_return_copies_not_cache_reference() -> void:
 	assert_int(_cache.get_currency("gold")).is_equal(1500)
 
 
+func test_apply_wallet_replaces_currencies_and_preserves_other_state() -> void:
+	# apply_wallet = refresh số dư server (Phase 31): thay riêng currencies, giữ profile/hero, phát refresh.
+	_cache = _make_cache()
+	_cache.apply_snapshot(_snapshot())
+	_refreshed = []
+	_cache.apply_wallet({"gold": 250, "ticket": 3})
+	assert_int(_cache.get_currency("gold")).is_equal(250)
+	assert_int(_cache.get_currency("ticket")).is_equal(3)
+	assert_int(_cache.get_currency("gem")).is_equal(0)  # server là chân lý số dư — thay toàn bộ
+	assert_str(str(_cache.get_profile()["displayName"])).is_equal("Nam")
+	assert_int(_cache.get_heroes().size()).is_equal(2)
+	assert_str(_cache.source()).is_equal("server")
+	assert_int(_refreshed.size()).is_equal(1)
+
+
 func test_no_authoritative_mutation_api_exists() -> void:
 	# Guard runtime: StateCache CHỈ đọc + apply_snapshot (từ server). KHÔNG có đường ghi chân lý.
 	_cache = _make_cache()

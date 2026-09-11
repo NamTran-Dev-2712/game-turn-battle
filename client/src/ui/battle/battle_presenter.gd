@@ -13,6 +13,7 @@ const _INTENT_BACK: StringName = &"back"
 const _INTENT_RETRY: StringName = &"retry"
 const _TEAM_PATH: String = "/team"
 const _BATTLES_PATH: String = "/battles"
+const _WALLET_PATH: String = "/wallet"
 ## Stage demo mặc định (khớp config/stages/stage_demo_01.json) khi không có context.
 const _DEFAULT_STAGE: String = "stage_demo_01"
 const _STAGE_TYPE: StringName = &"stage"
@@ -92,6 +93,24 @@ func _start() -> void:
 		return
 
 	_present(team, battle_res.value)
+	# Sau khi server đã cấp thưởng (atomic + idempotent, Phase 31), refresh số dư ví AUTHORITATIVE từ server
+	# vào StateCache để hub hiển thị gold mới. Client KHÔNG tự cộng thưởng — chỉ đọc lại số dư server.
+	await _refresh_wallet()
+
+
+# Refresh số dư ví từ server (best-effort) → StateCache.apply_wallet. Lỗi ⇒ bỏ qua (không bịa — ADR-007).
+func _refresh_wallet() -> void:
+	if _network == null or _state_cache == null:
+		return
+	var res = await _network.get_json(_WALLET_PATH, NetworkResponseParser.parse_wallet)
+	if res == null or not res.ok or res.value == null:
+		return
+	var balances: Dictionary = {}
+	for bal in res.value.balances:
+		var code := NetworkResponseParser.currency_code(bal.currency)
+		if code != "":
+			balances[code] = bal.amount
+	_state_cache.apply_wallet(balances)
 
 
 # Hiển thị kết quả: outcome + rewards THEO SERVER (authority); diễn biến từ REPLAY client bằng seed server.

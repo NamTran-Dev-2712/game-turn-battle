@@ -27,7 +27,9 @@ public class RealSpecTests
             // Phase 29 — team/formation contract.
             "team_dto.gd", "team_slot_dto.gd", "save_team_request.gd",
             // Phase 30 — battle contract.
-            "start_battle_request.gd", "battle_result_dto.gd", "reward_dto.gd");
+            "start_battle_request.gd", "battle_result_dto.gd", "reward_dto.gd",
+            // Phase 31 — currency/wallet contract.
+            "wallet_dto.gd", "currency_balance_dto.gd");
     }
 
     [Fact]

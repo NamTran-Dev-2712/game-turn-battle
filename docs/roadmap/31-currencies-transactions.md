@@ -41,14 +41,14 @@ Currency là hệ **nhạy cảm nhất** (🔴 mvp/08). Phải atomic + idempot
 
 # Công việc cần thực hiện
 
-- [ ] Domain: `Wallet`/currency trên profile; loại tiền enum (05); bất biến không âm.
-- [ ] Application: `GrantCurrencyCommand`/`SpendCurrencyCommand` (`ITransactionalRequest`) + idempotency key.
-- [ ] Infrastructure: bảng idempotency (dùng nền phase 11) — key đã xử lý → trả kết quả cũ, không thực hiện lại.
-- [ ] Query `GetBalance` + ghi audit giao dịch (nguồn/sink, thời điểm server).
-- [ ] Ràng buộc concurrency: cập nhật số dư an toàn (optimistic/row lock).
-- [ ] Integration test: atomic, idempotent (retry), spend thiếu→chặn, concurrency (2 spend song song không âm).
-- [ ] Client: hiển thị số dư từ StateCache (không tự tính).
-- [ ] Cập nhật `../gameplay/progression-and-economy.md`.
+- [x] Domain: `Wallet`/currency trên profile; loại tiền enum (05); bất biến không âm. — `GameTeam.Domain/Economy/Wallet.cs` nay có `Spend` (trả số dư mới) + `WalletBalance.Subtract` (bất biến **không âm**, ném khi vi phạm); loại tiền = enum `GameTeam.Contracts.Currency` (05) ở boundary, lưu mã chuỗi (`gold`/`gem`/`ticket`), map `Features/Economy/CurrencyCode` — KHÔNG duplicate enum. `WalletTests` 6 + `CurrencyTransactionTests` 4 xanh.
+- [x] Application: `GrantCurrencyCommand`/`SpendCurrencyCommand` (`ITransactionalRequest`) + idempotency key. — `Features/Economy/Commands/*` (record `(Currency, Amount, Source, IdempotencyKey)` + Validator amount>0/source/key) → handler **mỏng** (owner từ token `sub` — IDOR) uỷ cho `CurrencyWalletService`. KHÔNG endpoint công khai (cấp/tiêu là nội bộ). `CurrencyCommandHandlerTests` 5 xanh.
+- [x] Infrastructure: bảng idempotency (dùng nền phase 11) — key đã xử lý → trả kết quả cũ, không thực hiện lại. — `CurrencyTransaction` ledger (append-only) = audit + idempotency; bảng `currency_transactions` **unique `idempotency_key`** (`CurrencyTransactionConfiguration` + migration `AddCurrencyTransactions`, `has-pending-model-changes` sạch). Service check key trước ⇒ trả `CurrencyTransactionResult` dựng lại từ `balance_after`, KHÔNG áp dụng lại. `CurrencyTransactionPersistenceTests` (Testcontainers) chứng minh.
+- [x] Query `GetBalance` + ghi audit giao dịch (nguồn/sink, thời điểm server). — `GetWalletQuery` → `GET /api/v1/wallet` (protected, owner từ token; ví rỗng khi chưa có, không lỗi) trả `WalletDto{balances[]}`. Mỗi grant/spend ghi một dòng ledger (profile/currency/delta có dấu/balance_after/**source**/idempotency_key/**created_at** server `IClock`). `GetWalletQueryHandlerTests` 4 xanh.
+- [x] Ràng buộc concurrency: cập nhật số dư an toàn (optimistic/row lock). — **Row lock** `IWalletRepository.GetByProfileIdForUpdateAsync` = `SELECT … FROM wallets … FOR UPDATE` (`FromSql`) tuần tự hoá cấp/tiêu đồng thời. Test concurrency (2 spend song song, balance 100→spend 80×2) ⇒ đúng 1 thành công, số dư = 20, không âm — xanh trên Postgres thật.
+- [x] Integration test: atomic, idempotent (retry), spend thiếu→chặn, concurrency (2 spend song song không âm). — `CurrencyTransactionPersistenceTests` (Testcontainers pg16) **8 test**: grant/spend atomic (balance+ledger), idempotent grant/spend (retry không double), retry-returns-prior-result, insufficient (không mutate/không ledger), **concurrency** (2 spend song song), rollback (lỗi giữa transaction ⇒ balance+ledger+idempotency đều rollback). + `WalletEndpointTests` 4 (Api, HTTP thật).
+- [x] Client: hiển thị số dư từ StateCache (không tự tính). — `NetworkResponseParser.parse_wallet`+`currency_code`; `AuthProfileFlow._fetch_balances` (`GET /wallet` → snapshot boot); `StateCache.apply_wallet` (refresh riêng số dư từ server; KHÔNG mutator chân lý — guard `test_no_authoritative_mutation_api_exists` vẫn xanh); `BattlePresenter._refresh_wallet` (sau trận); hub hiện số dư thật. gdUnit4 **133/133, 0 orphan**; rà soát: KHÔNG có phép cộng/trừ currency ở client.
+- [x] Cập nhật `../gameplay/progression-and-economy.md`. — Thêm mục "Ví tiền tệ + giao dịch (Phase 31)": server-authoritative wallet, grant/spend atomic, idempotency (ledger unique key), concurrency (row lock), audit, client chỉ hiển thị, quan hệ battle reward, nền gacha/AFK/shop/mail. Kèm doc-sync: `infrastructure.md` §1.5, `domain-and-application.md` (Economy feature), `api-and-versioning.md`, `state-and-signals.md` §1.1, CLAUDE.md §4.6, `.memory/0029`.
 
 # Tiêu chí hoàn thành
 
@@ -83,7 +83,25 @@ Idempotency ở đây là mẫu tái dùng cho AFK claim (37), gacha (33), mail 
 
 # Phase Review
 
-Đóng khi currency grant/spend atomic + idempotent + concurrency-safe, client chỉ hiển thị, test xanh.
+**Đủ điều kiện đóng (2026-09-10, verify cục bộ — Docker Desktop 28.5.1 + Godot 4.7.1-stable).** Tất cả `# Công việc
+cần thực hiện` `[x]` với evidence từ run thật; tất cả `# Tiêu chí hoàn thành` thoả (đo được):
+
+- **Grant/spend atomic + idempotent:** đổi số dư + ghi ledger cùng một transaction (`TransactionBehavior`+`UnitOfWork`);
+  retry cùng `idempotency_key` ⇒ trả kết quả cũ, KHÔNG double (unique index backstop). PASS (`CurrencyTransactionPersistenceTests`
+  grant/spend atomic + idempotent grant/spend + retry-returns-prior; `WalletEndpointTests` battle retry no-double).
+- **Spend vượt số dư bị từ chối, số dư không âm:** service kiểm đủ tiền trước ⇒ `CURRENCY_INSUFFICIENT_FUNDS`, không mutate;
+  `Wallet.Spend`/`WalletBalance.Subtract` guard bất biến. PASS (insufficient test + `WalletTests`).
+- **2 thao tác song song không sai số dư:** row lock `FOR UPDATE` ⇒ đúng 1 spend thành công, số dư = 20, không âm. PASS
+  (concurrency test trên Postgres thật).
+- **Client chỉ hiển thị, không client-authority:** số dư từ `GET /wallet` → `StateCache`; KHÔNG mutator chân lý (guard test);
+  rà soát repo không còn currency math ở client. PASS.
+
+Verify: build Release 0/0; `dotnet test` — Domain 117 / Application 91 / Contracts 36 / Infrastructure 60 / Api 80; codegen 41
++ drift sạch (additive); config-validator 15 OK; gdUnit4 133/133 (0 orphan); Godot import exit 0; `has-pending-model-changes`
+sạch; `openapi.json` additive. Không TODO/blocker. Doc-sync + vibe-code sync hoàn tất (`.memory/0029`, CLAUDE.md §4.6).
+
+**CI-verification pending:** kết quả GitHub Actions (`ci-server`/`ci-client`/`codegen-check`/`validate-config`) — đã xanh
+đầy đủ ở local (gồm Testcontainers + Godot headless), chờ Actions xác nhận. Kết luận: **đủ điều kiện đóng.**
 
 ---
 

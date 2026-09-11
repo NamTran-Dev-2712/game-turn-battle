@@ -335,6 +335,36 @@
         }
       }
     },
+    "/api/v1/wallet": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetWallet",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -429,28 +459,6 @@
         ],
         "x-enum-values": [
           0
-        ]
-      },
-      "Currency": {
-        "enum": [
-          "None",
-          "Gold",
-          "Gem",
-          "Ticket"
-        ],
-        "type": "string",
-        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
-        "x-enum-varnames": [
-          "None",
-          "Gold",
-          "Gem",
-          "Ticket"
-        ],
-        "x-enum-values": [
-          0,
-          1,
-          2,
-          3
         ]
       },
       "AuthGuestRequest": {
@@ -567,6 +575,44 @@
           "schema": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "Currency": {
+        "enum": [
+          "None",
+          "Gold",
+          "Gem",
+          "Ticket"
+        ],
+        "type": "string",
+        "description": "Enum dùng chung (ổn định, chỉ thêm — additive). docs/backend/api-and-versioning.md §4.",
+        "x-enum-varnames": [
+          "None",
+          "Gold",
+          "Gem",
+          "Ticket"
+        ],
+        "x-enum-values": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "CurrencyBalanceDto": {
+        "required": [
+          "currency",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -919,6 +965,20 @@
           },
           "heroId": {
             "type": "string"
+          }
+        }
+      },
+      "WalletDto": {
+        "required": [
+          "balances"
+        ],
+        "type": "object",
+        "properties": {
+          "balances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurrencyBalanceDto"
+            }
           }
         }
       }

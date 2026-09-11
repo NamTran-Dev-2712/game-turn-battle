@@ -174,7 +174,7 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 
 - **`BattleRecord : AggregateRoot<Guid>`** — bản ghi kết quả + **idempotency** (unique `(profile_id, attempt_id)`); lưu đủ để
   dựng lại `BattleResult` cho retry. Factory `Create(...)` raise **`BattleResolved`**. **`Wallet : AggregateRoot<Guid>`** (1-1
-  profile) — ví **credit-only** tối giản (Phase 31 đầy đủ). Chi tiết bảng: `infrastructure.md` §1.4.
+  profile) — ví credit (Phase 30), nay credit+spend đầy đủ ở Phase 31 (xem Economy feature bên dưới). Chi tiết bảng: `infrastructure.md` §1.4/§1.5.
 - **`StartBattleCommand(teamId, stageId, attemptId) : IRequest<Result<BattleResultDto>>, ITransactionalRequest`** →
   `StartBattleCommandHandler`: owner từ token (chống IDOR) → **idempotency check** → snapshot đội (Phase 29
   `TeamSnapshotFactory`, validate `teamId` khớp) → **server sinh seed** (`IBattleSeedSource`) →
@@ -186,6 +186,27 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 > **Ranh giới (ADR-011/007):** seed + outcome + thưởng do **server** quyết/cấp; client replay **để hiển thị**, không tự
 > quyết/không tự cấp. `attemptId` idempotency chống double-grant. Ngoài scope: currency/inventory đầy đủ (31–33), nhiều stage
 > (34), sweep (43), loại thưởng hero/fragment/item.
+
+### Economy feature: ví + giao dịch tiền tệ atomic/idempotent/concurrency-safe (Phase 31 — đã đóng)
+
+`GameTeam.Domain/Economy/` + `GameTeam.Application/Features/Economy/`:
+
+- **`Wallet : AggregateRoot<Guid>`** (1-1 profile) nay hỗ trợ **credit + spend** với bất biến **số dư không âm** (ADR-011);
+  **`CurrencyTransaction : AggregateRoot<Guid>`** = sổ cái **append-only** (audit + idempotency: unique `idempotency_key`).
+  Loại tiền = enum `Currency` (phase 05) ở boundary, lưu mã chuỗi (`gold`/`gem`/`ticket`); ánh xạ `CurrencyCode`.
+- **`CurrencyWalletService`** (scoped, Application) = **cơ chế giao dịch dùng chung** cho mọi nguồn/sink: idempotency check
+  (key đã xử lý ⇒ trả kết quả cũ) → khoá dòng ví `GetByProfileIdForUpdateAsync` (`FOR UPDATE`) → credit/spend (kiểm đủ
+  tiền, thiếu ⇒ `CURRENCY_INSUFFICIENT_FUNDS`, không mutate) → ghi ledger. KHÔNG tự mở transaction (chạy trong transaction
+  của command top-level ⇒ không lồng transaction).
+- **`GrantCurrencyCommand`/`SpendCurrencyCommand`** (`ITransactionalRequest` + idempotency key + source) = handler **mỏng** uỷ
+  cho service; owner từ token `sub` (chống IDOR). **KHÔNG endpoint HTTP công khai** (cấp/tiêu là nội bộ — dùng bởi feature
+  khác; endpoint "cấp tiền" là lỗ hổng kinh tế). **`GetWalletQuery`** → **`GET /api/v1/wallet`** (protected) đọc số dư.
+- **Battle reward** (Phase 30) nay cấp Gold **qua `CurrencyWalletService`** (ghi ledger, cùng transaction) — thống nhất cơ chế.
+
+> **Ranh giới (ADR-007/011):** client CHỈ hiển thị số dư (server-authoritative); cấp/tiêu atomic + idempotent + concurrency-safe
+> ở server. **Reuse, đừng reinvent**: gacha (33)/AFK (37)/shop (40)/mail (42) dùng đúng `CurrencyWalletService` — KHÔNG cơ chế
+> giao dịch/idempotency thứ hai. Số tiền/tỉ lệ là config (ADR-004). Ngoài scope: Fragment/Material/Energy (33/36/39), lịch sử
+> giao dịch qua endpoint, `IdempotencyBehavior` pipeline tổng quát.
 
 ## 3. Ví dụ trách nhiệm: Start Battle (Phase 30 — đã hiện thực)
 

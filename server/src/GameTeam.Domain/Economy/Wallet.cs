@@ -4,9 +4,11 @@ namespace GameTeam.Domain.Economy;
 
 /// <summary>
 /// Ví tiền tệ của một người chơi — gắn 1-1 với gốc save <see cref="Profiles.PlayerProfile"/> qua
-/// <see cref="ProfileId"/> (unique). Server-authoritative (ADR-007). <b>Nền tối giản phase 30</b>: chỉ
-/// <b>cấp thưởng (credit)</b> trong transaction đánh trận — KHÔNG tiêu/giao dịch/ledger (currency/inventory
-/// đầy đủ là phase 31–33). Số dư số nguyên (ADR-011).
+/// <see cref="ProfileId"/> (unique). Server-authoritative (ADR-007). <b>Phase 31</b>: hỗ trợ
+/// <b>cấp (credit)</b> và <b>tiêu (spend)</b> có bất biến <b>số dư không âm</b>; giao dịch atomic +
+/// idempotency + audit ledger nằm ở tầng Application (<c>CurrencyWalletService</c> + <c>CurrencyTransaction</c>).
+/// Loại tiền là mã chuỗi (<c>gold</c>/<c>gem</c>/<c>ticket</c>) — ánh xạ <see cref="GameTeam.Contracts"/>
+/// <c>Currency</c> ở ranh giới Application. Số dư số nguyên (ADR-011).
 /// </summary>
 public sealed class Wallet : AggregateRoot<Guid>
 {
@@ -79,9 +81,9 @@ public sealed class Wallet : AggregateRoot<Guid>
 
     /// <summary>
     /// Cộng <paramref name="amount"/> (&gt; 0) vào số dư <paramref name="currency"/> (tạo dòng nếu chưa có) và
-    /// cập nhật <see cref="UpdatedAt"/>. Chỉ credit (phase 30) — không tiêu.
+    /// cập nhật <see cref="UpdatedAt"/>. Trả về số dư sau khi cộng.
     /// </summary>
-    public void Credit(string currency, long amount, DateTimeOffset nowUtc)
+    public long Credit(string currency, long amount, DateTimeOffset nowUtc)
     {
         if (string.IsNullOrWhiteSpace(currency))
         {
@@ -96,7 +98,8 @@ public sealed class Wallet : AggregateRoot<Guid>
         WalletBalance? existing = _balances.FirstOrDefault(b => string.Equals(b.Currency, currency, StringComparison.Ordinal));
         if (existing is null)
         {
-            _balances.Add(new WalletBalance(currency, amount));
+            existing = new WalletBalance(currency, amount);
+            _balances.Add(existing);
         }
         else
         {
@@ -104,6 +107,37 @@ public sealed class Wallet : AggregateRoot<Guid>
         }
 
         UpdatedAt = nowUtc;
+        return existing.Amount;
+    }
+
+    /// <summary>
+    /// Trừ <paramref name="amount"/> (&gt; 0) khỏi số dư <paramref name="currency"/> và cập nhật
+    /// <see cref="UpdatedAt"/>. Trả về số dư sau khi trừ. Bất biến <b>số dư không âm</b> được bảo vệ ở đây
+    /// (backstop lỗi lập trình): người gọi đã kiểm đủ tiền bằng <see cref="BalanceOf"/> và trả
+    /// <c>Result</c> lỗi nghiệp vụ trước khi tới đây; nếu vẫn thiếu ⇒ ném (không phải luồng nghiệp vụ).
+    /// </summary>
+    public long Spend(string currency, long amount, DateTimeOffset nowUtc)
+    {
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            throw new ArgumentException("Currency không được rỗng.", nameof(currency));
+        }
+
+        if (amount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount), amount, "Amount tiêu phải dương.");
+        }
+
+        WalletBalance? existing = _balances.FirstOrDefault(b => string.Equals(b.Currency, currency, StringComparison.Ordinal));
+        if (existing is null || existing.Amount < amount)
+        {
+            throw new InvalidOperationException(
+                $"Số dư '{currency}' không đủ để tiêu {amount} (bất biến không âm) — người gọi phải kiểm BalanceOf trước.");
+        }
+
+        existing.Subtract(amount);
+        UpdatedAt = nowUtc;
+        return existing.Amount;
     }
 
     /// <summary>Số dư hiện tại của một loại tiền tệ (0 nếu chưa có dòng).</summary>

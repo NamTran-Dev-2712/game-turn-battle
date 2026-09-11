@@ -94,7 +94,7 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   reads `NetResult.kind==UNAUTHORIZED`) — **no infinite loop**. **Offline** (health/auth fail + cached profile) ⇒ hub in
   **offline mode** (`[offline]` label), **never fabricate**; error screen only when no cache. New parsers
   `parse_auth_guest_response`/`parse_profile` → existing generated `AuthGuestResponse`/`ProfileDto` (**no contract change,
-  no generated drift**). Hub shows server **name·level** (currency = **placeholder** until phase 31) + offline label,
+  no generated drift**). Hub shows server **name·level** (+ real currency balances since phase 31) + offline label,
   refreshing on `state_refreshed`. **No new EventBus event** — reuse `unauthorized` + `state_refreshed` (catalogue stays
   CLOSED at 5). **Reuse `AuthProfileFlow`/`TokenStore`/`NetworkClient`/`StateCache`/`ProfileDto` — never add a second
   auth/token/HTTP/profile abstraction, never put auth in a view, never bypass StateCache, never add refresh-token
@@ -115,3 +115,13 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   KHÔNG để view gọi network; KHÔNG bịa ownership (chân lý ở server).** Ngoài scope: skill (28)/formation (29)/battle (30)/
   summon (33)/upgrade (35/39)/art thật + atlas-pool (52). Canonical: `docs/gameplay/hero-system.md` §7 +
   `docs/godot/resources-and-assets.md` §2.1 + `docs/godot/scene-architecture.md` §4.1; decision log `.memory/0025`.
+- **Currency display (Phase 31, closed):** số dư ví (Gold/Gem/Ticket) là **server-authoritative** — client CHỈ hiển thị,
+  KHÔNG tự cộng/trừ (ADR-007). `NetworkResponseParser.parse_wallet` (bọc `{balances:[{currency,amount}]}`; `currency` wire là
+  CHUỖI enum → map qua `NetworkResponseParser.currency_code` về mã `gold`/`gem`/`ticket`) → `WalletDto`/`CurrencyBalanceDto`
+  (generated, DO-NOT-EDIT). `AuthProfileFlow._fetch_balances` (`GET /api/v1/wallet`, best-effort) đổ `currencies` vào **một**
+  snapshot boot cùng profile+heroes. `StateCache.apply_wallet(balances)` = cập nhật RIÊNG số dư từ server response (giữ
+  profile/hero/progress; phát `state_refreshed`) — KHÔNG phải mutator chân lý (vẫn KHÔNG có `add_currency`/`spend_currency`/
+  `set_currency`). `BattlePresenter._refresh_wallet` refresh số dư sau trận (server đã cấp thưởng — client KHÔNG tự cộng).
+  Hub hiển thị số dư thật. **KHÔNG thêm event EventBus** (tái dùng `state_refreshed`). **Reuse `StateCache`/`NetworkClient`/
+  generated DTO — KHÔNG ví/parser/cache thứ 2, KHÔNG currency math ở client, KHÔNG endpoint cấp/tiêu (chỉ đọc).** Ngoài scope:
+  Fragment/Material/Energy, ví UI riêng. Canonical: `docs/godot/state-and-signals.md` §1.1 + `.memory/0029`.

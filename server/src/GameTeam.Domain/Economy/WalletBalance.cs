@@ -1,8 +1,9 @@
 namespace GameTeam.Domain.Economy;
 
 /// <summary>
-/// Số dư một loại tiền tệ trong <see cref="Wallet"/> (một dòng <c>currency → amount</c>). Số dư chỉ tăng ở
-/// phase 30 (cấp thưởng); tiêu/giao dịch có ledger là phase 31. Số nguyên không âm (ADR-011).
+/// Số dư một loại tiền tệ trong <see cref="Wallet"/> (một dòng <c>currency → amount</c>). Hỗ trợ cộng
+/// (credit) và trừ (spend); bất biến <b>số nguyên không âm</b> (ADR-011) được bảo vệ ở
+/// <see cref="Subtract"/>.
 /// </summary>
 public sealed class WalletBalance
 {
@@ -39,9 +40,27 @@ public sealed class WalletBalance
     {
         if (delta < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(delta), delta, "Chỉ cộng (credit) ở phase 30.");
+            throw new ArgumentOutOfRangeException(nameof(delta), delta, "Delta cộng không được âm.");
         }
 
         Amount += delta;
+    }
+
+    /// <summary>
+    /// Trừ khỏi số dư (chỉ dùng nội bộ <see cref="Wallet.Spend"/>). Bất biến không âm: ném nếu kết quả &lt; 0.
+    /// </summary>
+    internal void Subtract(long delta)
+    {
+        if (delta < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(delta), delta, "Delta trừ không được âm.");
+        }
+
+        if (Amount - delta < 0)
+        {
+            throw new InvalidOperationException("Số dư không được âm (bất biến ADR-011).");
+        }
+
+        Amount -= delta;
     }
 }

@@ -80,6 +80,32 @@ func test_offline_label_when_cache_source() -> void:
 	presenter.dispose()
 
 
+func test_renders_currency_balances_from_state_cache() -> void:
+	# Phase 31: hub hiển thị số dư ví server-authoritative từ StateCache (không tự tính).
+	var view := _make_view()
+	var sc := _StubStateCache.new()
+	sc.profile = {"displayName": "Guest", "level": 1}
+	sc.currencies = {"gold": 100, "gem": 5}
+	_make_dep(sc)
+	var cfg := _make_dep(_StubConfig.new())
+	var presenter = _PRESENTER.new(view, sc, cfg)
+
+	var currency_text := str(view.last.get("currency_text"))
+	assert_str(currency_text).contains("gold: 100")
+	assert_str(currency_text).contains("gem: 5")
+	presenter.dispose()
+
+
+func test_currency_placeholder_when_empty() -> void:
+	var view := _make_view()
+	var sc := _make_dep(_StubStateCache.new())  # currencies rỗng
+	var cfg := _make_dep(_StubConfig.new())
+	var presenter = _PRESENTER.new(view, sc, cfg)
+
+	assert_str(str(view.last.get("currency_text"))).is_equal("—")
+	presenter.dispose()
+
+
 func test_state_refreshed_event_rerenders_profile() -> void:
 	var view := _make_view()
 	var sc := _StubStateCache.new()  # profile rỗng ban đầu
