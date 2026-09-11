@@ -131,6 +131,47 @@ static func parse_battle_result(data: Dictionary) -> BattleResultDto:
 	return model
 
 
+## Parse `GET /api/v1/wallet` → WalletDto (phase 31). Body bọc object `{ "balances": [ { currency, amount } ] }`
+## (không mảng trần — hợp NetworkClient chỉ nhận Dictionary). `currency` wire là CHUỖI enum
+## (JsonStringEnumConverter, vd "Gold") — map về Currency enum; loại không nhận diện bị bỏ qua (không bịa).
+## `null` nếu thiếu `balances` hoặc phần tử sai hình dạng (thiếu `currency`). Mảng rỗng hợp lệ (ví rỗng).
+static func parse_wallet(data: Dictionary) -> WalletDto:
+	if not data.has("balances") or not (data["balances"] is Array):
+		return null
+	var balances: Array[CurrencyBalanceDto] = []
+	for item in data["balances"]:
+		if not (item is Dictionary) or not item.has("currency"):
+			return null
+		var currency_enum := _currency_from_wire(str(item["currency"]))
+		if currency_enum == Currency.NONE:
+			continue  # loại tiền không nhận diện — bỏ qua an toàn (không bịa)
+		var bal := CurrencyBalanceDto.new()
+		bal.currency = currency_enum
+		bal.amount = int(item.get("amount", 0))
+		balances.append(bal)
+	var model := WalletDto.new()
+	model.balances = balances
+	return model
+
+
+## Mã chuỗi StateCache (gold/gem/ticket) cho một giá trị Currency enum; "" nếu không nhận diện.
+static func currency_code(currency_enum: int) -> String:
+	match currency_enum:
+		Currency.GOLD: return "gold"
+		Currency.GEM: return "gem"
+		Currency.TICKET: return "ticket"
+		_: return ""
+
+
+## Map chuỗi wire (vd "Gold"/"gold") → Currency enum; Currency.NONE nếu không nhận diện.
+static func _currency_from_wire(wire: String) -> int:
+	match wire.to_lower():
+		"gold": return Currency.GOLD
+		"gem": return Currency.GEM
+		"ticket": return Currency.TICKET
+		_: return Currency.NONE
+
+
 ## Parse metadata bundle `{ "version": { "bundle": int, "schema": int } }` → ConfigBundleDto.
 ## Dùng cho ConfigProvider so version (phase 16). `null` nếu thiếu `version`/`bundle`.
 static func parse_config_bundle(data: Dictionary) -> ConfigBundleDto:

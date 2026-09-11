@@ -9,6 +9,7 @@ using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
 using GameTeam.Application.Combat;
 using GameTeam.Application.Features.Battles;
+using GameTeam.Application.Features.Economy;
 using GameTeam.Application.Tests.Combat;
 using GameTeam.Contracts.Battle;
 using GameTeam.Domain.Battles;
@@ -156,6 +157,7 @@ public sealed class StartBattleCommandHandlerTests
     {
         public IBattleRecordRepository BattleRecords { get; } = Substitute.For<IBattleRecordRepository>();
         public IWalletRepository Wallets { get; } = Substitute.For<IWalletRepository>();
+        public ICurrencyTransactionRepository Ledger { get; } = Substitute.For<ICurrencyTransactionRepository>();
         public ITeamRepository Teams { get; } = Substitute.For<ITeamRepository>();
         public IPlayerProfileRepository Profiles { get; } = Substitute.For<IPlayerProfileRepository>();
         public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
@@ -182,7 +184,7 @@ public sealed class StartBattleCommandHandlerTests
             h.Teams.GetByProfileIdAsync(h.Profile.Id, Arg.Any<CancellationToken>()).Returns(team);
             h.BattleRecords.GetByProfileAndAttemptAsync(h.Profile.Id, AttemptId, Arg.Any<CancellationToken>())
                 .Returns((BattleRecord?)null);
-            h.Wallets.GetByProfileIdAsync(h.Profile.Id, Arg.Any<CancellationToken>()).Returns((Wallet?)null);
+            h.Wallets.GetByProfileIdForUpdateAsync(h.Profile.Id, Arg.Any<CancellationToken>()).Returns((Wallet?)null);
 
             h.Config.Set("hero", "hero_a", $$"""
                 { "base_stats": { "hp": {{allyHp}}, "atk": {{allyAtk}}, "def": 50, "spd": 120 }, "skills": ["skill_basic"] }
@@ -217,9 +219,10 @@ public sealed class StartBattleCommandHandlerTests
         {
             var clock = Substitute.For<IClock>();
             clock.UtcNow.Returns(Now);
+            var wallet = new CurrencyWalletService(Wallets, Ledger, clock);
             var handler = new StartBattleCommandHandler(
                 CurrentUser, Profiles, Teams, Config, new CombatInputResolver(Config), new BattleSimulator(),
-                BattleRecords, Wallets, SeedSource, clock);
+                BattleRecords, wallet, SeedSource, clock);
             return handler.Handle(command, CancellationToken.None);
         }
     }

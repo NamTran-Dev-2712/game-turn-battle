@@ -8,6 +8,7 @@ using GameTeam.Application.Features.Auth.Commands;
 using GameTeam.Application.Features.Battles;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
+using GameTeam.Application.Features.Economy.Queries;
 using GameTeam.Application.Features.Heroes.Queries;
 using GameTeam.Application.Features.Profile.Commands;
 using GameTeam.Application.Features.Teams.Commands;
@@ -16,6 +17,7 @@ using GameTeam.Contracts.Auth;
 using GameTeam.Contracts.Battle;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
+using GameTeam.Contracts.Economy;
 using GameTeam.Contracts.Hero;
 using GameTeam.Contracts.Profile;
 using GameTeam.Contracts.Team;
@@ -184,6 +186,17 @@ apiV1.MapPost("/battles", (StartBattleRequest request, ISender sender, HttpConte
     .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
     .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
+
+// GET /api/v1/wallet (Phase 31): số dư ví CHÍNH mình — chủ sở hữu suy từ token sub (GetWalletQuery →
+// ICurrentUser), KHÔNG nhận owner từ client (chống IDOR). Protected mặc định. Chưa có ví ⇒ ví rỗng (số dư 0),
+// không lỗi. Chỉ ĐỌC — cấp/tiêu là command nội bộ (GrantCurrencyCommand/SpendCurrencyCommand), KHÔNG endpoint
+// công khai (một endpoint "cấp tiền" cho client là lỗ hổng kinh tế). Client chỉ hiển thị (server-authoritative).
+apiV1.MapGet("/wallet", (ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new GetWalletQuery()), httpContext))
+    .WithName("GetWallet")
+    .MapToApiVersion(1)
+    .Produces<WalletDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC

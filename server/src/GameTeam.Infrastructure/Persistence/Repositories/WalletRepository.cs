@@ -22,6 +22,14 @@ public sealed class WalletRepository : IWalletRepository
     public async Task<Wallet?> GetByProfileIdAsync(Guid profileId, CancellationToken cancellationToken)
         => await _dbContext.Wallets.FirstOrDefaultAsync(x => x.ProfileId == profileId, cancellationToken);
 
+    public async Task<Wallet?> GetByProfileIdForUpdateAsync(Guid profileId, CancellationToken cancellationToken)
+        // Khoá dòng ví (SELECT … FOR UPDATE) để tuần tự hoá cấp/tiêu đồng thời (Phase 31). PostgreSQL chỉ khoá
+        // trong transaction đang mở (do TransactionBehavior mở). Chọn *: cột JSON `balances` được EF rehydrate.
+        // FormattableString ⇒ tham số hoá (chống SQL injection). Tracked ⇒ mutation lưu ở SaveChanges.
+        => await _dbContext.Wallets
+            .FromSql($"SELECT * FROM wallets WHERE profile_id = {profileId} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task AddAsync(Wallet entity, CancellationToken cancellationToken)
         => await _dbContext.Wallets.AddAsync(entity, cancellationToken);
 }

@@ -3,13 +3,14 @@ using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
 using GameTeam.Application.Combat;
+using GameTeam.Application.Features.Economy;
 using GameTeam.Application.Features.Teams;
 using GameTeam.Contracts.Battle;
+using GameTeam.Contracts.Enums;
 using GameTeam.Domain.Battles;
 using GameTeam.Domain.Combat;
 using GameTeam.Domain.Combat.Serialization;
 using GameTeam.Domain.Common;
-using GameTeam.Domain.Economy;
 using MediatR;
 using DomainProfile = GameTeam.Domain.Profiles.PlayerProfile;
 using DomainTeam = GameTeam.Domain.Teams.Team;
@@ -23,8 +24,9 @@ namespace GameTeam.Application.Features.Battles;
 ///   <item><b>idempotency</b>: retry cùng <c>attemptId</c> ⇒ trả kết quả đã lưu (không re-sim/cấp thưởng);</item>
 ///   <item>snapshot đội (29) — validate <c>teamId</c> thuộc người gọi (chống IDOR);</item>
 ///   <item>sinh seed server (<see cref="IBattleSeedSource"/>) → dựng input (config) → <b>re-sim</b> (24);</item>
-///   <item>thưởng tối giản config-driven: chỉ khi VICTORY, chỉ loại <c>currency</c> → credit ví;</item>
-///   <item>ghi <see cref="BattleRecord"/> + credit ví trong <b>một transaction</b> (TransactionBehavior).</item>
+///   <item>thưởng tối giản config-driven: chỉ khi VICTORY, chỉ loại <c>currency</c> → cấp qua
+///     <see cref="CurrencyWalletService"/> (atomic + idempotent + audit ledger — cơ chế dùng chung Phase 31);</item>
+///   <item>ghi <see cref="BattleRecord"/> + cấp thưởng trong <b>một transaction</b> (TransactionBehavior).</item>
 /// </list>
 /// Client chỉ nhận kết quả + replay bằng seed — không tự quyết outcome/thưởng.
 /// </summary>
@@ -33,6 +35,7 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
     private const string RewardConfigType = "reward";
     private const string CurrencyRewardType = "currency";
     private const string VictoryOutcome = "VICTORY";
+    private const string BattleRewardSource = "battle_reward";
 
     private readonly ICurrentUser _currentUser;
     private readonly IPlayerProfileRepository _profiles;
@@ -41,7 +44,7 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
     private readonly CombatInputResolver _resolver;
     private readonly BattleSimulator _simulator;
     private readonly IBattleRecordRepository _battleRecords;
-    private readonly IWalletRepository _wallets;
+    private readonly CurrencyWalletService _wallet;
     private readonly IBattleSeedSource _seedSource;
     private readonly IClock _clock;
 
@@ -53,7 +56,7 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
         CombatInputResolver resolver,
         BattleSimulator simulator,
         IBattleRecordRepository battleRecords,
-        IWalletRepository wallets,
+        CurrencyWalletService wallet,
         IBattleSeedSource seedSource,
         IClock clock)
     {
@@ -64,7 +67,7 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
         _resolver = resolver;
         _simulator = simulator;
         _battleRecords = battleRecords;
-        _wallets = wallets;
+        _wallet = wallet;
         _seedSource = seedSource;
         _clock = clock;
     }
@@ -120,9 +123,9 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
         string outcome = output.Result.Outcome;
         string logJson = CombatEventSerializer.Serialize(output);
 
-        // Thưởng tối giản config-driven — server cấp, atomic trong transaction (credit ví ↓ và ghi record ↓).
+        // Thưởng tối giản config-driven — server cấp, atomic trong transaction (cấp ví ↓ và ghi record ↓).
         IReadOnlyList<BattleReward> granted = await GrantRewardsAsync(
-            request.StageId, outcome, profile.Id, cancellationToken);
+            request.StageId, outcome, profile.Id, request.AttemptId, cancellationToken);
 
         BattleRecord record = BattleRecord.Create(
             Guid.NewGuid(),
@@ -143,11 +146,15 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
 
     /// <summary>
     /// Cấp thưởng tối giản (config-driven): chỉ khi <paramref name="outcome"/> là VICTORY, chỉ entry loại
-    /// <c>currency</c> → credit ví (tạo ví nếu chưa có). Trả danh sách khoản đã cấp để lưu vào record + trả client.
-    /// Loại thưởng khác (hero/fragment/item) là phase 31–33 (bỏ qua ở đây).
+    /// <c>currency</c> → cấp qua cơ chế dùng chung <see cref="CurrencyWalletService"/> (atomic + idempotent +
+    /// audit ledger — Phase 31). Gộp số lượng theo loại tiền rồi cấp MỘT lần/loại với khoá idempotency ổn định
+    /// <c>battle:{attemptId}:{code}</c> (tránh trùng khoá khi nhiều entry cùng loại). Trả danh sách khoản
+    /// <b>theo entry</b> để lưu vào record + trả client (giữ nguyên hiển thị Phase 30). Retry cùng
+    /// <c>attemptId</c> đã được chặn sớm ở idempotency BattleRecord ⇒ không cấp lần hai. Loại thưởng khác
+    /// (hero/fragment/item) là phase 31–33 (bỏ qua ở đây).
     /// </summary>
     private async Task<IReadOnlyList<BattleReward>> GrantRewardsAsync(
-        string stageId, string outcome, Guid profileId, CancellationToken cancellationToken)
+        string stageId, string outcome, Guid profileId, string attemptId, CancellationToken cancellationToken)
     {
         var granted = new List<BattleReward>();
         if (!string.Equals(outcome, VictoryOutcome, StringComparison.Ordinal))
@@ -161,7 +168,8 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
             return granted;
         }
 
-        Wallet? wallet = null;
+        // Gộp số lượng theo loại tiền (một lần cấp/loại), vẫn giữ danh sách theo entry cho record/DTO.
+        var creditByCurrency = new Dictionary<Currency, long>();
         foreach (string rewardId in stage.Rewards)
         {
             RewardConfig? rewardConfig = _config.Get<RewardConfig>(RewardConfigType, rewardId);
@@ -177,25 +185,22 @@ public sealed class StartBattleCommandHandler : IRequestHandler<StartBattleComma
                     continue;
                 }
 
-                wallet ??= await LoadOrCreateWalletAsync(profileId, cancellationToken);
-                wallet.Credit(entry.RefId, entry.Amount, _clock.UtcNow);
+                if (!CurrencyCode.TryParse(entry.RefId, out Currency currency))
+                {
+                    continue; // refId không phải loại tiền nhận diện được (config lạ) — bỏ qua an toàn.
+                }
+
+                creditByCurrency[currency] = creditByCurrency.GetValueOrDefault(currency) + entry.Amount;
                 granted.Add(new BattleReward(entry.RewardType, entry.RefId, entry.Amount));
             }
         }
 
-        return granted;
-    }
-
-    private async Task<Wallet> LoadOrCreateWalletAsync(Guid profileId, CancellationToken cancellationToken)
-    {
-        Wallet? wallet = await _wallets.GetByProfileIdAsync(profileId, cancellationToken);
-        if (wallet is not null)
+        foreach ((Currency currency, long total) in creditByCurrency)
         {
-            return wallet;
+            string idempotencyKey = $"battle:{attemptId}:{CurrencyCode.ToCode(currency)}";
+            _ = await _wallet.GrantAsync(profileId, currency, total, BattleRewardSource, idempotencyKey, cancellationToken);
         }
 
-        wallet = Wallet.CreateFor(Guid.NewGuid(), profileId, _clock.UtcNow);
-        await _wallets.AddAsync(wallet, cancellationToken);
-        return wallet;
+        return granted;
     }
 }

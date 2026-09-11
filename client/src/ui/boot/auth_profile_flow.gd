@@ -16,6 +16,8 @@ const AUTH_GUEST_PATH: String = "/api/v1/auth/guest"
 const PROFILE_PATH: String = "/api/v1/profile"
 ## Endpoint hero owned (GET, cần Authorization; owner suy từ token — server-authoritative, phase 27).
 const HEROES_PATH: String = "/api/v1/heroes"
+## Endpoint ví/số dư (GET, cần Authorization; owner suy từ token — server-authoritative, phase 31).
+const WALLET_PATH: String = "/api/v1/wallet"
 ## Số lần re-login TỐI ĐA khi 401 (chống vòng lặp login→401→login…).
 const MAX_RELOGIN: int = 1
 
@@ -81,14 +83,15 @@ func _guest_login() -> Dictionary:
 	return {"ok": true, "code": ""}
 
 
-# Nạp profile + hero owned server vào StateCache trong MỘT snapshot (đường ghi DUY NHẤT = apply_snapshot,
-# thay nguyên snapshot ⇒ gộp profile+heroes để không ghi đè mất nhau). Hero là best-effort: lỗi ⇒ danh
-# sách rỗng (KHÔNG bịa dữ liệu — ADR-011), profile vẫn vào cache. Definition (chỉ số) client ghép từ
-# ConfigProvider theo hero id (phase 27) — KHÔNG gửi trùng qua đây.
+# Nạp profile + hero owned + số dư ví server vào StateCache trong MỘT snapshot (đường ghi DUY NHẤT =
+# apply_snapshot, thay nguyên snapshot ⇒ gộp profile+heroes+currencies để không ghi đè mất nhau). Hero &
+# ví là best-effort: lỗi ⇒ rỗng (KHÔNG bịa dữ liệu — ADR-011), profile vẫn vào cache. Definition (chỉ số)
+# client ghép từ ConfigProvider theo hero id (phase 27) — KHÔNG gửi trùng qua đây.
 func _apply_profile_and_heroes(profile: ProfileDto) -> void:
 	if state_cache == null:
 		return
 	var heroes: Array = await _fetch_heroes()
+	var currencies: Dictionary = await _fetch_balances()
 	state_cache.apply_snapshot({
 		"profile": {
 			"playerId": profile.player_id,
@@ -97,6 +100,7 @@ func _apply_profile_and_heroes(profile: ProfileDto) -> void:
 			"schemaVersion": profile.schema_version,
 		},
 		"heroes": heroes,
+		"currencies": currencies,
 	})
 
 
@@ -111,6 +115,22 @@ func _fetch_heroes() -> Array:
 	var out: Array = []
 	for dto in res.value:
 		out.append({"id": dto.hero_id, "level": dto.level, "stars": dto.stars})
+	return out
+
+
+# Tải số dư ví (best-effort). Trả { code(String): amount(int) } theo mã StateCache (gold/gem/ticket).
+# Lỗi/không có ⇒ {} (không bịa — client CHỈ hiển thị số dư server, ADR-007). Server là chân lý số dư.
+func _fetch_balances() -> Dictionary:
+	if network_client == null:
+		return {}
+	var res: NetResult = await network_client.get_json(WALLET_PATH, NetworkResponseParser.parse_wallet)
+	if not res.ok or res.value == null:
+		return {}
+	var out: Dictionary = {}
+	for bal in res.value.balances:
+		var code := NetworkResponseParser.currency_code(bal.currency)
+		if code != "":
+			out[code] = bal.amount
 	return out
 
 

@@ -96,6 +96,27 @@ Hai bảng nền cho luồng trận (ADR-011/007), mở rộng gốc save `Playe
 - Test: Testcontainers pg16 — round-trip JSON `rewards`/`balances`, **unique `(profile_id, attempt_id)`**, credit ví, dispatch
   `BattleResolved` (`BattlePersistenceTests`); end-to-end HTTP re-sim/rollback/idempotent (`BattleEndpointTests`, §5.1).
 
+### 1.5 Currency transactions — ledger + idempotency + concurrency (Phase 31 — đóng & verify)
+
+Hệ tiền tệ đầy đủ mở rộng `Wallet` (Phase 30) thành **cấp + tiêu** có audit + idempotency + concurrency-safe
+(ADR-007/011). `Wallet`/`WalletBalance` (Domain) nay có **`Spend`**/`Subtract` với bất biến **số dư không âm**;
+loại tiền vẫn là mã chuỗi (`gold`/`gem`/`ticket`), ánh xạ enum `Currency` ở Application (`CurrencyCode`).
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| Ledger | `Persistence/Configurations/CurrencyTransactionConfiguration.cs` | `ToTable("currency_transactions")` **append-only**; cột `snake_case`: `id`(uuid PK), `profile_id`, `currency`, `delta`(bigint có dấu: +grant/−spend), `balance_after`(bigint), `source`, `idempotency_key`, `schema_version`, `created_at`. **Unique `idempotency_key`** = **idempotency tầng DB** (ADR-007) + index `profile_id` + FK → `player_profiles` (cascade). |
+| Repository | `Persistence/Repositories/CurrencyTransactionRepository.cs` | `ICurrencyTransactionRepository` (`GetById`+`Add`+**`GetByIdempotencyKeyAsync`**). `WalletRepository` thêm **`GetByProfileIdForUpdateAsync`** — `SELECT … FROM wallets … FOR UPDATE` (`FromSql`, tham số hoá) để khoá dòng ví (tuần tự hoá cấp/tiêu đồng thời). |
+| Cơ chế dùng chung | `Application/Features/Economy/CurrencyWalletService.cs` | Một chỗ: idempotency check → khoá+tải/ tạo ví → credit/spend (kiểm đủ tiền) → ghi ledger. KHÔNG tự mở transaction (chạy trong transaction của command top-level). Tái dùng cho battle/gacha/AFK/shop/mail. |
+| Migration | `Persistence/Migrations/*_AddCurrencyTransactions.cs` | Tạo bảng + PK + FK + unique `idempotency_key` + index `profile_id`. `has-pending-model-changes` sạch. |
+| DI | `Infrastructure/DependencyInjection.cs` | `ICurrencyTransactionRepository` (scoped). `Application/DependencyInjection.cs`: `CurrencyWalletService` (scoped). `DbSet<CurrencyTransaction>` thêm vào `AppDbContext`. |
+
+- **Atomic**: đổi số dư + ghi ledger trong một transaction (`TransactionBehavior`+`UnitOfWork`); lỗi ⇒ cả hai + idempotency rollback.
+- **Idempotent**: `idempotency_key` đã xử lý ⇒ trả kết quả cũ (dựng lại từ ledger `balance_after`), KHÔNG áp dụng lại; unique index = backstop race.
+- **Concurrency**: hai spend song song trên cùng ví ⇒ khoá dòng `FOR UPDATE` tuần tự hoá ⇒ đúng một thành công, số dư không âm, không lost-update.
+- **Battle reward** (Phase 30) nay cấp Gold QUA `CurrencyWalletService` (ghi ledger, cùng transaction) — không còn `wallet.Credit` trực tiếp.
+- Test: Testcontainers pg16 — grant/spend atomic, idempotent (retry), thiếu tiền chặn, **concurrency** (2 spend song song), rollback
+  (`CurrencyTransactionPersistenceTests`); end-to-end HTTP ví + battle-reward + retry (`WalletEndpointTests`, §5.1).
+
 ---
 
 ## 2. Caching — Redis

@@ -70,6 +70,9 @@ public static class DependencyInjection
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddSingleton<IBattleSeedSource, CryptoBattleSeedSource>();
 
+        // Repository sổ cái giao dịch tiền tệ (Phase 31) — audit + idempotency (idempotency_key unique).
+        services.AddScoped<ICurrencyTransactionRepository, CurrencyTransactionRepository>();
+
         // ── Cache phân tán: Redis (ADR-003/005, Phase 12) ────────────────────────────────────────
         // Connection LẤY TỪ CONFIG (env ConnectionStrings__Redis) — không hardcode host/port/password.
         string? redisConnectionString = configuration.GetConnectionString(RedisConnectionName);

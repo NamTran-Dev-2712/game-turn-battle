@@ -53,6 +53,17 @@ func apply_snapshot(snapshot: Dictionary) -> void:
 	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
 
 
+## Cập nhật RIÊNG số dư ví từ server response `GET /api/v1/wallet` (giữ nguyên profile/hero/progress đang có).
+## Đây KHÔNG phải mutation chân lý / không cộng-trừ phía client — chỉ phản chiếu số dư server vừa trả
+## (dùng khi refresh ví sau một hành động, vd đánh trận). `balances` = { code(String): amount(int) }. Đánh dấu
+## nguồn = server (vừa online), lưu đĩa, phát `state_refreshed`.
+func apply_wallet(balances: Dictionary) -> void:
+	_currencies = balances.duplicate(true)
+	_source = SOURCE_SERVER
+	_persist_snapshot()
+	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
+
+
 # ── Đọc (trả BẢN SAO — caller không sửa được cache) ──────────────────────────────────────────────
 
 ## Số dư một loại currency (0 nếu không có). Client KHÔNG tự đổi số này — chỉ đọc.

@@ -59,8 +59,11 @@ public class AppDbContext : DbContext
     /// <summary>Bản ghi kết quả trận — server-authoritative + idempotency (profile, attempt_id) unique (Phase 30).</summary>
     public DbSet<BattleRecord> BattleRecords => Set<BattleRecord>();
 
-    /// <summary>Ví tiền tệ người chơi — nền tối giản cấp thưởng, gắn 1-1 profile (Phase 30; đầy đủ ở Phase 31).</summary>
+    /// <summary>Ví tiền tệ người chơi — cấp/tiêu, gắn 1-1 profile; số dư không âm (Phase 30/31, ADR-007/011).</summary>
     public DbSet<Wallet> Wallets => Set<Wallet>();
+
+    /// <summary>Sổ cái giao dịch tiền tệ (append-only) — audit + idempotency (idempotency_key unique) (Phase 31, ADR-007).</summary>
+    public DbSet<CurrencyTransaction> CurrencyTransactions => Set<CurrencyTransaction>();
 
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();

@@ -100,6 +100,59 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("battle_records", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Economy.CurrencyTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("BalanceAfter")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_after");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("currency");
+
+                    b.Property<long>("Delta")
+                        .HasColumnType("bigint")
+                        .HasColumnName("delta");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_currency_transactions_idempotency_key");
+
+                    b.HasIndex("ProfileId")
+                        .HasDatabaseName("ix_currency_transactions_profile_id");
+
+                    b.ToTable("currency_transactions", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Domain.Economy.Wallet", b =>
                 {
                     b.Property<Guid>("Id")
@@ -358,6 +411,15 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Rewards");
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Economy.CurrencyTransaction", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GameTeam.Domain.Economy.Wallet", b =>

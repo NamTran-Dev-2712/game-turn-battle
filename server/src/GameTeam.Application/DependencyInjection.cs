@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentValidation;
 using GameTeam.Application.Behaviors;
 using GameTeam.Application.Combat;
+using GameTeam.Application.Features.Economy;
 using GameTeam.Domain.Combat;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,10 @@ public static class DependencyInjection
         // (đọc config qua IConfigProvider). Registry effect mặc định (§23). Không phải port Infra ⇒ đăng ký ở đây.
         services.AddSingleton<BattleSimulator>(_ => new BattleSimulator());
         services.AddScoped<CombatInputResolver>();
+
+        // Economy (phase 31): cơ chế giao dịch tiền tệ dùng chung (atomic + idempotency + ledger). Không phải
+        // port Infra — logic Application thuần (dùng các port repo/clock) ⇒ đăng ký ở đây, scoped theo request.
+        services.AddScoped<CurrencyWalletService>();
 
         return services;
     }
