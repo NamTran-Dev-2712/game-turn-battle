@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/item.schema.json",
+  "title": "Item catalog config",
+  "description": "Định nghĩa vật phẩm (catalog item chung) data-driven (ADR-004). Bám ../../docs/gameplay/inventory-and-equipment.md §1. Chỉ ràng buộc cấu trúc/kiểu — KHÔNG chứa giá trị balance/số lượng (số lượng thuộc inventory người chơi, server-authoritative). Mảnh hero (fragment) KHÔNG phải catalog item: fragment tham chiếu hero_id, kiểm ở tầng inventory (Phase 32). Sink tiêu vật phẩm (equipment 38/ascension 39/shop 40) ở phase sau.",
+  "type": "object",
+  "required": ["schema_version", "id", "item_type"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/item_id" },
+    "item_type": {
+      "type": "string",
+      "enum": ["item"],
+      "description": "Loại vật phẩm catalog. MVP chỉ 'item' (vật phẩm/nguyên liệu chung); fragment là hero-referenced, không nằm ở catalog. Thêm loại mới = enum additive."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tên hiển thị (tuỳ chọn). Nội dung hiển thị — client có thể i18n về sau."
+    }
+  },
+  "additionalProperties": false
+}

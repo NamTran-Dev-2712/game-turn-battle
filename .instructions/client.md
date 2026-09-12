@@ -125,3 +125,14 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   Hub hiển thị số dư thật. **KHÔNG thêm event EventBus** (tái dùng `state_refreshed`). **Reuse `StateCache`/`NetworkClient`/
   generated DTO — KHÔNG ví/parser/cache thứ 2, KHÔNG currency math ở client, KHÔNG endpoint cấp/tiêu (chỉ đọc).** Ngoài scope:
   Fragment/Material/Energy, ví UI riêng. Canonical: `docs/godot/state-and-signals.md` §1.1 + `.memory/0029`.
+- **Inventory feature (Phase 32, closed):** màn kho `src/ui/inventory/` (`InventoryView` **network-free** + `InventoryPresenter`),
+  vào từ hub nút "Kho đồ" (`MainHubPresenter` `INVENTORY_PATH`). Presenter: `get_json("/api/v1/inventory", parse_inventory)` →
+  `StateCache.apply_inventory(items, owned_heroes)` → hiển thị (một nguồn = cache, `state_refreshed`). Lọc tab
+  [Tất cả][Anh hùng][Mảnh][Vật phẩm] **client-side** trên dữ liệu đã tải (endpoint cũng hỗ trợ lọc/phân trang server). Tên vật phẩm
+  ghép từ `ConfigProvider.get_entry(&"item", id)` (data-driven); fragment = "Mảnh <hero>". `parse_inventory` (bọc `{items:[{itemType,
+  itemId,quantity}], ownedHeroes:[…]}`) → generated `InventoryDto`/`ItemStackDto` (DO-NOT-EDIT). `StateCache.apply_inventory` +
+  `get_inventory()` = server-sourced, display-only (KHÔNG mutator chân lý — vẫn KHÔNG có `add_item`…). Fallback KHÔNG im lặng (Rule E):
+  lỗi tải ⇒ giữ cache + nhãn lỗi + Thử lại; kho trống ⇒ empty state. **Server-authoritative:** client CHỈ hiển thị số lượng, KHÔNG tự
+  cộng/trừ; KHÔNG endpoint thêm/bớt (cấp/tiêu là command nội bộ server). **KHÔNG thêm event EventBus** (tái dùng `state_refreshed`).
+  **Reuse `StateCache`/`NetworkClient`/`ConfigProvider`/generated DTO — KHÔNG cache/parser thứ 2.** Ngoài scope: gacha (33), equipment
+  (38), shop/mail (40/42). Canonical: `docs/godot/state-and-signals.md` §1.1 + `docs/gameplay/inventory-and-equipment.md` §1 + `.memory/0030`.

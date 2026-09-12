@@ -174,5 +174,32 @@ func test_parse_wallet_empty_balances_is_valid() -> void:
 	assert_int(wallet.balances.size()).is_equal(0)
 
 
+func test_parse_inventory_shape_and_mapping() -> void:
+	# Thiếu `items`/`ownedHeroes` ⇒ null (không bịa). Có ⇒ map itemType/itemId/quantity + hero chiếu kèm.
+	assert_object(NetworkResponseParser.parse_inventory({"items": []})).is_null()  # thiếu ownedHeroes
+	assert_object(NetworkResponseParser.parse_inventory({"ownedHeroes": []})).is_null()  # thiếu items
+	var inv := NetworkResponseParser.parse_inventory({
+		"items": [
+			{"itemType": "item", "itemId": "item_potion", "quantity": 10},
+			{"itemType": "fragment", "itemId": "hero_a", "quantity": 5},
+		],
+		"ownedHeroes": [{"heroId": "hero_a", "level": 1, "stars": 1}],
+	})
+	assert_object(inv).is_not_null()
+	assert_int(inv.items.size()).is_equal(2)
+	assert_str(inv.items[0].item_type).is_equal("item")
+	assert_str(inv.items[0].item_id).is_equal("item_potion")
+	assert_int(inv.items[0].quantity).is_equal(10)
+	assert_int(inv.owned_heroes.size()).is_equal(1)
+	assert_str(inv.owned_heroes[0].hero_id).is_equal("hero_a")
+
+
+func test_parse_inventory_empty_is_valid() -> void:
+	var inv := NetworkResponseParser.parse_inventory({"items": [], "ownedHeroes": []})
+	assert_object(inv).is_not_null()
+	assert_int(inv.items.size()).is_equal(0)
+	assert_int(inv.owned_heroes.size()).is_equal(0)
+
+
 func test_networkclient_autoload_present() -> void:
 	assert_object(get_node_or_null(^"/root/NetworkClient")).is_not_null()

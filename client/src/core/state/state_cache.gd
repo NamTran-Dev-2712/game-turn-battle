@@ -30,6 +30,7 @@ var _currencies: Dictionary = {}   # { code(String): amount(int) }
 var _heroes: Array = []            # [ { id, ... } ] — bản ghi hero người chơi sở hữu
 var _progress: Dictionary = {}     # { key(String): value }
 var _profile: Dictionary = {}      # thông tin profile (playerId/displayName/level…)
+var _inventory: Dictionary = {}    # { items: [ {item_type,item_id,quantity} ], owned_heroes: [ {hero_id,...} ] }
 var _source: String = SOURCE_EMPTY
 
 
@@ -59,6 +60,17 @@ func apply_snapshot(snapshot: Dictionary) -> void:
 ## nguồn = server (vừa online), lưu đĩa, phát `state_refreshed`.
 func apply_wallet(balances: Dictionary) -> void:
 	_currencies = balances.duplicate(true)
+	_source = SOURCE_SERVER
+	_persist_snapshot()
+	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
+
+
+## Cập nhật RIÊNG kho đồ từ server response `GET /api/v1/inventory` (giữ nguyên profile/currency/progress).
+## Đây KHÔNG phải mutation chân lý / không cộng-trừ phía client — chỉ phản chiếu kho server vừa trả
+## (server-authoritative, ADR-007). `items` = [ {item_type,item_id,quantity} ], `owned_heroes` = [ {hero_id,...} ].
+## Đánh dấu nguồn = server, lưu đĩa (offline-view), phát `state_refreshed`.
+func apply_inventory(items: Array, owned_heroes: Array) -> void:
+	_inventory = {"items": items.duplicate(true), "owned_heroes": owned_heroes.duplicate(true)}
 	_source = SOURCE_SERVER
 	_persist_snapshot()
 	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
@@ -105,6 +117,12 @@ func get_all_progress() -> Dictionary:
 ## Profile (bản sao).
 func get_profile() -> Dictionary:
 	return _profile.duplicate(true)
+
+
+## Kho đồ (bản sao sâu): { "items": [ {item_type,item_id,quantity} ], "owned_heroes": [ {hero_id,...} ] }.
+## Client CHỈ đọc/hiển thị — số lượng do server quyết (ADR-007).
+func get_inventory() -> Dictionary:
+	return _inventory.duplicate(true)
 
 
 ## Nhãn nguồn dữ liệu hiện tại: "empty" | "server" | "cache".
@@ -155,6 +173,7 @@ func _persist_snapshot() -> void:
 		"currencies": _currencies,
 		"heroes": _heroes,
 		"progress": _progress,
+		"inventory": _inventory,
 	}))
 	file.close()
 
@@ -178,4 +197,5 @@ func _load_snapshot_from_disk() -> void:
 	_currencies = _dict_field(snapshot, "currencies")
 	_heroes = _array_field(snapshot, "heroes")
 	_progress = _dict_field(snapshot, "progress")
+	_inventory = _dict_field(snapshot, "inventory")
 	_source = SOURCE_CACHE

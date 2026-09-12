@@ -41,13 +41,28 @@ Inventory là "nơi chứa" mọi phần thưởng (F10). Cần trước gacha (
 
 # Công việc cần thực hiện
 
-- [ ] Domain: `Inventory` (gắn profile) chứa hero owned + item stacks; bất biến số lượng ≥ 0.
-- [ ] Application: `AddItemsCommand`/`RemoveItemsCommand` (transactional + idempotency), `GetInventoryQuery` (lọc/phân trang).
-- [ ] Item định nghĩa theo config/schema (fragment, vật phẩm) — data-driven.
-- [ ] Client feature `inventory/`: màn kho, lọc theo loại, hiển thị số lượng.
-- [ ] Contract DTO inventory + codegen.
-- [ ] Integration test: add/remove atomic+idempotent; over-remove chặn; query đúng.
-- [ ] Cập nhật `../gameplay/inventory-and-equipment.md`.
+- [x] Domain: `Inventory` (gắn profile) chứa hero owned + item stacks; bất biến số lượng ≥ 0.
+  → `GameTeam.Domain/Inventory/` (`Inventory` aggregate 1-1 profile + `ItemStack` value object, bất biến `quantity ≥ 0`;
+  `InventoryTransaction` ledger append-only nhiều-item + `InventoryChange`). Hero owned KHÔNG nhân bản — là aggregate
+  riêng `OwnedHero` (Phase 27), inventory **chiếu** khi query. Test: `Domain.Tests/Inventory` (13) — add/remove/không âm/multi-stack.
+- [x] Application: `AddItemsCommand`/`RemoveItemsCommand` (transactional + idempotency), `GetInventoryQuery` (lọc/phân trang).
+  → `GameTeam.Application/Features/Inventory/` — `InventoryService` (idempotency-key + `FOR UPDATE` row-lock + kiểm config +
+  nhiều-item atomic + ledger, tái dùng mẫu Phase 31); `AddItems/RemoveItemsCommand` (`ITransactionalRequest`, **KHÔNG endpoint
+  công khai**); `GetInventoryQuery` (owner từ token, lọc `itemType` + phân trang + thứ tự tất định + chiếu hero). Test: 21.
+- [x] Item định nghĩa theo config/schema (fragment, vật phẩm) — data-driven.
+  → Loại config mới `item` (mẫu Phase 06/07): `shared/config-schema/item.schema.json` + `common.schema.json` (`item_id`/`item_type`)
+  + `config/items/*` + `ConfigType.Item`/`ConfigFileMapper` + reference (reward `item`→item, `fragment`→hero). `run.sh` exit 0 (17 file);
+  validator 51 test. Fragment = mảnh hero (`item_id` là `hero_id`); item = catalog. Service kiểm id theo `IConfigProvider`.
+- [x] Client feature `inventory/`: màn kho, lọc theo loại, hiển thị số lượng.
+  → `client/src/ui/inventory/` (`InventoryView` network-free + `InventoryPresenter` tải server → `StateCache.apply_inventory` → hiển thị,
+  lọc tab [Tất cả][Anh hùng][Mảnh][Vật phẩm], fallback KHÔNG im lặng). Route từ hub. Test gdUnit4: 6.
+- [x] Contract DTO inventory + codegen.
+  → `GameTeam.Contracts/Inventory/` (`InventoryDto`{items, ownedHeroes} + `ItemStackDto`) → regen `openapi.json` → `shared/codegen/run.sh`
+  → `client/src/data/generated/{inventory_dto,item_stack_dto}.gd`. Drift gate sạch; `RealSpecTests` + codegen 41 test.
+- [x] Integration test: add/remove atomic+idempotent; over-remove chặn; query đúng.
+  → `Infrastructure.Tests/Persistence/InventoryPersistenceTests` (Testcontainers pg16, 10: atomic/idempotent/over-remove/**concurrency**/rollback/
+  **§17 multi-item partial-fail không mutate**); `Api.IntegrationTests/InventoryEndpointTests` (6: auth 401/seed/lọc/phân trang/isolation).
+- [x] Cập nhật `../gameplay/inventory-and-equipment.md`. → §1 cập nhật theo implementation thật (ledger/atomic/idempotency/query/authority).
 
 # Tiêu chí hoàn thành
 
@@ -82,7 +97,21 @@ Inventory + currency là hai "sổ tài sản" server-authoritative; gacha/shop/
 
 # Phase Review
 
-Đóng khi inventory add/remove atomic+idempotent + query + client hiển thị, test xanh.
+**ĐÓNG (đã xác minh 2026-09-11).** Inventory add/remove **atomic nhiều-item + idempotent** (retry/replay không double; một
+item thiếu ⇒ toàn bộ fail không mutate một phần — §17), **concurrency-safe** (`FOR UPDATE`, hai consume song song không âm),
+query kho **lọc + phân trang + thứ tự tất định** + chiếu hero owned; client hiển thị **server-authoritative** (không client-authority,
+fallback KHÔNG im lặng). Item **data-driven** (loại config `item` mới; fragment→hero). Tái dùng đúng mẫu Phase 31 (ledger +
+idempotency-key + row-lock) — KHÔNG cơ chế thứ hai. **KHÔNG endpoint thêm/bớt công khai** (chỉ `GET /api/v1/inventory`; cấp/tiêu là
+command nội bộ — bảo mật kinh tế như Phase 31).
+
+**Bằng chứng chạy:** build Release 0/0; `dotnet test` — Domain 130 / Application 112 / Contracts 36 / Infrastructure 70
+(Testcontainers) / Api 86 (Testcontainers); config-validator 51 + `run.sh` exit 0; codegen 41 + drift sạch; `has-pending-model-changes`
+= "No changes"; Godot 4.7.1 import exit 0 + gdUnit4 **143/143, 0 orphan**. Không openapi/generated drift ngoài additive inventory.
+
+**Nợ (chuyển phase sau, có chủ đích):** gacha cấp hero/fragment thật (33); equipment lắp/tháo (38); ascension tiêu fragment (39);
+shop/mail cấp item (40/42) — đều là **caller** của `AddItems/RemoveItemsCommand`, KHÔNG dựng cơ chế mới. Seed starter inventory
+trong `CreateGuestAccountCommandHandler` là **tạm** (đến khi 33/40). Query truy vấn trên JSON stacks per-profile (bounded); nếu kho
+cực lớn về sau cân nhắc tách bảng dòng — chưa cần MVP.
 
 ---
 

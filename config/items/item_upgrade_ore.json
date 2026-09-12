@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "id": "item_upgrade_ore",
+  "item_type": "item",
+  "name": "Upgrade Ore"
+}

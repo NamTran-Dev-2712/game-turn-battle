@@ -154,6 +154,40 @@ static func parse_wallet(data: Dictionary) -> WalletDto:
 	return model
 
 
+## Parse `GET /api/v1/inventory` → InventoryDto (phase 32). Body bọc object
+## `{ "items": [ {itemType, itemId, quantity} ], "ownedHeroes": [ {heroId, level, stars} ] }`
+## (không mảng trần — hợp NetworkClient chỉ nhận Dictionary). Server-authoritative: client chỉ HIỂN THỊ số
+## lượng, KHÔNG tự cộng/trừ. `null` nếu thiếu `items`/`ownedHeroes` hoặc phần tử sai hình dạng. Mảng rỗng hợp
+## lệ (kho trống). Tên/metadata hiển thị ghép từ ConfigProvider theo itemId (data-driven).
+static func parse_inventory(data: Dictionary) -> InventoryDto:
+	if not data.has("items") or not (data["items"] is Array):
+		return null
+	if not data.has("ownedHeroes") or not (data["ownedHeroes"] is Array):
+		return null
+	var items: Array[ItemStackDto] = []
+	for item in data["items"]:
+		if not (item is Dictionary) or not item.has("itemType") or not item.has("itemId"):
+			return null
+		var stack := ItemStackDto.new()
+		stack.item_type = str(item["itemType"])
+		stack.item_id = str(item["itemId"])
+		stack.quantity = int(item.get("quantity", 0))
+		items.append(stack)
+	var heroes: Array[OwnedHeroDto] = []
+	for hero in data["ownedHeroes"]:
+		if not (hero is Dictionary) or not hero.has("heroId"):
+			return null
+		var dto := OwnedHeroDto.new()
+		dto.hero_id = str(hero["heroId"])
+		dto.level = int(hero.get("level", 0))
+		dto.stars = int(hero.get("stars", 0))
+		heroes.append(dto)
+	var model := InventoryDto.new()
+	model.items = items
+	model.owned_heroes = heroes
+	return model
+
+
 ## Mã chuỗi StateCache (gold/gem/ticket) cho một giá trị Currency enum; "" nếu không nhận diện.
 static func currency_code(currency_enum: int) -> String:
 	match currency_enum:

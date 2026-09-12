@@ -121,8 +121,8 @@ public static class ReferenceValidator
     // reward.entries[].ref_id → đa hình theo reward_type.
     //   currency → ref_id ∈ {gold,gem,ticket} (else REF002)
     //   hero     → tồn tại trong hero index (else REF001)
-    //   fragment/item → KHÔNG có loại config tương ứng → chỉ kiểm định dạng, không kiểm tồn tại
-    //                   (giới hạn có chủ đích — tránh phát minh quan hệ; xem README §Known limitations).
+    //   item     → tồn tại trong item index (Phase 32 — catalog item; else REF001)
+    //   fragment → tồn tại trong hero index (Phase 32 — mảnh của hero, khớp inventory fragment=hero_id; else REF001)
     private static IEnumerable<ValidationError> Reward(ConfigEntity e, JsonObject obj, IdIndex index)
     {
         if (obj["entries"] is not JsonArray entries)
@@ -152,7 +152,16 @@ public static class ReferenceValidator
                     yield return Missing(e, path, ConfigType.Hero, refId);
                     break;
 
-                // fragment/item: không kiểm tồn tại (không có config type). currency/hero hợp lệ: bỏ qua.
+                case "item" when !index.Contains(ConfigType.Item, refId):
+                    yield return Missing(e, path, ConfigType.Item, refId);
+                    break;
+
+                // fragment = mảnh của một hero ⇒ ref_id trỏ hero index (khớp inventory fragment=hero_id, Phase 32).
+                case "fragment" when !index.Contains(ConfigType.Hero, refId):
+                    yield return Missing(e, path, ConfigType.Hero, refId);
+                    break;
+
+                // ref hợp lệ (currency/hero/item/fragment tồn tại): bỏ qua.
                 default:
                     break;
             }

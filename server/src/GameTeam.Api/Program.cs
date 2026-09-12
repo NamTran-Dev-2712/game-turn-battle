@@ -10,6 +10,7 @@ using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
 using GameTeam.Application.Features.Economy.Queries;
 using GameTeam.Application.Features.Heroes.Queries;
+using GameTeam.Application.Features.Inventory.Queries;
 using GameTeam.Application.Features.Profile.Commands;
 using GameTeam.Application.Features.Teams.Commands;
 using GameTeam.Application.Features.Teams.Queries;
@@ -19,6 +20,7 @@ using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
 using GameTeam.Contracts.Economy;
 using GameTeam.Contracts.Hero;
+using GameTeam.Contracts.Inventory;
 using GameTeam.Contracts.Profile;
 using GameTeam.Contracts.Team;
 using GameTeam.Domain.Common;
@@ -196,6 +198,20 @@ apiV1.MapGet("/wallet", (ISender sender, HttpContext httpContext) =>
     .WithName("GetWallet")
     .MapToApiVersion(1)
     .Produces<WalletDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// GET /api/v1/inventory (Phase 32): kho đồ CHÍNH mình — chủ sở hữu suy từ token sub (GetInventoryQuery →
+// ICurrentUser), KHÔNG nhận owner từ client (chống IDOR). Protected mặc định. Chưa có kho ⇒ kho rỗng, không
+// lỗi. Hỗ trợ lọc theo loại (itemType=item|fragment) + phân trang (page/pageSize). Chỉ ĐỌC — thêm/bớt là
+// command nội bộ (AddItemsCommand/RemoveItemsCommand), KHÔNG endpoint công khai (một endpoint "cấp item" cho
+// client là lỗ hổng kinh tế). Client chỉ hiển thị (server-authoritative). Hero sở hữu được chiếu kèm (Phase 27).
+apiV1.MapGet("/inventory", (string? itemType, int? page, int? pageSize, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(
+            sender.Send(new GetInventoryQuery(itemType, page ?? 1, pageSize ?? 50)), httpContext))
+    .WithName("GetInventory")
+    .MapToApiVersion(1)
+    .Produces<InventoryDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
 
 // ─────────────────────────────────────────────────────────────────────────────

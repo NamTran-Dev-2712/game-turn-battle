@@ -4,6 +4,7 @@ using GameTeam.Domain.Battles;
 using GameTeam.Domain.Common;
 using GameTeam.Domain.Economy;
 using GameTeam.Domain.Heroes;
+using GameTeam.Domain.Inventory;
 using GameTeam.Domain.Profiles;
 using GameTeam.Domain.Teams;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +65,12 @@ public class AppDbContext : DbContext
 
     /// <summary>Sổ cái giao dịch tiền tệ (append-only) — audit + idempotency (idempotency_key unique) (Phase 31, ADR-007).</summary>
     public DbSet<CurrencyTransaction> CurrencyTransactions => Set<CurrencyTransaction>();
+
+    /// <summary>Kho đồ người chơi — chồng vật phẩm/mảnh, gắn 1-1 profile; số lượng không âm (Phase 32, ADR-007/011).</summary>
+    public DbSet<Inventory> Inventories => Set<Inventory>();
+
+    /// <summary>Sổ cái giao dịch kho đồ (append-only) — audit + idempotency (idempotency_key unique) (Phase 32, ADR-007).</summary>
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
 
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();

@@ -114,6 +114,25 @@ loại tiền vẫn là mã chuỗi (`gold`/`gem`/`ticket`), ánh xạ enum `Cur
 - **Idempotent**: `idempotency_key` đã xử lý ⇒ trả kết quả cũ (dựng lại từ ledger `balance_after`), KHÔNG áp dụng lại; unique index = backstop race.
 - **Concurrency**: hai spend song song trên cùng ví ⇒ khoá dòng `FOR UPDATE` tuần tự hoá ⇒ đúng một thành công, số dư không âm, không lost-update.
 - **Battle reward** (Phase 30) nay cấp Gold QUA `CurrencyWalletService` (ghi ledger, cùng transaction) — không còn `wallet.Credit` trực tiếp.
+
+### 1.6 Inventory — asset ledger nhiều-item + idempotency + concurrency (Phase 32 — đóng & verify)
+
+"Sổ tài sản" thứ hai (song sinh với ví, §1.5): kho đồ chứa **vật phẩm (item) + mảnh (fragment)** dạng chồng
+`(item_type, item_id) → quantity` (bất biến **không âm**, ADR-011), gắn **1-1 profile**. Hero sở hữu KHÔNG lưu
+ở đây — vẫn là `OwnedHero` (§1.3), query kho **chiếu** kèm. Tái dùng đúng mẫu Phase 31 (ledger + idempotency-key
+unique + row-lock `FOR UPDATE`) — mở rộng cho **nhiều-item ATOMIC** (một item thiếu ⇒ toàn bộ fail, không mutate một phần).
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| Kho | `Persistence/Configurations/InventoryConfiguration.cs` | `ToTable("inventories")`; `id`(uuid PK), `profile_id`, `schema_version`, `created_at`, `updated_at`; chồng = cột **JSON `stacks`** (`OwnsMany().ToJson()`: `item_type`/`item_id`/`quantity`). **Unique `profile_id`** (1-1) + FK → `player_profiles` (cascade). |
+| Ledger | `Persistence/Configurations/InventoryTransactionConfiguration.cs` | `ToTable("inventory_transactions")` **append-only**; `id`(uuid PK), `profile_id`, `direction`(grant/consume), `source`, `idempotency_key`, `schema_version`, `created_at`; các dòng thay đổi = cột **JSON `changes`** (`item_type`/`item_id`/`delta`/`quantity_after` — nhiều-item/giao dịch). **Unique `idempotency_key`** + index `profile_id` + FK → `player_profiles` (cascade). |
+| Repository | `Persistence/Repositories/{InventoryRepository,InventoryTransactionRepository}.cs` | `IInventoryRepository` (`GetById`+`Add`+`GetByProfileIdAsync`+**`GetByProfileIdForUpdateAsync`** `SELECT … FROM inventories … FOR UPDATE`); `IInventoryTransactionRepository` (+**`GetByIdempotencyKeyAsync`**). |
+| Cơ chế dùng chung | `Application/Features/Inventory/InventoryService.cs` | Một chỗ: idempotency check → khoá+tải/tạo kho → **kiểm data-driven** (item→catalog, fragment→hero qua `IConfigProvider`) → **nhiều-item atomic** (consume: kiểm đủ MỌI item trước) → ghi MỘT dòng ledger. KHÔNG tự mở transaction. Tái dùng cho gacha/shop/mail/equipment. |
+| Migration | `Persistence/Migrations/*_AddInventory.cs` | Tạo `inventories` + `inventory_transactions` + PK/FK/unique/index. `has-pending-model-changes` sạch. |
+| DI | `Infrastructure/DependencyInjection.cs` | `IInventoryRepository`/`IInventoryTransactionRepository` (scoped). `Application/DependencyInjection.cs`: `InventoryService` (scoped). `DbSet<Inventory>`/`DbSet<InventoryTransaction>` thêm vào `AppDbContext`. |
+
+- **Atomic nhiều-item**: đổi kho + ghi ledger trong một transaction; consume một item thiếu ⇒ toàn bộ fail, KHÔNG bớt một phần (test §17). **Idempotent**: `idempotency_key` đã xử lý ⇒ trả kết quả cũ (dựng từ ledger `changes`). **Concurrency**: hai consume song song ⇒ `FOR UPDATE` tuần tự hoá ⇒ đúng một thành công, không âm.
+- **KHÔNG endpoint thêm/bớt công khai** — chỉ `GET /api/v1/inventory` (đọc). Cấp/tiêu là command nội bộ (`AddItems/RemoveItemsCommand`), caller = gacha/shop/mail/equipment. Seed starter inventory trong `CreateGuestAccountCommandHandler` là **tạm** (đến khi 33/40).
 - Test: Testcontainers pg16 — grant/spend atomic, idempotent (retry), thiếu tiền chặn, **concurrency** (2 spend song song), rollback
   (`CurrencyTransactionPersistenceTests`); end-to-end HTTP ví + battle-reward + retry (`WalletEndpointTests`, §5.1).
 

@@ -20,6 +20,7 @@ public static class ConfigFileMapper
             ["economy"] = ConfigType.Economy,
             ["quests"] = ConfigType.Quest,
             ["formation"] = ConfigType.Formation,
+            ["items"] = ConfigType.Item,
         };
 
     /// <summary>
