@@ -28,6 +28,7 @@
 | Formation | `PUT /api/v1/teams/{id}` | command |
 | Battle | `POST /api/v1/battles` | command (re-sim) |
 | Wallet | `GET /api/v1/wallet` (số dư, protected — owner từ token) | query (Phase 31) |
+| Inventory | `GET /api/v1/inventory` (kho: item/fragment + hero chiếu, protected — owner từ token; lọc `itemType` + `page`/`pageSize`) | query (Phase 32) — thêm/bớt là command nội bộ, KHÔNG endpoint công khai |
 | Summon | `POST /api/v1/summons` | command (idempotent) |
 | Campaign | `GET /api/v1/campaign`, `POST /api/v1/campaign/{stage}/sweep` | query/command |
 | Economy | `POST /api/v1/afk/claim`, `POST /api/v1/shop/purchase` | command (idempotent) |

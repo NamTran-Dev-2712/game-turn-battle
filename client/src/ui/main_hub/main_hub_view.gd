@@ -9,6 +9,7 @@ const FEATURES: Array[Dictionary] = [
 	{"id": &"heroes", "label": "Anh hùng"},
 	{"id": &"formation", "label": "Đội hình"},
 	{"id": &"battle", "label": "Chiến đấu"},
+	{"id": &"inventory", "label": "Kho đồ"},
 	{"id": &"summon", "label": "Triệu hồi"},
 	{"id": &"shop", "label": "Cửa hàng"},
 ]

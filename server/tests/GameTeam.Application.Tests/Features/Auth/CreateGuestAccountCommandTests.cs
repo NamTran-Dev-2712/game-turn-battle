@@ -6,6 +6,7 @@ using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
 using GameTeam.Application.Features.Auth.Commands;
+using GameTeam.Application.Features.Inventory;
 using GameTeam.Application.Tests.TestSupport;
 using GameTeam.Contracts.Auth;
 using GameTeam.Domain.Accounts;
@@ -55,8 +56,15 @@ public sealed class CreateGuestAccountCommandTests
         var config = Substitute.For<IConfigProvider>();
         config.GetIds("hero").Returns(SeededHeroIds);
 
+        // Phase 32: the guest-login command also seeds a starter inventory via InventoryService (same
+        // transaction). Wire a real service over substitute repos; config has no catalog items here, so only
+        // hero fragments are seeded — the ports return defaults, which the service stages without assertion.
+        var inventories = Substitute.For<IInventoryRepository>();
+        var inventoryLedger = Substitute.For<IInventoryTransactionRepository>();
+        var inventory = new InventoryService(inventories, inventoryLedger, config, Clock);
+
         var handler = new CreateGuestAccountCommandHandler(
-            repository, profiles, ownedHeroes, config, tokenService, Clock);
+            repository, profiles, ownedHeroes, inventory, config, tokenService, Clock);
 
         Result<AuthGuestResponse> result = await handler.Handle(
             new CreateGuestAccountCommand("device-1"), CancellationToken.None);

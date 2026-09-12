@@ -22,6 +22,7 @@
 | `economy/` | Đường cong cost (level/sao), energy params | Progression, Economy |
 | `quests/` | Quest definition | Quest |
 | `formation/` | Lưới đội hình (rows×cols → team size) | Hero, Combat |
+| `items/` | Catalog vật phẩm (item định nghĩa) | Inventory (F10) |
 | `liveops/` | Event/season/flag (schedule) — Post-MVP | LiveOps |
 
 ## 2b. Ánh xạ schema (phase 06)
@@ -33,12 +34,13 @@ Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/conf
 | hero | `hero.schema.json` | `hero-system.md` | `skills` → skill id | `base_stats` integer; `faction` chuỗi (GP2 chưa chốt); **`art`** tuỳ chọn (path/atlas → AssetLoader lazy, ADR-009 — thêm additive phase 27) |
 | skill | `skill.schema.json` | `skill-framework.md` | `effects[].effect_type` (registry) | effect_type: damage/heal/apply_buff/apply_debuff/shield; `params` typed tuỳ chọn (coeff_fixed/amount_fixed/atk/def/spd/duration) + `trigger`/`cooldown` (Phase 28) |
 | stage | `stage.schema.json` | `progression-and-economy.md` | `enemies[].hero_id` → hero; `rewards[]` → reward | `energy_cost` integer; **Phase 30 (additive, không bump version):** optional `max_rounds`/`basic_skill_id`/`combat_rules{…}` + enemy `slot` để nối sim thật (combat-framework §24) |
-| reward | `reward.schema.json` | `progression-and-economy.md` | `entries[].ref_id` (currency/hero/fragment/item) | `amount` integer |
+| reward | `reward.schema.json` | `progression-and-economy.md` | `entries[].ref_id` đa hình theo `reward_type`: currency→{gold,gem,ticket}; hero→hero; **item→item; fragment→hero** (kiểm tồn tại từ Phase 32) | `amount` integer |
 | gacha | `gacha.schema.json` | `progression-and-economy.md` | `pool[]` → hero; `rates[].rarity` | rate/pity **cấu trúc**, không giá trị |
 | shop | `shop.schema.json` | `progression-and-economy.md` | `items[].reward_ref` → reward; `cost.currency` | `cost.amount` integer |
 | economy | `economy.schema.json` | `progression-and-economy.md` | `cost_curves`, `energy` | bước đường cong integer, không cố định |
 | quest | `quest.schema.json` | `quest-system.md` | `reward_refs[]` → reward; `condition_type` | condition_type: battles_won/summons_done/login |
 | formation | `formation.schema.json` | `hero-system.md` §8 | — | `rows`/`cols` integer (≥1); **team size = rows×cols**; KHÔNG bonus vị trí (tuning/Post-MVP) — thêm Phase 29 |
+| item | `item.schema.json` | `inventory-and-equipment.md` §1 | — (catalog; ref đến từ reward/inventory) | `item_id` prefix `item_`; `item_type` enum (MVP `item`); `name` tuỳ chọn — **KHÔNG balance/số lượng** (số lượng thuộc inventory người chơi). Fragment là mảnh hero (tham chiếu `hero_id`), KHÔNG phải catalog item — thêm Phase 32 |
 
 > **Cấp độ tham chiếu:** JSON Schema chỉ ràng buộc **định dạng/cấu trúc** của ref (prefix id, kiểu). **Kiểm tồn tại id chéo file** (hero→skill…) là việc của validator (phase 07 — §3, §6), không phải schema đơn. Fixture pass/fail ở `../../shared/config-schema/fixtures/`; quy tắc migration ở `../../shared/config-schema/_versions/`.
 
@@ -51,6 +53,8 @@ flowchart LR
     Stage[stage.rewards -> reward id] --> Reward
     Gacha[gacha.pool -> hero id] --> Hero
     Shop[shop.items -> item/reward id] --> Reward
+    Reward[reward.entries item -> item id] --> Item
+    Reward2[reward.entries fragment -> hero id] --> Hero
 ```
 
 - Validator kiểm **id tham chiếu tồn tại** (không trỏ id không có) — chống lỗi config khi live.

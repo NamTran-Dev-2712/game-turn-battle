@@ -1,8 +1,9 @@
 namespace GameTeam.ConfigValidator;
 
 /// <summary>
-/// 9 loại config data-driven (ADR-004). Khớp 9 schema per-type ở shared/config-schema/.
-/// <c>Formation</c> thêm ở Phase 29 (lưới đội hình) — không phát minh loại mới ngoài scope.
+/// 10 loại config data-driven (ADR-004). Khớp các schema per-type ở shared/config-schema/.
+/// <c>Formation</c> thêm ở Phase 29 (lưới đội hình); <c>Item</c> thêm ở Phase 32 (catalog vật phẩm cho
+/// inventory) — không phát minh loại mới ngoài scope.
 /// </summary>
 public enum ConfigType
 {
@@ -15,4 +16,5 @@ public enum ConfigType
     Economy,
     Quest,
     Formation,
+    Item,
 }

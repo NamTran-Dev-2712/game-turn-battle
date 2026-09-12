@@ -1126,6 +1126,64 @@ codegen 41 + drift clean (additive); config-validator 15 OK; `has-pending-model-
   `.instructions/backend.md`/`client.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the
   integration tests are the behavior contract — update them.
 
+**Inventory is standardized (Phase 32 — closed & verified).** The server-authoritative **asset ledger** — the second "asset book"
+alongside the Phase-31 wallet — has ONE home: **`GameTeam.Domain/Inventory/`** + **`GameTeam.Application/Features/Inventory/`** +
+**`GameTeam.Infrastructure/Persistence/`** + client **`client/src/ui/inventory/`**. **`Inventory`** (`AggregateRoot<Guid>`, 1-1 profile
+via unique `profile_id`) holds **`ItemStack`** `(item_type,item_id)→quantity` value objects (invariant **`quantity ≥ 0`**, ADR-011;
+JSON column `stacks`); **`InventoryTransaction`** is an append-only **multi-item** ledger (JSON `changes`, **unique `idempotency_key`**) —
+generalizing the Phase-31 currency ledger for multi-item ops. **Owned heroes are NOT duplicated** — they stay the Phase-27 `OwnedHero`
+aggregate; the query **projects** them alongside item stacks. The ONE mechanism is **`InventoryService`** (scoped, mirrors
+`CurrencyWalletService`): idempotency check → **`SELECT … FOR UPDATE`** row-lock → **data-driven validation** (item→`item` catalog,
+fragment→`hero`, via `IConfigProvider` — unknown ⇒ `INVENTORY_UNKNOWN_ITEM`) → **multi-item ATOMIC** (consume checks EVERY item's
+sufficiency BEFORE mutating any; one shortfall ⇒ whole op fails `INVENTORY_INSUFFICIENT_CONFLICT`, no partial mutation — §17) → one
+ledger row; it never opens its own transaction (runs inside `TransactionBehavior`). **`AddItemsCommand`/`RemoveItemsCommand`**
+(`ITransactionalRequest`, owner from token `sub` — anti-IDOR) have **NO public HTTP endpoint** (a client "grant item" route is an
+economy exploit, exactly like currency); the only public route is **`GET /api/v1/inventory`** (`GetInventoryQuery`, protected, read-only,
+filter `itemType`=item|fragment + `page`/`pageSize` + deterministic order + hero projection). Items are **data-driven**: a new config type
+**`item`** (Phase-06/07 "add a config type" contract — `shared/config-schema/item.schema.json` + `common.schema.json` `item_id`/`item_type`
++ `config/items/*` + `ConfigType.Item`/`ConfigFileMapper` + reward reference `item`→item/`fragment`→hero + fixtures); fragment = a hero's
+fragment (`item_id` is a `hero_id`), item = generic catalog. Persistence: tables **`inventories`** + **`inventory_transactions`** (snake_case,
+unique/index/FK cascade), migration `AddInventory`; a **temporary** starter-item seed in `CreateGuestAccountCommandHandler` (until gacha/shop).
+Client: generated `InventoryDto`/`ItemStackDto`; `NetworkResponseParser.parse_inventory`; `StateCache.apply_inventory` (server-sourced,
+display-only, offline-view) + `get_inventory`; `client/src/ui/inventory/` (`InventoryView` network-free + `InventoryPresenter` fetch→cache→
+display, filter tabs, non-silent fallback); hub route; **no new EventBus event** (reuse `state_refreshed`). Verified (2026-09-11, Docker up +
+Godot 4.7.1): build Release 0/0; `dotnet test` Domain 130 / Application 112 / Contracts 36 / Infrastructure 70 (Testcontainers) / Api 86
+(Testcontainers); config-validator 51 + `run.sh` exit 0; codegen 41 + drift clean; `has-pending-model-changes` clean; gdUnit4 **143/143, 0
+orphan**; no openapi/generated drift beyond additive inventory. Canonical: `docs/gameplay/inventory-and-equipment.md` §1 +
+`docs/backend/infrastructure.md` §1.6 + `docs/backend/domain-and-application.md` + `docs/backend/api-and-versioning.md` +
+`docs/gameplay/configuration-and-data.md` §2b + `docs/godot/state-and-signals.md` §1.1; decision log: `.memory/0030-inventory-standardized.md`.
+
+- **Rule A — Asset Ledger.** Inventory is a server-authoritative **asset ledger**; Currency and Inventory share the SAME
+  transaction/idempotency philosophy (idempotency-key ledger + `FOR UPDATE` row-lock + one-transaction audit). Future agents **MUST reuse**
+  `InventoryService`/`Inventory`/`InventoryTransaction`/`IInventoryRepository`/`IInventoryTransactionRepository` before adding any asset
+  storage; **MUST NOT** create a second inventory/ledger/idempotency mechanism, a second save root, store hero stats in stacks, or duplicate
+  the `OwnedHero` aggregate.
+- **Rule B — No Client Authority.** The client **never** mutates authoritative asset quantity — every change is a server transaction; the
+  client shows server numbers only (`GET /inventory` → `StateCache.apply_inventory`), never fabricated. **MUST NOT** add a `StateCache`
+  authoritative mutator (`add_item`…), call an asset-write endpoint from a view, or read the owner from client input (IDOR).
+- **Rule C — Atomic Multi-Item Mutation.** Add/remove of multiple items is atomic — if one item fails (unknown / insufficient), the whole
+  operation fails with **no partial mutation** (the §17 test is the contract). **MUST NOT** mutate before validating every entry.
+- **Rule D — Idempotency.** Every asset mutation carries a unique `idempotency_key`; a seen key returns the stored result, never re-applies
+  (no double grant/consume, retry-safe). Concurrent mutations serialize via the inventory row lock (never negative).
+- **Rule E — Data-Driven Items.** Item/fragment definitions are data-driven via config/schema (the `item` config type + `hero` for
+  fragments); **MUST NOT** hardcode business item content. A new item using existing types = config only; a new item_type = additive schema
+  enum + validator + service branch, in one change.
+- **Rule F — Reuse Existing Patterns.** New phases (gacha 33, equipment 38, shop 40, mail 42, ascension 39) are **callers** of
+  `AddItems/RemoveItemsCommand` — reuse the transaction/idempotency/persistence/API patterns; do NOT invent new infrastructure when the
+  existing abstraction suffices.
+- **Contract/DTO change workflow (binding):** edit `GameTeam.Contracts/Inventory/*` → rebuild (regenerate `openapi.json`) → `bash
+  shared/codegen/run.sh` → commit the generated diff (add filenames to `RealSpecTests`) → extend `Api.IntegrationTests`/`OpenApiContractTests`
+  → doc-sync. Never hand-edit `client/src/data/generated/**` or `openapi.json`.
+- When changing inventory, keep **`GameTeam.Domain/Inventory/*` + `GameTeam.Application/Features/Inventory/*` +
+  `IInventoryRepository`/`IInventoryTransactionRepository` + `Infrastructure/Persistence/{Configurations,Repositories}/*` + migration +
+  `AppDbContext`/both `DependencyInjection` + `CreateGuestAccountCommandHandler` (seed) + `Contracts/Inventory/*` + regenerated `openapi.json`
+  + `client/src/data/generated/**` + `client/src/ui/inventory/*` + `response_parser.gd`/`state_cache.gd` + main-hub wiring + `item.schema.json`/
+  `common.schema.json`/`config/items/*` + `ConfigType`/`ConfigFileMapper`/`ReferenceValidator` (+ tests) + all the tests (behavior contract) +
+  `docs/gameplay/inventory-and-equipment.md` + `docs/backend/infrastructure.md` §1.6 + `docs/backend/domain-and-application.md` +
+  `docs/backend/api-and-versioning.md` + `docs/gameplay/configuration-and-data.md` + `docs/godot/state-and-signals.md` §1.1 +
+  `.instructions/backend.md`/`client.md`/`config.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5);
+  the integration + gdUnit4 tests are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

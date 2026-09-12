@@ -30,12 +30,12 @@ flowchart LR
 
 | Trách nhiệm | Chi tiết |
 |---|---|
-| Read-cache | Giữ bản sao đọc của `profile`/`currencies`/`heroes`/`progress` để UI hiển thị + offline-view. `const IS_DISPLAY_ONLY = true`. |
-| Đường ghi từ server | `apply_snapshot(snapshot)` — thay **toàn bộ** cache bằng snapshot từ **server response**. `apply_wallet(balances)` (Phase 31) — thay **riêng** số dư ví từ `GET /api/v1/wallet` (giữ profile/hero/progress), dùng khi refresh ví sau một hành động (vd đánh trận). Cả hai đều là **phản chiếu server response**, KHÔNG phải mutator chân lý — **KHÔNG** có `add_currency`/`spend_currency`/`set_currency`/`set_progress`… (client không phải chân lý kinh tế). |
-| API đọc | `get_currency(code)`, `get_currencies()`, `get_heroes()`, `get_hero(id)`, `get_progress(key)`, `get_all_progress()`, `get_profile()` — **trả BẢN SAO** ⇒ caller không sửa được cache. Số dư ví (`gold`/`gem`/`ticket`) là **server-authoritative** — client chỉ hiển thị. |
+| Read-cache | Giữ bản sao đọc của `profile`/`currencies`/`heroes`/`progress`/`inventory` để UI hiển thị + offline-view. `const IS_DISPLAY_ONLY = true`. |
+| Đường ghi từ server | `apply_snapshot(snapshot)` — thay **toàn bộ** cache. `apply_wallet(balances)` (Phase 31) — thay **riêng** số dư ví. `apply_inventory(items, owned_heroes)` (Phase 32) — thay **riêng** kho đồ từ `GET /api/v1/inventory` (giữ profile/currency/progress). Cả ba đều là **phản chiếu server response**, KHÔNG phải mutator chân lý — **KHÔNG** có `add_currency`/`spend_currency`/`set_currency`/`set_progress`/`add_item`… (client không phải chân lý kinh tế/tài sản). |
+| API đọc | `get_currency(code)`, `get_currencies()`, `get_heroes()`, `get_hero(id)`, `get_progress(key)`, `get_all_progress()`, `get_profile()`, `get_inventory()` — **trả BẢN SAO** ⇒ caller không sửa được cache. Số dư ví (`gold`/`gem`/`ticket`) + số lượng kho là **server-authoritative** — client chỉ hiển thị. |
 | Nhãn nguồn | `source()` = `"empty"｜"server"｜"cache"`; `is_offline()` (nguồn=cache ⇒ UI gắn nhãn "offline/cached"); ưu tiên server khi online. |
 | Cache đĩa | Lưu snapshot xuống `user://state_cache/snapshot.json`; boot nạp lại với nhãn `"cache"` (offline-view dữ liệu cũ) tới khi server refresh lật về `"server"`. Chỉ dữ liệu hiển thị — **không bí mật**. |
-| Sự kiện | Phát `state_refreshed` (§3.1) sau mỗi `apply_snapshot`/`apply_wallet`. |
+| Sự kiện | Phát `state_refreshed` (§3.1) sau mỗi `apply_snapshot`/`apply_wallet`/`apply_inventory`. |
 
 **Số dư ví (Phase 31):** boot đổ số dư vào snapshot qua `AuthProfileFlow._fetch_balances` (`GET /api/v1/wallet` →
 `NetworkResponseParser.parse_wallet`, map enum `Currency`→mã `gold`/`gem`/`ticket`); sau đánh trận, `BattlePresenter`

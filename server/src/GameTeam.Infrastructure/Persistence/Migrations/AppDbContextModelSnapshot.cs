@@ -223,6 +223,82 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("owned_heroes", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Inventory.Inventory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_inventories_profile_id");
+
+                    b.ToTable("inventories", (string)null);
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Inventory.InventoryTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_inventory_transactions_idempotency_key");
+
+                    b.HasIndex("ProfileId")
+                        .HasDatabaseName("ix_inventory_transactions_profile_id");
+
+                    b.ToTable("inventory_transactions", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Domain.Profiles.PlayerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -468,6 +544,98 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProfileId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Inventory.Inventory", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Inventory.ItemStack", "Stacks", b1 =>
+                        {
+                            b1.Property<Guid>("InventoryId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<string>("ItemId")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "item_id");
+
+                            b1.Property<string>("ItemType")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "item_type");
+
+                            b1.Property<long>("Quantity")
+                                .HasColumnType("bigint")
+                                .HasAnnotation("Relational:JsonPropertyName", "quantity");
+
+                            b1.HasKey("InventoryId", "__synthesizedOrdinal");
+
+                            b1.ToTable("inventories");
+
+                            b1.ToJson("stacks");
+
+                            b1.WithOwner()
+                                .HasForeignKey("InventoryId");
+                        });
+
+                    b.Navigation("Stacks");
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Inventory.InventoryTransaction", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Inventory.InventoryChange", "Changes", b1 =>
+                        {
+                            b1.Property<Guid>("InventoryTransactionId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<long>("Delta")
+                                .HasColumnType("bigint")
+                                .HasAnnotation("Relational:JsonPropertyName", "delta");
+
+                            b1.Property<string>("ItemId")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "item_id");
+
+                            b1.Property<string>("ItemType")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "item_type");
+
+                            b1.Property<long>("QuantityAfter")
+                                .HasColumnType("bigint")
+                                .HasAnnotation("Relational:JsonPropertyName", "quantity_after");
+
+                            b1.HasKey("InventoryTransactionId", "__synthesizedOrdinal");
+
+                            b1.ToTable("inventory_transactions");
+
+                            b1.ToJson("changes");
+
+                            b1.WithOwner()
+                                .HasForeignKey("InventoryTransactionId");
+                        });
+
+                    b.Navigation("Changes");
                 });
 
             modelBuilder.Entity("GameTeam.Domain.Profiles.PlayerProfile", b =>

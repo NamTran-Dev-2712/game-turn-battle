@@ -365,6 +365,71 @@
         }
       }
     },
+    "/api/v1/inventory": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetInventory",
+        "parameters": [
+          {
+            "name": "itemType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -757,6 +822,47 @@
           "art": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "InventoryDto": {
+        "required": [
+          "items",
+          "ownedHeroes"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemStackDto"
+            }
+          },
+          "ownedHeroes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnedHeroDto"
+            }
+          }
+        }
+      },
+      "ItemStackDto": {
+        "required": [
+          "itemType",
+          "itemId",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "itemType": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

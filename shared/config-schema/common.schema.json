@@ -90,6 +90,16 @@
       "pattern": "^formation_[a-z0-9_]+$",
       "description": "Id cấu hình formation (lưới đội hình), prefix 'formation_' (vd formation_default)."
     },
+    "item_id": {
+      "type": "string",
+      "pattern": "^item_[a-z0-9_]+$",
+      "description": "Id vật phẩm (catalog item chung), prefix 'item_' (vd item_potion_small). Mảnh (fragment) tham chiếu hero_id, KHÔNG phải catalog item (Phase 32)."
+    },
+    "item_type": {
+      "type": "string",
+      "enum": ["item", "fragment"],
+      "description": "Loại tài sản dạng stack trong inventory (Phase 32): 'item' trỏ catalog item (item_id), 'fragment' trỏ hero (hero_id). Khớp reward_type (reward.schema) trừ currency/hero. Thêm loại mới = enum additive."
+    },
     "cost": {
       "type": "object",
       "description": "Chi phí tiền tệ (cấu trúc). amount là giá trị tuning, không đặt ở schema.",

@@ -15,6 +15,7 @@ public sealed class ConfigFileMapperTests
     [InlineData("economy", ConfigType.Economy)]
     [InlineData("quests", ConfigType.Quest)]
     [InlineData("formation", ConfigType.Formation)]
+    [InlineData("items", ConfigType.Item)]
     public void Plural_directory_maps_to_singular_type(string dir, ConfigType expected)
     {
         ConfigFileMapper.DirectoryToType[dir].Should().Be(expected);

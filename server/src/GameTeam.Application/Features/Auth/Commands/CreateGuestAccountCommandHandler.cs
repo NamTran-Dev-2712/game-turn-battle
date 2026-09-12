@@ -2,6 +2,7 @@ using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
 using GameTeam.Application.Features.Heroes;
+using GameTeam.Application.Features.Inventory;
 using GameTeam.Contracts.Auth;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
@@ -25,9 +26,16 @@ namespace GameTeam.Application.Features.Auth.Commands;
 public sealed class CreateGuestAccountCommandHandler
     : IRequestHandler<CreateGuestAccountCommand, Result<AuthGuestResponse>>
 {
+    /// <summary>Seed TẠM số lượng mỗi vật phẩm catalog cho guest mới (Phase 32 — chưa có gacha/shop).</summary>
+    private const long StarterItemQuantity = 10;
+
+    /// <summary>Seed TẠM số lượng mảnh mỗi hero cho guest mới (Phase 32 — chưa có gacha/ascension).</summary>
+    private const long StarterFragmentQuantity = 20;
+
     private readonly IRepository<Account, Guid> _accounts;
     private readonly IPlayerProfileRepository _profiles;
     private readonly IOwnedHeroRepository _ownedHeroes;
+    private readonly InventoryService _inventory;
     private readonly IConfigProvider _config;
     private readonly ITokenService _tokenService;
     private readonly IClock _clock;
@@ -36,6 +44,7 @@ public sealed class CreateGuestAccountCommandHandler
         IRepository<Account, Guid> accounts,
         IPlayerProfileRepository profiles,
         IOwnedHeroRepository ownedHeroes,
+        InventoryService inventory,
         IConfigProvider config,
         ITokenService tokenService,
         IClock clock)
@@ -43,6 +52,7 @@ public sealed class CreateGuestAccountCommandHandler
         _accounts = accounts;
         _profiles = profiles;
         _ownedHeroes = ownedHeroes;
+        _inventory = inventory;
         _config = config;
         _tokenService = tokenService;
         _clock = clock;
@@ -69,6 +79,27 @@ public sealed class CreateGuestAccountCommandHandler
             OwnedHero hero = OwnedHero.Grant(
                 Guid.NewGuid(), profile.Id, heroId, OwnedHero.InitialLevel, OwnedHero.InitialStars, now);
             await _ownedHeroes.AddAsync(hero, cancellationToken);
+        }
+
+        // Seed TẠM (Phase 32): cấp cho guest mới một ít vật phẩm catalog + mảnh mỗi hero để màn kho có dữ liệu
+        // hiển thị. Data-driven (đọc config) — KHÔNG phải cơ chế nhận thật; nhận thật (gacha/shop) ở phase
+        // 33/40. Đi qua InventoryService (atomic + idempotency + ledger) trong CÙNG transaction với
+        // account+profile+hero. Config trống ⇒ danh sách rỗng ⇒ KHÔNG gọi (tránh Result lỗi UnknownItem).
+        var starter = new List<ItemChange>();
+        foreach (string itemId in _config.GetIds(InventoryItemTypes.ItemConfigType))
+        {
+            starter.Add(new ItemChange(InventoryItemTypes.Item, itemId, StarterItemQuantity));
+        }
+
+        foreach (string heroId in _config.GetIds(HeroMapping.ConfigType))
+        {
+            starter.Add(new ItemChange(InventoryItemTypes.Fragment, heroId, StarterFragmentQuantity));
+        }
+
+        if (starter.Count > 0)
+        {
+            await _inventory.GrantAsync(
+                profile.Id, starter, "seed_starter", $"seed:{profile.Id}:starter", cancellationToken);
         }
 
         TokenBundle tokens = _tokenService.CreateTokens(account.Id, account.Type);

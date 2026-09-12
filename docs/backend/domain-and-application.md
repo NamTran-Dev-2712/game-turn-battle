@@ -208,6 +208,22 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 > giao dịch/idempotency thứ hai. Số tiền/tỉ lệ là config (ADR-004). Ngoài scope: Fragment/Material/Energy (33/36/39), lịch sử
 > giao dịch qua endpoint, `IdempotencyBehavior` pipeline tổng quát.
 
+### Inventory feature: kho đồ atomic nhiều-item/idempotent/concurrency-safe (Phase 32 — đã đóng)
+
+`GameTeam.Domain/Inventory/` + `GameTeam.Application/Features/Inventory/`:
+
+- **`Inventory`** aggregate (1-1 profile) chứa `ItemStack` `(item_type, item_id) → quantity` (bất biến **không âm**);
+  **`InventoryTransaction`** ledger append-only **nhiều-item** (`idempotency_key` unique). Hero owned KHÔNG nhân bản — chiếu `OwnedHero` (Phase 27).
+- **`InventoryService`** (scoped) = **cơ chế giao dịch kho dùng chung** (song sinh `CurrencyWalletService`): idempotency check →
+  `FOR UPDATE` khoá dòng → **kiểm data-driven** (item→catalog, fragment→hero qua `IConfigProvider`) → **nhiều-item ATOMIC**
+  (consume: kiểm đủ MỌI item trước; một item thiếu ⇒ toàn bộ fail, không mutate một phần) → ghi MỘT dòng ledger.
+- **`AddItemsCommand`/`RemoveItemsCommand`** (`ITransactionalRequest`, owner từ token — chống IDOR) **KHÔNG endpoint công khai**
+  (như tiền tệ). **`GetInventoryQuery`** → **`GET /api/v1/inventory`** (protected) đọc kho (lọc `itemType` + phân trang + chiếu hero).
+
+> **Ranh giới (ADR-007/011):** client CHỈ hiển thị số lượng (server-authoritative). **Reuse, đừng reinvent**: gacha (33)/shop (40)/
+> mail (42)/equipment (38) là **caller** của `AddItems/RemoveItemsCommand` — KHÔNG cơ chế thứ hai. Item **data-driven** (loại config
+> `item`; fragment→hero). Seed starter inventory trong guest login là **tạm** (đến 33/40). Ngoài scope: equipment lắp/tháo (38), ascension (39).
+
 ## 3. Ví dụ trách nhiệm: Start Battle (Phase 30 — đã hiện thực)
 
 | Bước | Ai làm |

@@ -139,6 +139,19 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   EventBus event** (reuse `state_refreshed`). **Reuse `StateCache`/`NetworkClient`/generated DTO — no second wallet/parser/cache,
   no client currency math, no grant/spend call (read-only `/wallet`).** Out of scope: Fragment/Material/Energy, a dedicated wallet
   screen. Canonical: `docs/godot/state-and-signals.md` §1.1; decision log `.memory/0029-currencies-transactions-standardized.md`.
+- **Inventory feature (Phase 32, closed):** the inventory screen `src/ui/inventory/` (`InventoryView` **network-free** +
+  `InventoryPresenter`), entered from the hub "Kho đồ" button (`MainHubPresenter` `INVENTORY_PATH`). Presenter:
+  `get_json("/api/v1/inventory", parse_inventory)` → `StateCache.apply_inventory(items, owned_heroes)` → display (single source =
+  cache, `state_refreshed`). Filter tabs [All][Heroes][Fragments][Items] **client-side** over fetched data (the endpoint also supports
+  server filter/pagination). Item names joined from `ConfigProvider.get_entry(&"item", id)` (data-driven); fragment = "Mảnh <hero>".
+  `parse_inventory` (wraps `{items:[{itemType,itemId,quantity}], ownedHeroes:[…]}`) → generated `InventoryDto`/`ItemStackDto`
+  (DO-NOT-EDIT). `StateCache.apply_inventory` + `get_inventory()` = server-sourced, display-only (NOT a truth mutator — still no
+  `add_item`…; the forbidden-mutator guard test stays green). Non-silent fallback (Rule E): fetch error ⇒ keep cache + error label +
+  Retry; empty ⇒ empty state. **Server-authoritative:** the client only DISPLAYS quantities, never mutates; no add/remove endpoint
+  (grant/consume are internal server commands). **No new EventBus event** (reuse `state_refreshed`). **Reuse
+  `StateCache`/`NetworkClient`/`ConfigProvider`/generated DTO — no second cache/parser.** Out of scope: gacha (33), equipment (38),
+  shop/mail (40/42). Canonical: `docs/godot/state-and-signals.md` §1.1 + `docs/gameplay/inventory-and-equipment.md` §1; decision log
+  `.memory/0030-inventory-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

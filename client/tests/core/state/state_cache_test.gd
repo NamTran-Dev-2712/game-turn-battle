@@ -111,6 +111,31 @@ func test_apply_wallet_replaces_currencies_and_preserves_other_state() -> void:
 	assert_int(_refreshed.size()).is_equal(1)
 
 
+func test_apply_inventory_replaces_inventory_and_preserves_other_state() -> void:
+	# apply_inventory = refresh kho server (Phase 32): thay riêng inventory, giữ profile/currency, phát refresh.
+	_cache = _make_cache()
+	_cache.apply_snapshot(_snapshot())
+	_refreshed = []
+	_cache.apply_inventory(
+		[{"item_type": "item", "item_id": "item_potion", "quantity": 10}],
+		[{"hero_id": "hero_a", "level": 1, "stars": 1}])
+	var inventory: Dictionary = _cache.get_inventory()
+	assert_int((inventory.get("items") as Array).size()).is_equal(1)
+	assert_int(int(inventory["items"][0]["quantity"])).is_equal(10)
+	assert_int((inventory.get("owned_heroes") as Array).size()).is_equal(1)
+	assert_str(str(_cache.get_profile()["displayName"])).is_equal("Nam")  # state khác giữ nguyên
+	assert_str(_cache.source()).is_equal("server")
+	assert_int(_refreshed.size()).is_equal(1)
+
+
+func test_get_inventory_returns_copy_not_reference() -> void:
+	_cache = _make_cache()
+	_cache.apply_inventory([{"item_type": "item", "item_id": "item_potion", "quantity": 10}], [])
+	var first: Dictionary = _cache.get_inventory()
+	(first["items"] as Array).clear()  # sửa bản sao KHÔNG được ảnh hưởng cache
+	assert_int((_cache.get_inventory().get("items") as Array).size()).is_equal(1)
+
+
 func test_no_authoritative_mutation_api_exists() -> void:
 	# Guard runtime: StateCache CHỈ đọc + apply_snapshot (từ server). KHÔNG có đường ghi chân lý.
 	_cache = _make_cache()
