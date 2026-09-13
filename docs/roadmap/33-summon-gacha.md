@@ -41,13 +41,13 @@ Gacha là trái tim monetization/collection (F02) và 🔴 nhạy cảm (mvp/08)
 
 # Công việc cần thực hiện
 
-- [ ] Schema banner (mở rộng gacha.schema phase 06): rate theo rarity, pity ngưỡng, pool — không nhúng số vào code.
-- [ ] Application `SummonCommand`: validate đủ tiền → spend (31, idempotent) → RNG server (seeded, log seed để audit) → chọn hero theo rate/pity → cấp inventory (32) / trùng→fragment; tất cả trong 1 transaction.
-- [ ] Pity counter server-side theo profile+banner; reset đúng khi trúng; đảm bảo ngưỡng.
-- [ ] 10-pull: xử lý gộp atomic (tất cả hoặc không).
-- [ ] Client feature `summon/`: chọn banner, single/10x, gửi intent, hiển thị kết quả (không tự random).
-- [ ] Integration test: chạy N summon kiểm phân phối gần rate config; pity kích hoạt tại ngưỡng; tiêu tiền atomic; idempotent (retry không double hero/không mất tiền hai lần); dupes→fragment.
-- [ ] Cập nhật `../gameplay/progression-and-economy.md`.
+- [x] Schema banner (mở rộng gacha.schema phase 06): rate theo rarity, pity ngưỡng, pool — không nhúng số vào code. — `gacha.schema.json` +additive `cost`/`dupe_fragments`/`pity.target_rarity`; banner thật `config/gacha/banner_standard.json`; config-validator exit 0 (18 file, pool→hero).
+- [x] Application `SummonCommand`: validate đủ tiền → spend (31, idempotent) → RNG server (seeded, log seed để audit) → chọn hero theo rate/pity → cấp inventory (32) / trùng→fragment; tất cả trong 1 transaction. — `SummonCommandHandler` (compose `CurrencyWalletService`+`InventoryService`+`OwnedHero`+`IBattleSeedSource`+`Pcg32`); seed lưu `summon_records` (audit, không trả client).
+- [x] Pity counter server-side theo profile+banner; reset đúng khi trúng; đảm bảo ngưỡng. — `GachaPity` (unique `(profile_id,banner_id)`, `FOR UPDATE`); `SummonRollerTests` boundary (t-1/t/t+1) + reset + 10-pull tuần tự xanh.
+- [x] 10-pull: xử lý gộp atomic (tất cả hoặc không). — `SummonEndpointTests.Ten_pull_is_atomic_costs_ten_and_converts_dupes_to_fragments` (1 mới + 9 mảnh, tiêu 10 ticket).
+- [x] Client feature `summon/`: chọn banner, single/10x, gửi intent, hiển thị kết quả (không tự random). — `client/src/ui/summon/*`; banner từ `ConfigProvider.get_all("gacha")`; `randi()` chỉ cho requestId; gdUnit4 `summon_presenter_test` 7/7.
+- [x] Integration test: chạy N summon kiểm phân phối gần rate config; pity kích hoạt tại ngưỡng; tiêu tiền atomic; idempotent (retry không double hero/không mất tiền hai lần); dupes→fragment. — `SummonRollerTests` (N=40000 phân phối + data-driven A/B) + `SummonEndpointTests` (atomic/idempotent/dupe→fragment/insufficient) + `SummonPersistenceTests`.
+- [x] Cập nhật `../gameplay/progression-and-economy.md`. — §5 "Summon/Gacha (Phase 33 — đã hiện thực)"; + `hero-system.md` §7, `configuration-and-data.md`, `backend/infrastructure.md` §1.7, `backend/api-and-versioning.md`.
 
 # Tiêu chí hoàn thành
 
@@ -84,7 +84,27 @@ Gacha là trái tim monetization/collection (F02) và 🔴 nhạy cảm (mvp/08)
 
 # Phase Review
 
-Đóng khi gacha rate+pity server-side + atomic idempotent + dupes→fragment + data-driven, test phân phối/pity xanh. **Hoàn tất Collection Core.**
+**Đủ điều kiện đóng (2026-09-12).** Mọi mục `# Công việc cần thực hiện` `[x]` với bằng chứng chạy thật; mọi
+`# Tiêu chí hoàn thành` thoả:
+- **RNG + rate + pity hoàn toàn server-side; client không quyết:** `SummonRoller` (thuần, seed server qua
+  `IBattleSeedSource`, `Pcg32`); client chỉ gửi intent (`bannerId/count/requestId`) + hiển thị — sweep client
+  không có RNG quyết reward (`randi()` chỉ sinh requestId).
+- **Phân phối khớp rate config + pity đúng ngưỡng:** `SummonRollerTests` (N=40000 trong dung sai 2%; config A/B →
+  hành vi khác không sửa code; boundary t-1/t/t+1; reset; 10-pull tuần tự) xanh.
+- **Atomic + idempotent (không double):** `SummonCommand` một transaction (`ITransactionalRequest`); retry cùng
+  `requestId` ⇒ kết quả đã lưu, không tiêu/cấp lần hai (`SummonEndpointTests` idempotency; unique
+  `(profile_id,request_id)`); thiếu tiền ⇒ 409 rollback toàn bộ.
+- **Data-driven:** rate/pity/cost/dupe từ config; đổi config → hành vi đổi (banner test khác banner thật).
+
+Verify (Docker Desktop + Godot 4.7.1, 2026-09-12): `dotnet test server/GameTeam.sln` — Domain 130 / Application 121 /
+Contracts 36 / Infrastructure 74 / Api 98 xanh; codegen 41 (+ drift check sạch); config-validator exit 0 (18 file);
+`has-pending-model-changes` sạch (migration `AddSummon`); Godot import exit 0; gdUnit4 **150/150, 0 orphan**. **Hoàn
+tất Collection Core (P3).**
+
+**Quyết định lộ ra ngoài scope thuần Phase 33 (đã đồng thuận):** gỡ seed TẠM "guest login cấp toàn bộ hero + mảnh"
+(Phase 27/32, vốn đánh dấu "tạm tới phase 33") để summon là đường nhận thật — cập nhật các test team/battle/hero/
+inventory dùng seed đó (grant tường minh qua `IntegrationTestSeeding`). Mapping `CURRENCY_INSUFFICIENT_FUNDS`→409
+thêm vào `ErrorHttpMapping` (lần đầu lên HTTP ở summon).
 
 ---
 

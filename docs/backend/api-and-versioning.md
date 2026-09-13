@@ -29,7 +29,7 @@
 | Battle | `POST /api/v1/battles` | command (re-sim) |
 | Wallet | `GET /api/v1/wallet` (số dư, protected — owner từ token) | query (Phase 31) |
 | Inventory | `GET /api/v1/inventory` (kho: item/fragment + hero chiếu, protected — owner từ token; lọc `itemType` + `page`/`pageSize`) | query (Phase 32) — thêm/bớt là command nội bộ, KHÔNG endpoint công khai |
-| Summon | `POST /api/v1/summons` | command (idempotent) |
+| Summon | `POST /api/v1/summon` (gacha, protected — owner từ token; `SummonRequest{bannerId,count(1\|10),requestId}`) | command (idempotent, Phase 33) — server quyết RNG/rate/pity |
 | Campaign | `GET /api/v1/campaign`, `POST /api/v1/campaign/{stage}/sweep` | query/command |
 | Economy | `POST /api/v1/afk/claim`, `POST /api/v1/shop/purchase` | command (idempotent) |
 | Mail | `GET /api/v1/mail`, `POST /api/v1/mail/{id}/claim` | query/command |
@@ -171,6 +171,13 @@ endpoint** về sau — không tự vẽ convention khác.
   Client CHỈ đọc. **Không có endpoint cấp/tiêu công khai** — `GrantCurrencyCommand`/`SpendCurrencyCommand` là command nội bộ (atomic +
   idempotency key), dùng bởi feature khác (battle/gacha/AFK/shop). Contract additive (`Contracts/Economy/*`) → regenerate `openapi.json`
   → codegen. Chi tiết: `infrastructure.md` §1.5, `progression-and-economy.md`.
+- **Summon endpoint (Phase 33 — đã chốt):** `POST /api/v1/summon` (version set, **protected**) → `SummonCommand(bannerId,count,requestId)`
+  (`ITransactionalRequest`). Body `SummonRequest`; trả `SummonResultDto{bannerId,count,pityAfter,pulls[]}` (200) / `ErrorEnvelope`
+  (400 `GACHA_INVALID_COUNT`/`GACHA_INVALID_BANNER` · 401 · 404 `GACHA_BANNER_NOT_FOUND` · **409 `CURRENCY_INSUFFICIENT_FUNDS`**).
+  Server-authoritative (ADR-004/007/011): server sinh seed + quyết rate/pity/hero; tiêu tiền (31) + cấp hero (27)/mảnh (32) **atomic +
+  idempotent** (`requestId` = idempotency key, unique `(profile_id,request_id)`). Seed KHÔNG trả client (audit-only). Contract
+  (`Contracts/Summon/*`) → regenerate `openapi.json` → codegen. **Mapping mở rộng:** `CURRENCY_INSUFFICIENT_FUNDS` thêm vào
+  `ErrorHttpMapping.KnownCodes` → 409 (lần đầu lên HTTP ở summon). Chi tiết: `infrastructure.md` §1.7, `progression-and-economy.md` §5.
 - **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
   integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
   (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.

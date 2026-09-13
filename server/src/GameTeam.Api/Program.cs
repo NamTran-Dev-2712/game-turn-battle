@@ -12,6 +12,7 @@ using GameTeam.Application.Features.Economy.Queries;
 using GameTeam.Application.Features.Heroes.Queries;
 using GameTeam.Application.Features.Inventory.Queries;
 using GameTeam.Application.Features.Profile.Commands;
+using GameTeam.Application.Features.Summon;
 using GameTeam.Application.Features.Teams.Commands;
 using GameTeam.Application.Features.Teams.Queries;
 using GameTeam.Contracts.Auth;
@@ -22,6 +23,7 @@ using GameTeam.Contracts.Economy;
 using GameTeam.Contracts.Hero;
 using GameTeam.Contracts.Inventory;
 using GameTeam.Contracts.Profile;
+using GameTeam.Contracts.Summon;
 using GameTeam.Contracts.Team;
 using GameTeam.Domain.Common;
 using GameTeam.Infrastructure;
@@ -213,6 +215,22 @@ apiV1.MapGet("/inventory", (string? itemType, int? page, int? pageSize, ISender 
     .Produces<InventoryDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized);
+
+// POST /api/v1/summon (Phase 33): triệu hồi (gacha) — body là INTENT client (SummonRequest{bannerId, count,
+// requestId}); SERVER quyết RNG/rate/pity/hero/thưởng (client KHÔNG tự random — ADR-011). Server sinh seed,
+// tiêu tiền (Phase 31) + cấp hero (Phase 27)/trùng→mảnh (Phase 32) ATOMIC (transaction). requestId là
+// idempotency key: retry cùng khoá ⇒ trả kết quả đã lưu, KHÔNG quay/tiêu/cấp lần hai. Protected mặc định.
+// Chủ sở hữu suy từ token (không nhận trong body — chống IDOR).
+apiV1.MapPost("/summon", (SummonRequest request, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(
+            sender.Send(new SummonCommand(request.BannerId, request.Count, request.RequestId)), httpContext))
+    .WithName("Summon")
+    .MapToApiVersion(1)
+    .Produces<SummonResultDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound)
+    .Produces<ErrorEnvelope>(StatusCodes.Status409Conflict);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC

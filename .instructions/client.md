@@ -136,3 +136,13 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   cộng/trừ; KHÔNG endpoint thêm/bớt (cấp/tiêu là command nội bộ server). **KHÔNG thêm event EventBus** (tái dùng `state_refreshed`).
   **Reuse `StateCache`/`NetworkClient`/`ConfigProvider`/generated DTO — KHÔNG cache/parser thứ 2.** Ngoài scope: gacha (33), equipment
   (38), shop/mail (40/42). Canonical: `docs/godot/state-and-signals.md` §1.1 + `docs/gameplay/inventory-and-equipment.md` §1 + `.memory/0030`.
+- **Summon feature (Phase 33, closed):** màn triệu hồi `src/ui/summon/` (`SummonView` **network-free** + `SummonPresenter`), vào từ hub
+  nút "Triệu hồi" (`MainHubPresenter` `SUMMON_PATH`). **Client CHỈ gửi intent + hiển thị kết quả SERVER — KHÔNG tự random / KHÔNG quyết
+  reward / KHÔNG tính pity** (ADR-011). Banner đọc từ `ConfigProvider.get_all(&"gacha")` (config bundle, CHỈ để hiển thị cost/pity).
+  Presenter: `post_json("/summon", {bannerId,count,requestId}, parse_summon_result)` → hiển thị `pulls[]` (hero/rarity/isNew/fragments) +
+  `pityAfter` server trả; rồi refresh ví (`/wallet`→`apply_wallet`) + kho (`/inventory`→`apply_inventory`) — client KHÔNG tự cộng. `requestId`
+  = idempotency key sinh cục bộ `"sum-%d-%d" % [Time.get_ticks_usec(), randi()]` — **`randi()` CHỈ cho requestId, KHÔNG dùng quyết kết quả**.
+  `parse_summon_result` (bọc `{bannerId,count,pityAfter,pulls:[…]}`) → generated `SummonResultDto`/`SummonPullDto` (DO-NOT-EDIT); seed KHÔNG
+  có trong response (audit server-only). Fallback KHÔNG im lặng (Rule E): lỗi ⇒ nhãn lỗi + Thử lại, KHÔNG bịa. **KHÔNG thêm event EventBus**
+  (tái dùng `state_refreshed` qua apply_*). **Reuse `NetworkClient`/`ConfigProvider`/`StateCache`/generated DTO — KHÔNG parser/RNG thứ 2.**
+  Ngoài scope: banner rotation/limited (Post-MVP), ascension (39). Canonical: `docs/gameplay/progression-and-economy.md` §5 + `.memory/0031`.

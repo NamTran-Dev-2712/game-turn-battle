@@ -15,6 +15,10 @@ The contract lives in `shared/config-schema/` (JSON Schema draft 2020-12). Reuse
 
 - **8 per-type schemas** (`hero/skill/stage/gacha/shop/reward/economy/quest.schema.json`) + `common.schema.json`
   (`$defs`: id prefixes, `combat_int`, enums, `cost`) + `config-bundle.schema.json` (envelope, `config@vN`).
+  - **`gacha.schema.json` (Phase 33, additive — no version bump):** banner = `pool[]`(hero) + `rates[{rarity,weight}]` +
+    `pity{enabled,threshold,target_rarity?}` + `cost{currency,amount}` + `dupe_fragments[{rarity,amount}]`. `cost`/`dupe_fragments`
+    optional structurally but **app-required** for a summonable banner (checked before spend). A hero's rarity comes from
+    **hero config**, never the banner. Rate/pity/cost values are tuning (config) — never in code. Real banner: `config/gacha/banner_standard.json`.
 - **Schema-first:** before adding/changing a config field, read the relevant `docs/gameplay/*` doc + ADR +
   the schema. Never invent config fields, enum values, effect types, quest/condition types, currencies, or
   reward types not backed by the gameplay docs or `GameTeam.Contracts` enums (phase 05).

@@ -90,6 +90,47 @@ flowchart LR
 - **RNG server-side**, rate + pity từ config; trùng hero → fragment (`../mvp/13` A08/A09).
 - Kết quả atomic + idempotent; pity state per-player server-side.
 
+### Summon/Gacha (Phase 33 — đã hiện thực)
+
+**Triệu hồi là đường nhận hero thật** (thay seed tạm "cấp toàn bộ hero khi login" đã gỡ — xem `hero-system.md`
+§7). Server-authoritative tuyệt đối (ADR-004/007/011): client chỉ gửi **intent**, **server** quyết
+RNG/rate/pity/hero/thưởng.
+
+**Endpoint duy nhất** `POST /api/v1/summon` (protected; owner suy từ token `sub` — chống IDOR). Body
+`SummonRequest{bannerId, count(1|10), requestId}`. Trả `SummonResultDto{bannerId, count, pityAfter, pulls[]}`
+với mỗi `pull{heroId, rarity, isNew, fragments}` — **seed KHÔNG trả client** (gacha không replay ở client; seed
+chỉ lưu server để audit). Danh sách banner client đọc từ **config bundle** (`ConfigProvider.get_all("gacha")`) —
+không có endpoint liệt kê banner riêng.
+
+**Data-driven (ADR-004):** banner đọc từ `gacha.schema.json` (Phase 06 + mở rộng additive Phase 33) — `pool`
+(hero id), `rates[{rarity, weight}]`, `pity{enabled, threshold, target_rarity?}`, `cost{currency, amount}` (giá
+một lần quay), `dupe_fragments[{rarity, amount}]` (số mảnh khi trùng, theo rarity). **Rarity của một hero đọc từ
+hero config** (`hero.rarity`), KHÔNG lặp ở banner. Đổi rate/pity/cost trong config ⇒ hành vi đổi, KHÔNG sửa code.
+
+**Quyết định kết quả (`SummonRoller` — lõi thuần, tất định theo seed, dùng PCG32 như combat):**
+1. **Rate**: bốc rarity theo trọng số (`weight`); rồi chọn đồng đều một hero trong pool có rarity đó.
+2. **Pity server-side** theo `(profile, banner)`, **persistent** (bảng `gacha_pity`, unique `(profile_id, banner_id)`):
+   bộ đếm = số lần quay liên tiếp chưa trúng rarity mục tiêu; khi `count + 1 ≥ threshold` ⇒ lần quay này **đảm
+   bảo** rarity mục tiêu; trúng mục tiêu (tự nhiên hoặc do pity) ⇒ reset 0, ngược lại +1. 10-pull xử lý pity
+   **từng lần theo thứ tự** (tương đương 10 lần quay đơn trong một thao tác atomic).
+
+**Luồng handler (`SummonCommand`, `ITransactionalRequest` — một transaction):** owner từ token → kiểm count(1/10)
++ banner hợp lệ (mọi rarity có thể sinh ra đều có hero trong pool + có `dupe_fragments`) → **idempotency** (retry
+cùng `requestId` ⇒ trả kết quả đã lưu, KHÔNG quay/tiêu/cấp lại) → **khoá dòng pity** (`FOR UPDATE`) → seed server →
+`SummonRoller` → **tiêu tiền** qua `CurrencyWalletService` (Phase 31, idempotent, key `gacha:{requestId}:spend`) →
+hero **mới** ⇒ cấp `OwnedHero` (Phase 27); **trùng** (đã sở hữu HOẶC đã trúng trước trong cùng lượt) ⇒ gộp mảnh cấp
+qua `InventoryService` (Phase 32, key `gacha:{requestId}:grant`, `item_type=fragment`) → cập nhật pity + ghi
+`SummonRecord` (unique `(profile_id, request_id)`, lưu seed để audit). Thiếu tiền ⇒ `CURRENCY_INSUFFICIENT_FUNDS`
+(409) và **rollback toàn bộ** (không cấp gì). 10-pull **atomic** — tất cả hoặc không.
+
+**Tái dùng, không dựng mới:** summon **không** có cơ chế giao dịch/idempotency riêng — nó **compose**
+`CurrencyWalletService` + `InventoryService` + `OwnedHero` + seed server (`IBattleSeedSource`) + `Pcg32`. Client
+(`client/src/ui/summon/`) chỉ gửi intent (`requestId` sinh cục bộ chỉ để idempotent — KHÔNG dùng để random) và
+hiển thị kết quả server; sau summon refresh ví + kho từ server vào `StateCache`.
+
+**Ngoài phạm vi (nợ/định hướng):** banner rotation, limited banner, LiveOps/tuning rate ngoài config, ascension
+tiêu fragment (Phase 39), shop redesign — đều **không** làm ở Phase 33.
+
 ## 6. Client/server
 | | Client | Server |
 |---|---|---|

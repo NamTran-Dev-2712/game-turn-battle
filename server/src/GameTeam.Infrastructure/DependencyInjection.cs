@@ -77,6 +77,10 @@ public static class DependencyInjection
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IInventoryTransactionRepository, InventoryTransactionRepository>();
 
+        // Repository triệu hồi (Phase 33): pity server-side (profile, banner) + bản ghi summon (idempotency).
+        services.AddScoped<IGachaPityRepository, GachaPityRepository>();
+        services.AddScoped<ISummonRecordRepository, SummonRecordRepository>();
+
         // ── Cache phân tán: Redis (ADR-003/005, Phase 12) ────────────────────────────────────────
         // Connection LẤY TỪ CONFIG (env ConnectionStrings__Redis) — không hardcode host/port/password.
         string? redisConnectionString = configuration.GetConnectionString(RedisConnectionName);

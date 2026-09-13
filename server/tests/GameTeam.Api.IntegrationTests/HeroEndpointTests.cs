@@ -57,8 +57,10 @@ public sealed class HeroEndpointTests : IClassFixture<HeroPostgresApiFactory>
     }
 
     [Fact]
-    public async Task Guest_login_seeds_heroes_from_config_and_get_returns_them_for_owner()
+    public async Task Fresh_guest_owns_no_heroes()
     {
+        // Phase 33: the temporary "guest login grants all heroes" seed was removed — a new guest owns nothing
+        // until they summon. The endpoint returns an empty (not error) list for the owner.
         HttpClient client = _factory.CreateClient();
         string token = await LoginGuestAsync(client);
         Authenticated(client, token);
@@ -67,14 +69,15 @@ public sealed class HeroEndpointTests : IClassFixture<HeroPostgresApiFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         MyHeroesResponse body = (await response.Content.ReadFromJsonAsync<MyHeroesResponse>())!;
-        body.Heroes.Select(h => h.HeroId).Should().BeEquivalentTo(HeroPostgresApiFactory.SeededHeroIds);
-        body.Heroes.Should().OnlyContain(h => h.Level == 1 && h.Stars == 1);
+        body.Heroes.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task Two_guests_each_own_their_own_seeded_heroes()
+    public async Task Owned_heroes_are_returned_only_for_their_owner()
     {
+        // Owner A is granted heroes (test convenience — real acquisition is summon); owner B is a fresh guest.
         string tokenA = await LoginGuestAsync(_factory.CreateClient());
+        await IntegrationTestSeeding.GrantHeroesAsync(_factory, tokenA, HeroPostgresApiFactory.SeededHeroIds);
         string tokenB = await LoginGuestAsync(_factory.CreateClient());
 
         MyHeroesResponse heroesA = (await (await Authenticated(_factory.CreateClient(), tokenA)
@@ -83,7 +86,8 @@ public sealed class HeroEndpointTests : IClassFixture<HeroPostgresApiFactory>
             .GetAsync("/api/v1/heroes")).Content.ReadFromJsonAsync<MyHeroesResponse>())!;
 
         heroesA.Heroes.Select(h => h.HeroId).Should().BeEquivalentTo(HeroPostgresApiFactory.SeededHeroIds);
-        heroesB.Heroes.Select(h => h.HeroId).Should().BeEquivalentTo(HeroPostgresApiFactory.SeededHeroIds);
+        heroesA.Heroes.Should().OnlyContain(h => h.Level == 1 && h.Stars == 1);
+        heroesB.Heroes.Should().BeEmpty("owner B chưa nhận hero — không thấy hero của owner A");
     }
 
     [Fact]

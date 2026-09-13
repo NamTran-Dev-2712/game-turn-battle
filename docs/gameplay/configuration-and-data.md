@@ -35,7 +35,7 @@ Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/conf
 | skill | `skill.schema.json` | `skill-framework.md` | `effects[].effect_type` (registry) | effect_type: damage/heal/apply_buff/apply_debuff/shield; `params` typed tuỳ chọn (coeff_fixed/amount_fixed/atk/def/spd/duration) + `trigger`/`cooldown` (Phase 28) |
 | stage | `stage.schema.json` | `progression-and-economy.md` | `enemies[].hero_id` → hero; `rewards[]` → reward | `energy_cost` integer; **Phase 30 (additive, không bump version):** optional `max_rounds`/`basic_skill_id`/`combat_rules{…}` + enemy `slot` để nối sim thật (combat-framework §24) |
 | reward | `reward.schema.json` | `progression-and-economy.md` | `entries[].ref_id` đa hình theo `reward_type`: currency→{gold,gem,ticket}; hero→hero; **item→item; fragment→hero** (kiểm tồn tại từ Phase 32) | `amount` integer |
-| gacha | `gacha.schema.json` | `progression-and-economy.md` | `pool[]` → hero; `rates[].rarity` | rate/pity **cấu trúc**, không giá trị |
+| gacha | `gacha.schema.json` | `progression-and-economy.md` | `pool[]` → hero; `rates[].rarity` | rate/pity **cấu trúc**, không giá trị; **Phase 33 (additive, không bump version):** optional `cost{currency,amount}` (giá 1 lượt), `dupe_fragments[{rarity,amount}]` (mảnh khi trùng), `pity.target_rarity` — app bắt buộc có `cost`/`dupe_fragments` để banner quay được |
 | shop | `shop.schema.json` | `progression-and-economy.md` | `items[].reward_ref` → reward; `cost.currency` | `cost.amount` integer |
 | economy | `economy.schema.json` | `progression-and-economy.md` | `cost_curves`, `energy` | bước đường cong integer, không cố định |
 | quest | `quest.schema.json` | `quest-system.md` | `reward_refs[]` → reward; `condition_type` | condition_type: battles_won/summons_done/login |

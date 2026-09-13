@@ -35,9 +35,31 @@
       "required": ["enabled"],
       "properties": {
         "enabled": { "type": "boolean" },
-        "threshold": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+        "threshold": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "target_rarity": {
+          "description": "Rarity được đảm bảo khi chạm ngưỡng pity (tuỳ chọn). Thiếu ⇒ app dùng rarity cao nhất trong rates.",
+          "$ref": "https://game-team/schema/common.schema.json#/$defs/rarity"
+        }
       },
       "additionalProperties": false
+    },
+    "cost": {
+      "description": "Giá một lần quay (tuỳ chọn về CẤU TRÚC; app BẮT BUỘC có để banner quay được). amount là tuning.",
+      "$ref": "https://game-team/schema/common.schema.json#/$defs/cost"
+    },
+    "dupe_fragments": {
+      "type": "array",
+      "description": "Số mảnh cấp khi trúng hero đã sở hữu, theo rarity (tuỳ chọn về CẤU TRÚC; app BẮT BUỘC phủ mọi rarity trong rates). amount là tuning.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["rarity", "amount"],
+        "properties": {
+          "rarity": { "$ref": "https://game-team/schema/common.schema.json#/$defs/rarity" },
+          "amount": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

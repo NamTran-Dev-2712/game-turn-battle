@@ -430,6 +430,76 @@
         }
       }
     },
+    "/api/v1/summon": {
+      "post": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "Summon",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SummonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummonResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -1036,6 +1106,79 @@
           },
           "attemptId": {
             "type": "string"
+          }
+        }
+      },
+      "SummonPullDto": {
+        "required": [
+          "heroId",
+          "rarity",
+          "isNew",
+          "fragments"
+        ],
+        "type": "object",
+        "properties": {
+          "heroId": {
+            "type": "string"
+          },
+          "rarity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isNew": {
+            "type": "boolean"
+          },
+          "fragments": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SummonRequest": {
+        "required": [
+          "bannerId",
+          "count",
+          "requestId"
+        ],
+        "type": "object",
+        "properties": {
+          "bannerId": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        }
+      },
+      "SummonResultDto": {
+        "required": [
+          "bannerId",
+          "count",
+          "pityAfter",
+          "pulls"
+        ],
+        "type": "object",
+        "properties": {
+          "bannerId": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pityAfter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pulls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SummonPullDto"
+            }
           }
         }
       },

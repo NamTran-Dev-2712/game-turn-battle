@@ -1,12 +1,10 @@
 using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Abstractions.Persistence;
 using GameTeam.Application.Abstractions.Security;
-using GameTeam.Application.Features.Heroes;
 using GameTeam.Application.Features.Inventory;
 using GameTeam.Contracts.Auth;
 using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Common;
-using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
 using MediatR;
 
@@ -22,19 +20,20 @@ namespace GameTeam.Application.Features.Auth.Commands;
 /// Eager, atomic profile creation satisfies "guest login → profile created" and guarantees exactly one
 /// profile per account (the unique <c>account_id</c> index is the DB-level idempotency backstop).
 /// </para>
+/// <para>
+/// <b>Hero/fragment acquisition is summon (Phase 33).</b> Guest mới KHÔNG được cấp sẵn hero/mảnh — nhận hero
+/// thật qua triệu hồi (gacha). (Trước Phase 33 có seed TẠM cấp toàn bộ hero + mảnh; đã gỡ để summon là đường
+/// nhận thật.) Chỉ giữ seed vật phẩm catalog để màn kho có dữ liệu hiển thị tới khi có shop (Phase 40).
+/// </para>
 /// </summary>
 public sealed class CreateGuestAccountCommandHandler
     : IRequestHandler<CreateGuestAccountCommand, Result<AuthGuestResponse>>
 {
-    /// <summary>Seed TẠM số lượng mỗi vật phẩm catalog cho guest mới (Phase 32 — chưa có gacha/shop).</summary>
+    /// <summary>Seed TẠM số lượng mỗi vật phẩm catalog cho guest mới (chưa có shop — Phase 40).</summary>
     private const long StarterItemQuantity = 10;
-
-    /// <summary>Seed TẠM số lượng mảnh mỗi hero cho guest mới (Phase 32 — chưa có gacha/ascension).</summary>
-    private const long StarterFragmentQuantity = 20;
 
     private readonly IRepository<Account, Guid> _accounts;
     private readonly IPlayerProfileRepository _profiles;
-    private readonly IOwnedHeroRepository _ownedHeroes;
     private readonly InventoryService _inventory;
     private readonly IConfigProvider _config;
     private readonly ITokenService _tokenService;
@@ -43,7 +42,6 @@ public sealed class CreateGuestAccountCommandHandler
     public CreateGuestAccountCommandHandler(
         IRepository<Account, Guid> accounts,
         IPlayerProfileRepository profiles,
-        IOwnedHeroRepository ownedHeroes,
         InventoryService inventory,
         IConfigProvider config,
         ITokenService tokenService,
@@ -51,7 +49,6 @@ public sealed class CreateGuestAccountCommandHandler
     {
         _accounts = accounts;
         _profiles = profiles;
-        _ownedHeroes = ownedHeroes;
         _inventory = inventory;
         _config = config;
         _tokenService = tokenService;
@@ -70,30 +67,14 @@ public sealed class CreateGuestAccountCommandHandler
         PlayerProfile profile = PlayerProfile.CreateForAccount(Guid.NewGuid(), account.Id, now);
         await _profiles.AddAsync(profile, cancellationToken);
 
-        // Seed TẠM (Phase 27): cấp cho guest mới toàn bộ hero có trong config hiện hành (data-driven —
-        // thêm hero vào config ⇒ guest mới tự sở hữu, KHÔNG sửa code). Đây KHÔNG phải cơ chế nhận thật;
-        // nhận hero thật (summon) ở phase 33. Config trống ⇒ không cấp gì (graceful). Cùng transaction với
-        // account+profile ⇒ nguyên tử.
-        foreach (string heroId in _config.GetIds(HeroMapping.ConfigType))
-        {
-            OwnedHero hero = OwnedHero.Grant(
-                Guid.NewGuid(), profile.Id, heroId, OwnedHero.InitialLevel, OwnedHero.InitialStars, now);
-            await _ownedHeroes.AddAsync(hero, cancellationToken);
-        }
-
-        // Seed TẠM (Phase 32): cấp cho guest mới một ít vật phẩm catalog + mảnh mỗi hero để màn kho có dữ liệu
-        // hiển thị. Data-driven (đọc config) — KHÔNG phải cơ chế nhận thật; nhận thật (gacha/shop) ở phase
-        // 33/40. Đi qua InventoryService (atomic + idempotency + ledger) trong CÙNG transaction với
-        // account+profile+hero. Config trống ⇒ danh sách rỗng ⇒ KHÔNG gọi (tránh Result lỗi UnknownItem).
+        // Seed TẠM (Phase 32): cấp cho guest mới một ít vật phẩm catalog để màn kho có dữ liệu hiển thị. Data-driven
+        // (đọc config) — KHÔNG phải cơ chế nhận thật; nhận thật (shop) ở phase 40. Hero/mảnh KHÔNG seed nữa —
+        // nhận hero/mảnh qua triệu hồi (Phase 33). Đi qua InventoryService (atomic + idempotency + ledger) trong
+        // CÙNG transaction với account+profile. Config trống ⇒ danh sách rỗng ⇒ KHÔNG gọi (tránh Result UnknownItem).
         var starter = new List<ItemChange>();
         foreach (string itemId in _config.GetIds(InventoryItemTypes.ItemConfigType))
         {
             starter.Add(new ItemChange(InventoryItemTypes.Item, itemId, StarterItemQuantity));
-        }
-
-        foreach (string heroId in _config.GetIds(HeroMapping.ConfigType))
-        {
-            starter.Add(new ItemChange(InventoryItemTypes.Fragment, heroId, StarterFragmentQuantity));
         }
 
         if (starter.Count > 0)

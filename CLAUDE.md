@@ -1184,6 +1184,68 @@ orphan**; no openapi/generated drift beyond additive inventory. Canonical: `docs
   `.instructions/backend.md`/`client.md`/`config.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5);
   the integration + gdUnit4 tests are the behavior contract — update them.
 
+**Summon/Gacha is standardized (Phase 33 — closed & verified). CLOSES Group 7 / Collection Core (P3).** Triệu hồi is the
+first player-facing hero-acquisition loop and the most security-sensitive phase — it is **server-authoritative +
+data-driven + atomic + idempotent** (ADR-004/007/011): the client sends an **intent**, the **server** decides
+RNG/rate/pity/hero/reward. It is built by **composing** existing mechanisms, not inventing new ones. Homes: **server**
+`GameTeam.Domain/Gacha/` + `GameTeam.Application/Features/Summon/` + `GameTeam.Infrastructure/Persistence/`; **client**
+`client/src/ui/summon/`. Endpoint **`POST /api/v1/summon`** (version set, protected; owner from token `sub` — anti-IDOR)
+→ **`SummonCommand(bannerId, count(1|10), requestId) : ITransactionalRequest`**: owner → validate count + banner
+(`PrepareBanner` — every producible rarity has a pool hero + a `dupe_fragments` entry + valid `cost`, checked BEFORE any
+spend) → **idempotency** (`ISummonRecordRepository.GetByProfileAndRequestAsync`; retry ⇒ stored result, no re-roll/spend/
+grant) → **row-lock pity** (`IGachaPityRepository.GetByProfileAndBannerForUpdateAsync` = `SELECT … FOR UPDATE`) → **server
+seed** (`IBattleSeedSource`) → **`SummonRoller`** (pure, static, deterministic-by-seed, uses `Pcg32` like combat) → **spend**
+via `CurrencyWalletService.SpendAsync` (Phase 31, idempotent key `gacha:{requestId}:spend`) → new hero ⇒ `OwnedHero.Grant`
+(Phase 27); dup (already owned OR granted earlier in the same multi-pull) ⇒ accumulate fragments granted once via
+`InventoryService.GrantAsync` (Phase 32, key `gacha:{requestId}:grant`, `item_type=fragment`) → update pity + write
+`SummonRecord` — all in ONE transaction. **`SummonRoller`**: rate = weighted roll over `rates[{rarity,weight}]` then uniform
+hero pick within that rarity (a hero's rarity comes from its **hero config**, not the banner); **pity server-side** per
+`(profile, banner)`, persistent (`gacha_pity`, unique `(profile_id,banner_id)`): `count + 1 ≥ threshold` ⇒ guaranteed target
+rarity; hitting the target (naturally or via pity) resets to 0, else +1; a 10-pull applies pity **per roll in sequence** (10
+singles inside one atomic op). **`gacha.schema.json`** gained **additive** `cost{currency,amount}` + `dupe_fragments[{rarity,
+amount}]` + `pity.target_rarity` (optional structurally; app-required for a summonable banner — no `schema_version` bump);
+banner `config/gacha/banner_standard.json`. Two tables (`gacha_pity`, `summon_records` with unique `(profile_id,request_id)`;
+seed stored for **audit only, NOT returned to the client** — gacha has no client replay), migration `AddSummon`. Contracts
+`GameTeam.Contracts/Summon/*` → regenerated `openapi.json` → GDScript. `ErrorHttpMapping` gained
+**`CURRENCY_INSUFFICIENT_FUNDS` → 409** (first HTTP-exercised by summon). **The temporary "guest login grants all heroes +
+fragments" seed (Phase 27/32) was REMOVED** — a new guest owns 0 heroes and acquires via summon; integration tests seed
+ownership via `IntegrationTestSeeding`. Client `client/src/ui/summon/*` sends only the intent (client-generated `requestId`
+used ONLY for idempotency, never for randomness) and renders the server result, then refreshes wallet + inventory into
+`StateCache`; banners are read from `ConfigProvider.get_all("gacha")` (config bundle). Verified (2026-09-12, Docker Desktop +
+Godot 4.7.1): `dotnet test` Domain 130 / Application 121 / Contracts 36 / Infrastructure 74 / Api 98; codegen 41 (+drift clean);
+config-validator exit 0 (18 files); `has-pending-model-changes` clean; Godot import exit 0 + gdUnit4 **150/150, 0 orphan**.
+Canonical: `docs/gameplay/progression-and-economy.md` §5 + `docs/backend/infrastructure.md` §1.7 +
+`docs/backend/api-and-versioning.md` + `docs/gameplay/hero-system.md` §7; decision log: `.memory/0031-summon-gacha-standardized.md`.
+
+- Future agents **MUST reuse** `SummonRoller`/`GachaPity`/`SummonRecord`/`IGachaPityRepository`/`ISummonRecordRepository` +
+  `CurrencyWalletService` (spend) + `InventoryService` (fragments) + `OwnedHero` (grant) + `IBattleSeedSource` + `Pcg32` before
+  adding any gacha/RNG-reward plumbing; **MUST NOT** fork a second simulator/roller/PRNG/transaction/idempotency mechanism,
+  add a public grant-hero/grant-currency endpoint, let the **client** random/decide the result or compute pity, choose the
+  seed on the client, read the owner from client input (IDOR), hardcode rate/pity/cost/dupe numbers (they are **config** —
+  ADR-004), or hand-edit `client/src/data/generated`/`openapi.json`.
+- **Server authority + audit are binding (ADR-011):** RNG/rate/pity are server-only; the seed is stored in `summon_records`
+  for **audit** and **never** returned to the client (gacha is not client-replayable, unlike combat). The client sends an
+  intent and displays the server result; `randi()` on the client is allowed ONLY to generate the idempotency `requestId`.
+- **Atomic + idempotent are binding (ADR-007):** spend + hero/fragment grant + pity update + record write commit or roll back
+  together; retry with the same `requestId` returns the stored result with no second spend/grant/pity-increment (unique
+  `(profile_id,request_id)` + wallet/inventory ledger keys); a 10-pull is all-or-nothing; insufficient funds ⇒ 409 with no
+  mutation. Concurrent summons of the same `(profile,banner)` serialize via the pity **row lock**.
+- **Data-driven is binding (ADR-004):** rate/pity/cost/dupe-fragment come from `gacha.schema.json` config; a hero's rarity
+  comes from hero config (never duplicated on the banner). Changing config changes behavior with **no code change** (proven by
+  the config-A/B distribution test). A new banner using existing fields is **config-only**.
+- **Out of scope (leave as debt / future phases):** banner rotation / limited banners / LiveOps / rate tuning beyond config,
+  ascension consuming fragments (Phase 39), shop redesign. Do NOT implement future-phase scope.
+- When changing summon/gacha, keep **`GameTeam.Domain/Gacha/*` + `GameTeam.Application/Features/Summon/*` +
+  `IGachaPityRepository`/`ISummonRecordRepository` + `Infrastructure/Persistence/{Configurations,Repositories}/*` + migration +
+  `AppDbContext`/both `DependencyInjection` + `Contracts/Summon/*` + regenerated `openapi.json` + `client/src/data/generated/**`
+  + `gacha.schema.json` + `config/gacha/*` + `ErrorHttpMapping` + `CreateGuestAccountCommandHandler` (seed removal) +
+  `client/src/ui/summon/*` + `response_parser.gd` + main-hub wiring + all the tests (behavior contract: `SummonRollerTests`,
+  `SummonPersistenceTests`, `SummonEndpointTests`, `summon_presenter_test.gd`) + `docs/gameplay/progression-and-economy.md` §5 +
+  `docs/gameplay/hero-system.md` §7 + `docs/backend/infrastructure.md` §1.7 + `docs/backend/api-and-versioning.md` +
+  `docs/gameplay/configuration-and-data.md` + `.instructions/backend.md`/`client.md`/`config.md` +
+  `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the tests are the behavior contract —
+  update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

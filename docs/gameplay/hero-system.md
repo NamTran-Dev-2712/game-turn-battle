@@ -64,8 +64,10 @@ Nền tảng Hero data-driven đã hiện thực (ADR-004/007). Chi tiết vận
   `MyHeroesResponse` bọc `OwnedHeroDto{heroId,level,stars}`) + `GetHeroDefinitionQuery` (definition từ config →
   `HeroDefinitionDto`). Endpoint: `GET /api/v1/heroes` (protected) + `GET /api/v1/heroes/{heroId}/definition`
   (public catalog).
-- **Seed tạm:** guest login cấp toàn bộ hero trong config (`GetIds("hero")`) cùng transaction — **tạm tới
-  phase 33 (summon)**, KHÔNG phải cơ chế nhận thật.
+- **Nhận hero = summon (Phase 33 — đã hiện thực):** guest mới **KHÔNG** sở hữu hero nào; nhận hero thật qua
+  **triệu hồi** (`POST /api/v1/summon` → cấp `OwnedHero`; trùng → mảnh, xem `progression-and-economy.md` §5).
+  (Seed TẠM "cấp toàn bộ hero khi login" của Phase 27 đã **gỡ** ở Phase 33 — nó chỉ là dữ liệu tạm trước khi có
+  summon.)
 
 **Client (hiển thị, không chân lý):**
 - **Hero List** (`client/src/ui/hero_list/`): GHÉP hero **owned** (`StateCache.get_heroes()`, server-authoritative)

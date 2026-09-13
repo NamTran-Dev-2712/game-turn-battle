@@ -145,6 +145,10 @@ public sealed class BattleEndpointTests : IClassFixture<BattlePostgresApiFactory
         login.StatusCode.Should().Be(HttpStatusCode.OK);
         AuthGuestResponse body = (await login.Content.ReadFromJsonAsync<AuthGuestResponse>())!;
 
+        // Phase 33: guest no longer starts owning heroes — seed the team heroes directly (test convenience) so
+        // SaveTeam's ownership rule is satisfied. The battle command still runs server-authoritative.
+        await IntegrationTestSeeding.GrantHeroesAsync(factory, body.AccessToken, BattlePostgresApiFactory.SeededHeroIds);
+
         HttpClient client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.AccessToken);
         return client;
