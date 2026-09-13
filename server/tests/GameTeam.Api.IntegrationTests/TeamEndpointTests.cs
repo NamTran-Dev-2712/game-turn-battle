@@ -51,10 +51,19 @@ public sealed class TeamEndpointTests : IClassFixture<TeamPostgresApiFactory>
     private static SaveTeamRequest TeamOf(params string[] heroes)
         => new(heroes.Select((h, i) => new TeamSlotDto(i, h)).ToList());
 
+    // Phase 33: guest no longer starts owning heroes (summon is real acquisition). Team tests seed ownership
+    // directly (test convenience) so SaveTeam's ownership rule is satisfied — the command still runs server-side.
+    private async Task<HttpClient> OwnerWithHeroesAsync()
+    {
+        string token = await LoginGuestAsync(_factory.CreateClient());
+        await IntegrationTestSeeding.GrantHeroesAsync(_factory, token, TeamPostgresApiFactory.SeededHeroIds);
+        return Authenticated(_factory.CreateClient(), token);
+    }
+
     [Fact]
     public async Task Save_valid_team_then_get_returns_the_saved_team()
     {
-        HttpClient client = Authenticated(_factory.CreateClient(), await LoginGuestAsync(_factory.CreateClient()));
+        HttpClient client = await OwnerWithHeroesAsync();
 
         HttpResponseMessage save = await client.PostAsJsonAsync("/api/v1/team", TeamOf(TeamPostgresApiFactory.SeededHeroIds));
         save.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -69,7 +78,7 @@ public sealed class TeamEndpointTests : IClassFixture<TeamPostgresApiFactory>
     [Fact]
     public async Task Save_team_with_five_heroes_is_rejected()
     {
-        HttpClient client = Authenticated(_factory.CreateClient(), await LoginGuestAsync(_factory.CreateClient()));
+        HttpClient client = await OwnerWithHeroesAsync();
 
         HttpResponseMessage save = await client.PostAsJsonAsync(
             "/api/v1/team", TeamOf(TeamPostgresApiFactory.SeededHeroIds.Take(5).ToArray()));
@@ -81,7 +90,7 @@ public sealed class TeamEndpointTests : IClassFixture<TeamPostgresApiFactory>
     public async Task Team_does_not_leak_across_owners()
     {
         // Owner A saves a team; owner B (a different guest) has not saved ⇒ empty.
-        HttpClient ownerA = Authenticated(_factory.CreateClient(), await LoginGuestAsync(_factory.CreateClient()));
+        HttpClient ownerA = await OwnerWithHeroesAsync();
         (await ownerA.PostAsJsonAsync("/api/v1/team", TeamOf(TeamPostgresApiFactory.SeededHeroIds)))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 

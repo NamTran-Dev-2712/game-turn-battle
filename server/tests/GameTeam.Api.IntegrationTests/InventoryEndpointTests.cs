@@ -41,24 +41,25 @@ public sealed class InventoryEndpointTests : IClassFixture<InventoryPostgresApiF
     }
 
     [Fact]
-    public async Task New_guest_has_seeded_items_fragments_and_projected_heroes()
+    public async Task New_guest_has_seeded_catalog_items_but_no_fragments_or_heroes()
     {
+        // Phase 33: only the catalog-item starter remains (shop = Phase 40). Fragments/heroes come from summon,
+        // so a fresh guest has NO fragment stacks and NO owned heroes.
         HttpClient client = await AuthenticatedClientAsync();
 
         InventoryDto inventory = await GetInventoryAsync(client);
 
         inventory.Items.Should().Contain(x => x.ItemType == "item" && x.ItemId == "item_potion" && x.Quantity > 0,
-            "guest mới được seed vật phẩm catalog (tạm, Phase 32)");
-        inventory.Items.Should().Contain(x => x.ItemType == "fragment" && x.ItemId == "hero_ignis" && x.Quantity > 0,
-            "guest mới được seed mảnh cho mỗi hero");
-        inventory.OwnedHeroes.Select(h => h.HeroId).Should().BeEquivalentTo(InventoryPostgresApiFactory.SeededHeroIds,
-            "hero sở hữu được chiếu kèm (Phase 27)");
+            "guest mới được seed vật phẩm catalog (tạm, Phase 40)");
+        inventory.Items.Should().NotContain(x => x.ItemType == "fragment", "không seed mảnh nữa — mảnh từ summon");
+        inventory.OwnedHeroes.Should().BeEmpty("guest mới không sở hữu hero — nhận qua summon");
     }
 
     [Fact]
     public async Task Filter_by_item_type_returns_only_that_type()
     {
-        HttpClient client = await AuthenticatedClientAsync();
+        // Seed a collection (heroes + fragments) directly (test convenience) so both filters have data.
+        HttpClient client = await OwnerWithSeededCollectionAsync();
 
         InventoryDto items = await GetInventoryAsync(client, "?itemType=item");
         InventoryDto fragments = await GetInventoryAsync(client, "?itemType=fragment");
@@ -90,8 +91,8 @@ public sealed class InventoryEndpointTests : IClassFixture<InventoryPostgresApiF
     [Fact]
     public async Task Two_guests_each_see_their_own_inventory()
     {
-        HttpClient a = await AuthenticatedClientAsync();
-        HttpClient b = await AuthenticatedClientAsync();
+        HttpClient a = await OwnerWithSeededCollectionAsync();
+        HttpClient b = await OwnerWithSeededCollectionAsync();
 
         InventoryDto inventoryA = await GetInventoryAsync(a);
         InventoryDto inventoryB = await GetInventoryAsync(b);
@@ -104,16 +105,31 @@ public sealed class InventoryEndpointTests : IClassFixture<InventoryPostgresApiF
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────
-    private async Task<HttpClient> AuthenticatedClientAsync()
+    private async Task<string> LoginAsync()
     {
         HttpResponseMessage login = await _factory.CreateClient()
             .PostAsJsonAsync("/api/v1/auth/guest", new AuthGuestRequest(null));
         login.StatusCode.Should().Be(HttpStatusCode.OK);
-        AuthGuestResponse body = (await login.Content.ReadFromJsonAsync<AuthGuestResponse>())!;
+        return (await login.Content.ReadFromJsonAsync<AuthGuestResponse>())!.AccessToken;
+    }
 
+    private HttpClient Authenticated(string token)
+    {
         HttpClient client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.AccessToken);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
+    }
+
+    private async Task<HttpClient> AuthenticatedClientAsync() => Authenticated(await LoginAsync());
+
+    // Phase 33: seed a collection (owned heroes + fragments) directly (test convenience — real source is summon)
+    // so inventory tests that assert fragment stacks / owned-hero projection have data.
+    private async Task<HttpClient> OwnerWithSeededCollectionAsync()
+    {
+        string token = await LoginAsync();
+        await IntegrationTestSeeding.GrantHeroesAsync(_factory, token, InventoryPostgresApiFactory.SeededHeroIds);
+        await IntegrationTestSeeding.GrantFragmentsAsync(_factory, token, 20, InventoryPostgresApiFactory.SeededHeroIds);
+        return Authenticated(token);
     }
 
     private static async Task<InventoryDto> GetInventoryAsync(HttpClient client, string query = "")

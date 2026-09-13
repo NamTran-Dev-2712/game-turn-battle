@@ -3,6 +3,7 @@ using GameTeam.Domain.Accounts;
 using GameTeam.Domain.Battles;
 using GameTeam.Domain.Common;
 using GameTeam.Domain.Economy;
+using GameTeam.Domain.Gacha;
 using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Inventory;
 using GameTeam.Domain.Profiles;
@@ -71,6 +72,12 @@ public class AppDbContext : DbContext
 
     /// <summary>Sổ cái giao dịch kho đồ (append-only) — audit + idempotency (idempotency_key unique) (Phase 32, ADR-007).</summary>
     public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+
+    /// <summary>Bộ đếm pity gacha — server-side theo (profile, banner) unique (Phase 33, ADR-007/011).</summary>
+    public DbSet<GachaPity> GachaPities => Set<GachaPity>();
+
+    /// <summary>Bản ghi triệu hồi — server-authoritative + idempotency (profile, request_id) unique (Phase 33).</summary>
+    public DbSet<SummonRecord> SummonRecords => Set<SummonRecord>();
 
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();

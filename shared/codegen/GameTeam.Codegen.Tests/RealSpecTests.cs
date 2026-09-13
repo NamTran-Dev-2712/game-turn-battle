@@ -31,7 +31,9 @@ public class RealSpecTests
             // Phase 31 — currency/wallet contract.
             "wallet_dto.gd", "currency_balance_dto.gd",
             // Phase 32 — inventory contract.
-            "inventory_dto.gd", "item_stack_dto.gd");
+            "inventory_dto.gd", "item_stack_dto.gd",
+            // Phase 33 — summon/gacha contract.
+            "summon_request.gd", "summon_pull_dto.gd", "summon_result_dto.gd");
     }
 
     [Fact]

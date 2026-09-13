@@ -184,6 +184,91 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("wallets", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Gacha.GachaPity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BannerId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("banner_id");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId", "BannerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_gacha_pity_profile_banner");
+
+                    b.ToTable("gacha_pity", (string)null);
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Gacha.SummonRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BannerId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("banner_id");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("PityAfter")
+                        .HasColumnType("integer")
+                        .HasColumnName("pity_after");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<long>("Seed")
+                        .HasColumnType("bigint")
+                        .HasColumnName("seed");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId", "RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_summon_records_profile_request");
+
+                    b.ToTable("summon_records", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Domain.Heroes.OwnedHero", b =>
                 {
                     b.Property<Guid>("Id")
@@ -535,6 +620,62 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Balances");
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Gacha.GachaPity", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Gacha.SummonRecord", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Gacha.SummonPullLine", "Pulls", b1 =>
+                        {
+                            b1.Property<Guid>("SummonRecordId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("integer");
+
+                            b1.Property<long>("Fragments")
+                                .HasColumnType("bigint")
+                                .HasAnnotation("Relational:JsonPropertyName", "fragments");
+
+                            b1.Property<string>("HeroId")
+                                .IsRequired()
+                                .HasColumnType("text")
+                                .HasAnnotation("Relational:JsonPropertyName", "hero_id");
+
+                            b1.Property<bool>("IsNew")
+                                .HasColumnType("boolean")
+                                .HasAnnotation("Relational:JsonPropertyName", "is_new");
+
+                            b1.Property<int>("Rarity")
+                                .HasColumnType("integer")
+                                .HasAnnotation("Relational:JsonPropertyName", "rarity");
+
+                            b1.HasKey("SummonRecordId", "__synthesizedOrdinal");
+
+                            b1.ToTable("summon_records");
+
+                            b1.ToJson("pulls");
+
+                            b1.WithOwner()
+                                .HasForeignKey("SummonRecordId");
+                        });
+
+                    b.Navigation("Pulls");
                 });
 
             modelBuilder.Entity("GameTeam.Domain.Heroes.OwnedHero", b =>

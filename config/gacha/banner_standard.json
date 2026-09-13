@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "gacha_standard",
+  "pool": ["hero_lux", "hero_aqua", "hero_gale", "hero_terra", "hero_ignis", "hero_umbra"],
+  "rates": [
+    { "rarity": 3, "weight": 790 },
+    { "rarity": 4, "weight": 190 },
+    { "rarity": 5, "weight": 20 }
+  ],
+  "pity": { "enabled": true, "threshold": 90, "target_rarity": 5 },
+  "cost": { "currency": "ticket", "amount": 1 },
+  "dupe_fragments": [
+    { "rarity": 3, "amount": 10 },
+    { "rarity": 4, "amount": 20 },
+    { "rarity": 5, "amount": 50 }
+  ]
+}

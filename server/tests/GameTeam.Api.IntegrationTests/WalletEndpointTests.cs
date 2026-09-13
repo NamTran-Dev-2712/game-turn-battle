@@ -91,6 +91,10 @@ public sealed class WalletEndpointTests : IClassFixture<BattlePostgresApiFactory
         login.StatusCode.Should().Be(HttpStatusCode.OK);
         AuthGuestResponse body = (await login.Content.ReadFromJsonAsync<AuthGuestResponse>())!;
 
+        // Phase 33: guest no longer starts owning heroes — seed the team heroes directly so SaveTeam succeeds
+        // (harmless for the wallet-only tests; the battle/reward path stays server-authoritative).
+        await IntegrationTestSeeding.GrantHeroesAsync(_factory, body.AccessToken, BattlePostgresApiFactory.SeededHeroIds);
+
         HttpClient client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.AccessToken);
         return client;

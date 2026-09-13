@@ -136,6 +136,29 @@ unique + row-lock `FOR UPDATE`) — mở rộng cho **nhiều-item ATOMIC** (m�
 - Test: Testcontainers pg16 — grant/spend atomic, idempotent (retry), thiếu tiền chặn, **concurrency** (2 spend song song), rollback
   (`CurrencyTransactionPersistenceTests`); end-to-end HTTP ví + battle-reward + retry (`WalletEndpointTests`, §5.1).
 
+### 1.7 Summon/Gacha — pity server-side + summon record (Phase 33 — đóng & verify)
+
+Hai bảng nền cho triệu hồi (chi tiết luồng: `progression-and-economy.md` §5). Server-authoritative + idempotent
+(ADR-004/007/011). **Không dựng cơ chế giao dịch mới** — `SummonCommand` compose `CurrencyWalletService` (§1.5) +
+`InventoryService` (§1.6) + `OwnedHero` (§1.3) + seed server (`IBattleSeedSource`) + `Pcg32`.
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| Pity | `Persistence/Configurations/GachaPityConfiguration.cs` | `ToTable("gacha_pity")`; `id`(uuid PK), `profile_id`, `banner_id`, `count`, `created_at`, `updated_at`. **Unique `(profile_id, banner_id)`** + FK → `player_profiles` (cascade). Server-side, persistent. |
+| Bản ghi | `Persistence/Configurations/SummonRecordConfiguration.cs` | `ToTable("summon_records")`; `id`(uuid PK), `profile_id`, `request_id`, `banner_id`, `count`, `seed`(audit), `pity_after`, `schema_version`, `created_at`; kết quả từng lượt = cột **JSON `pulls`** (`hero_id`/`rarity`/`is_new`/`fragments`). **Unique `(profile_id, request_id)`** (idempotency) + FK → `player_profiles` (cascade). |
+| Repository | `Persistence/Repositories/{GachaPityRepository,SummonRecordRepository}.cs` | `IGachaPityRepository` (`GetByProfileAndBannerAsync` + **`GetByProfileAndBannerForUpdateAsync`** `SELECT … FROM gacha_pity … FOR UPDATE`); `ISummonRecordRepository` (**`GetByProfileAndRequestAsync`**). |
+| Lõi quyết định | `Application/Features/Summon/SummonRoller.cs` | **Thuần** (không I/O), tất định theo seed, `Pcg32`. Rate theo weight; pity theo ngưỡng/mục tiêu config; 10-pull xử lý pity từng lượt. |
+| Handler | `Application/Features/Summon/SummonCommandHandler.cs` | Owner từ token → kiểm count/banner → idempotency (`SummonRecord`) → khoá pity `FOR UPDATE` → seed → roller → spend (`gacha:{req}:spend`) → hero mới `OwnedHero` / trùng → mảnh (`gacha:{req}:grant`) → cập nhật pity + ghi record. Một transaction (`ITransactionalRequest`). |
+| Migration | `Persistence/Migrations/*_AddSummon.cs` | Tạo `gacha_pity` + `summon_records` + PK/FK/unique. `has-pending-model-changes` sạch. |
+| DI | `Infrastructure/DependencyInjection.cs` | `IGachaPityRepository`/`ISummonRecordRepository` (scoped). `DbSet<GachaPity>`/`DbSet<SummonRecord>` thêm vào `AppDbContext`. `SummonRoller` static (không DI). |
+
+- **Endpoint** `POST /api/v1/summon` (protected). **KHÔNG endpoint cấp hero/tiền công khai** — summon là hành
+  động người chơi hợp lệ kích hoạt spend/grant nội bộ. Seed server (`IBattleSeedSource`) lưu ở `summon_records` để
+  **audit**, KHÔNG trả client.
+- Test: Testcontainers pg16 — pity + record round-trip, unique `(profile_id, request_id)`/`(profile_id, banner_id)`,
+  `FOR UPDATE` (`SummonPersistenceTests`); end-to-end HTTP single/10-pull, idempotency, dupe→fragment, thiếu tiền
+  (`SummonEndpointTests`, §5.1); phân phối rate + pity ngưỡng (unit `SummonRollerTests`).
+
 ---
 
 ## 2. Caching — Redis

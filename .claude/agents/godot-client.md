@@ -152,6 +152,18 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   `StateCache`/`NetworkClient`/`ConfigProvider`/generated DTO — no second cache/parser.** Out of scope: gacha (33), equipment (38),
   shop/mail (40/42). Canonical: `docs/godot/state-and-signals.md` §1.1 + `docs/gameplay/inventory-and-equipment.md` §1; decision log
   `.memory/0030-inventory-standardized.md`.
+- **Summon feature (Phase 33, closed):** the summon screen `src/ui/summon/` (`SummonView` **network-free** + `SummonPresenter`),
+  entered from the hub "Triệu hồi" button (`MainHubPresenter` `SUMMON_PATH`). **The client only sends an INTENT and renders the
+  SERVER result — never randoms, decides the reward, or computes pity** (ADR-011). Banners are read from `ConfigProvider.get_all(&"gacha")`
+  (config bundle, for DISPLAY of cost/pity only). Presenter: `post_json("/summon", {bannerId,count,requestId}, parse_summon_result)` →
+  render `pulls[]` (hero/rarity/isNew/fragments) + `pityAfter` from the server; then refresh wallet (`/wallet`→`apply_wallet`) + inventory
+  (`/inventory`→`apply_inventory`) — the client never adds anything itself. `requestId` = a locally-generated idempotency key
+  (`"sum-%d-%d" % [Time.get_ticks_usec(), randi()]`) — **`randi()` is used ONLY for the requestId, never to decide the result**.
+  `parse_summon_result` (wraps `{bannerId,count,pityAfter,pulls:[…]}`) → generated `SummonResultDto`/`SummonPullDto` (DO-NOT-EDIT);
+  the seed is NOT in the response (server audit-only). Non-silent fallback (Rule E): error ⇒ error label + Retry, never fabricate.
+  **No new EventBus event** (reuse `state_refreshed` via apply_*). **Reuse `NetworkClient`/`ConfigProvider`/`StateCache`/generated DTO —
+  no second parser/RNG.** Out of scope: banner rotation/limited (Post-MVP), ascension (39). Canonical:
+  `docs/gameplay/progression-and-economy.md` §5; decision log `.memory/0031-summon-gacha-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

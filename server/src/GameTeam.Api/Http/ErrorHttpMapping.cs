@@ -22,6 +22,10 @@ public static class ErrorHttpMapping
     {
         // Phase 10 pipeline: FluentValidation failure surfaces as this code.
         [ValidationErrors.Code] = StatusCodes.Status400BadRequest,
+
+        // Phase 31 economy: spending more than the balance is a state conflict (first HTTP-exercised by
+        // summon, Phase 33). The code has no _CONFLICT suffix, so map it explicitly → 409.
+        ["CURRENCY_INSUFFICIENT_FUNDS"] = StatusCodes.Status409Conflict,
     };
 
     /// <summary>

@@ -17,6 +17,8 @@ const FORMATION_PATH: String = "res://src/ui/formation/formation.tscn"
 const BATTLE_PATH: String = "res://src/ui/battle/battle.tscn"
 ## Màn kho đồ (Phase 32, Inventory) — điều hướng khi bấm nút "Kho đồ".
 const INVENTORY_PATH: String = "res://src/ui/inventory/inventory.tscn"
+## Màn triệu hồi (Phase 33, Summon/Gacha) — điều hướng khi bấm nút "Triệu hồi".
+const SUMMON_PATH: String = "res://src/ui/summon/summon.tscn"
 ## Stage demo mặc định khi vào trận từ hub (khớp config/stages/stage_demo_01.json). Màn chọn stage = phase 34.
 const DEMO_STAGE_ID: String = "stage_demo_01"
 ## Id ý định nút "Anh hùng" (khớp MainHubView.FEATURES).
@@ -27,6 +29,8 @@ const _INTENT_FORMATION: StringName = &"formation"
 const _INTENT_BATTLE: StringName = &"battle"
 ## Id ý định nút "Kho đồ" (khớp MainHubView.FEATURES).
 const _INTENT_INVENTORY: StringName = &"inventory"
+## Id ý định nút "Triệu hồi" (khớp MainHubView.FEATURES).
+const _INTENT_SUMMON: StringName = &"summon"
 
 var _view: BaseView = null
 # Nguồn đọc (inject cho test; mặc định = autoload). CHỈ đọc-cache, không network.
@@ -109,5 +113,9 @@ func _on_intent(intent_name: StringName, _payload: Dictionary) -> void:
 	if intent_name == _INTENT_INVENTORY:
 		if _scene_router != null:
 			_scene_router.goto_scene(INVENTORY_PATH)
+		return
+	if intent_name == _INTENT_SUMMON:
+		if _scene_router != null:
+			_scene_router.goto_scene(SUMMON_PATH)
 		return
 	print_verbose("MainHub: intent '%s' (placeholder — feature ở phase sau)." % intent_name)

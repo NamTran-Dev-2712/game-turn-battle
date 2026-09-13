@@ -188,6 +188,31 @@ static func parse_inventory(data: Dictionary) -> InventoryDto:
 	return model
 
 
+## Parse `POST /api/v1/summon` → SummonResultDto (phase 33). Server-authoritative: kết quả từng lần quay
+## (heroId/rarity/isNew/fragments) + pityAfter do SERVER quyết — client CHỈ hiển thị, KHÔNG tự random. Body
+## `{ bannerId, count, pityAfter, pulls: [ {heroId, rarity, isNew, fragments} ] }`. `null` nếu thiếu `pulls`
+## hoặc phần tử sai hình dạng (thiếu `heroId`). Mảng rỗng hợp lệ (không xảy ra ở luồng thường).
+static func parse_summon_result(data: Dictionary) -> SummonResultDto:
+	if not data.has("pulls") or not (data["pulls"] is Array):
+		return null
+	var pulls: Array[SummonPullDto] = []
+	for item in data["pulls"]:
+		if not (item is Dictionary) or not item.has("heroId"):
+			return null
+		var pull := SummonPullDto.new()
+		pull.hero_id = str(item["heroId"])
+		pull.rarity = int(item.get("rarity", 0))
+		pull.is_new = bool(item.get("isNew", false))
+		pull.fragments = int(item.get("fragments", 0))
+		pulls.append(pull)
+	var model := SummonResultDto.new()
+	model.banner_id = str(data.get("bannerId", ""))
+	model.count = int(data.get("count", 0))
+	model.pity_after = int(data.get("pityAfter", 0))
+	model.pulls = pulls
+	return model
+
+
 ## Mã chuỗi StateCache (gold/gem/ticket) cho một giá trị Currency enum; "" nếu không nhận diện.
 static func currency_code(currency_enum: int) -> String:
 	match currency_enum:
