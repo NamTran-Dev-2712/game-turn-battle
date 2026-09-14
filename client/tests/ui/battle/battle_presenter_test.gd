@@ -60,14 +60,18 @@ class _StubNet extends Node:
 		return post_result
 
 
-# StateCache giả — bắt apply_wallet (refresh số dư server sau trận, phase 31).
+# StateCache giả — bắt apply_wallet (refresh số dư server sau trận, phase 31) + cấp hero cho replay (phase 35).
 class _StubStateCache extends Node:
 	var applied_wallet: Dictionary = {}
 	var wallet_calls: int = 0
+	var heroes: Array = []  # phase 35: cấp hero owned để replay tính chỉ số theo cấp
 
 	func apply_wallet(balances: Dictionary) -> void:
 		wallet_calls += 1
 		applied_wallet = balances.duplicate(true)
+
+	func get_heroes() -> Array:
+		return heroes.duplicate(true)
 
 
 func _node(n: Node) -> Node:

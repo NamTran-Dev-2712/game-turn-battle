@@ -100,6 +100,18 @@ thật (không thêm event/nút — danh mục EventBus ĐÓNG, `state-and-signa
   mỗi lần đánh — re-fight = trận mới; server chống double-grant. Ví/currency toàn cục ở hub = phase 31 (Phase 30 chỉ
   hiện thưởng của trận từ response). Chi tiết `combat-framework.md` §24, `state-and-signals.md` §4.
 
+### 4.3 Hero upgrade (Phase 35 — đã chốt)
+
+- **`client/src/ui/hero_detail`** (`HeroDetailView` thuần + `HeroDetailPresenter`): hiển thị chỉ số **theo cấp** +
+  **Power Rating** + **chi phí gold** + gold hiện có (presenter tính bằng `client/src/shared/hero_stats.gd` — công thức
+  data-driven **khớp server**, chỉ để hiển thị). Nút "Nâng cấp" gửi **intent** → presenter `POST /heroes/{id}/level-up`
+  (server-authoritative) → refresh hero + ví **AUTHORITATIVE** vào `StateCache` (`apply_heroes`/`apply_wallet` →
+  `state_refreshed` → auto re-render). **View KHÔNG gọi network** (presenter là điểm chạm duy nhất). Thất bại (thiếu
+  gold `409` / max cấp / không sở hữu) ⇒ hiện mã lỗi, **không** mutate cục bộ.
+- **Client không phải chân lý (ADR-007/011):** không tự tăng cấp/chỉ số/Power/trừ gold — mọi giá trị từ server; hiển
+  thị chỉ số theo cấp là bản tính lại **tất định** (mirror server), không phải quyết định. Chi tiết
+  `../gameplay/hero-system.md` §9, `state-and-signals.md` §1.1.
+
 ## 5. Accessibility & localization
 - Text qua khoá i18n (`resources-and-assets.md`); tránh chữ nhúng trong ảnh.
 - Kích thước chạm tối thiểu; tương phản đủ.

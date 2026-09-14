@@ -1307,6 +1307,59 @@ sạch. Canonical: `docs/gameplay/progression-and-economy.md` §2b + `docs/mvp/0
   `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the tests are the behavior contract —
   update them.
 
+**Hero upgrade — Level is standardized (Phase 35 — closed & verified).** Trục nâng cấp **Must** đầu tiên (F06): hero tăng
+**Level** bằng tiêu **Gold** ⇒ chỉ số combat + **Power Rating** tăng — **server-authoritative + data-driven + tất định
+integer + atomic** (ADR-004/007/011), xây bằng **composing** (currency 31, config 21, save-root 27, battle 30/34 — KHÔNG
+fork transaction/sim/config). **Quyết định:** gold-per-cấp (không EXP item riêng), một cấp/lệnh; idempotency lần tiêu =
+khoá mã hoá **cấp đích** `hero-levelup:{profileId}:{ownedHeroId}:{targetLevel}` + **khoá dòng hero** (`FOR UPDATE`) ⇒
+không cần requestId/bảng record mới; Power Rating **tính-khi-đọc** (không lưu → không stale). **Đường cong = `economy`
+config (additive, KHÔNG bump `schema_version`):** `economy.schema.json` +`level_stat_growth_bp` +`power_weights`
+(`cost_curves.level_up` sẵn có = gold/cấp; **số cấp tối đa = 1 + độ dài mảng**), dữ liệu `config/economy/economy_default.json`.
+**`HeroStatCalculator`** (`Features/Heroes/`) = công thức DUY NHẤT tất định integer: `ScaleStat(base,level,bp) = base +
+round_half_up(base·bp·(level−1)/10000)` (cấp 1 ⇒ nền, qua Phase-24 `FixedPoint`) + `Power` (Σ trọng số) +
+`MaxLevel`/`TryGetLevelUpCost` — **dùng chung** bởi handler nâng cấp VÀ `CombatInputResolver` (chỉ số vào trận == hiển
+thị); mirror client `client/src/shared/hero_stats.gd` (bit-parity). **Domain:** `OwnedHero.LevelUp()` + event
+`OwnedHeroLeveledUp` (tăng cột `level` sẵn có ⇒ **KHÔNG migration**). **Application:** `LevelUpHeroCommand(heroId) :
+ITransactionalRequest` → owner từ token (IDOR) → `GetByProfileAndHeroForUpdateAsync` → kiểm trần cấp
+(`HERO_MAX_LEVEL_CONFLICT`→409) → `CurrencyWalletService.SpendAsync` (thiếu ⇒ `CURRENCY_INSUFFICIENT_FUNDS`→409) →
+`LevelUp()` → chỉ số/Power → `LevelUpHeroResponse{level,stats,power,goldSpent,goldBalanceAfter}` — MỘT transaction (thiếu
+gold/lỗi ⇒ rollback, không trừ tiền/không tăng cấp). Errors `OWNED_HERO_NOT_FOUND`/`ECONOMY_CONFIG_NOT_FOUND` (404) map
+qua suffix — **không sửa `ErrorHttpMapping`**. **Combat theo cấp:** `CombatTeamMember.Level` +
+`TeamSnapshotFactory.Create(team, levelByHeroId)` + `BattleExecutionService` nạp cấp owned → `CombatInputResolver` nhân
+chỉ số **ally** (địch = nền, cấp 1). **Golden vectors (Phase 26) KHÔNG đổi** — dùng chỉ số tường minh + bypass resolver ⇒
+scaling ở tầng resolver không đụng sim (14 vector byte-identical). **API** `POST /api/v1/heroes/{heroId}/level-up`
+(protected). **Client:** `hero_detail_{presenter,view}.gd` (chỉ số theo cấp + Power + cost + gold + nút Nâng cấp → POST →
+refresh `StateCache.apply_heroes`/`apply_wallet`); `StateCache.apply_heroes` (mới); parser `parse_level_up_hero_response`.
+Verified (2026-09-14, Docker Desktop + Godot 4.7.1): build Release 0/0, `dotnet test` — Domain **137** / Application **146**
+(`HeroStatCalculatorTests` + `CombatLevelScalingTests`) / Contracts **36** / Infrastructure **77** / Api.IntegrationTests
+**112** (`LevelUpHeroEndpointTests` 6: success atomic / thiếu gold 409 no-mutation / max cấp 409 / không sở hữu 404 / 401 /
+combat mạnh hơn sau nâng) / Codegen **41**; config-validator **26 file** OK; golden `tools/combat-baseline` **14 vector**
+khớp; `has-pending-model-changes` **sạch**; no openapi/generated drift ngoài additive `LevelUpHeroResponse` + path level-up;
+Godot import exit 0 + gdUnit4 **167/167, 0 orphan**. Canonical: `docs/gameplay/hero-system.md` §9 +
+`docs/backend/domain-and-application.md` (Hero level-up) + `docs/backend/infrastructure.md` §1.3 +
+`docs/backend/api-and-versioning.md` §4.5 + `docs/gameplay/progression-and-economy.md` §1 +
+`docs/gameplay/configuration-and-data.md` + `docs/godot/state-and-signals.md` §1.1 + `docs/godot/ui-architecture.md` §4.3;
+decision log: `.memory/0033-hero-upgrade-level-standardized.md`.
+
+- Future agents **MUST reuse** `HeroStatCalculator`/`EconomyConfig`/`LevelUpHeroCommand`/`OwnedHero.LevelUp`/
+  `GetByProfileAndHeroForUpdateAsync` + `CurrencyWalletService` (spend) + client `hero_stats.gd`/`StateCache.apply_heroes`
+  before adding any hero-upgrade plumbing; **MUST NOT** store stats in `owned_heroes`, hardcode the curve/growth/power
+  weights (config), read the owner from client input (IDOR), let the client level up / compute stats/Power / spend gold,
+  create a second transaction/idempotency/config/sim, or add a public grant-level/currency endpoint.
+- **Data-driven + atomic + server-authoritative are binding:** đổi `economy` config ⇒ chi phí/chỉ số/Power đổi KHÔNG sửa
+  code; spend + level-up commit/rollback cùng nhau (thiếu gold ⇒ 409, không mutate); Power Rating computed-on-read.
+  Level scaling ở tầng resolver — **không** sửa golden vectors để "vá"; luôn chạy golden gate hai phía sau khi đụng combat.
+- **Out of scope (leave as debt / future phases):** EXP item (dùng gold), batch level-up, power-gate campaign, bảng
+  idempotency riêng, Sao/Ascension (39), Equipment (38), Skill level (Post-MVP). Do NOT implement future-phase scope.
+- When changing hero upgrade, keep **`economy.schema.json` + `config/economy/*` + fixtures + `HeroStatCalculator`/
+  `EconomyConfig` + `Features/Heroes/Commands/*` + `OwnedHero.LevelUp`/`OwnedHeroLeveledUp` + `IOwnedHeroRepository`/
+  `OwnedHeroRepository` (FOR UPDATE) + `Combat/{CombatTeamMember,CombatInputResolver}` + `TeamSnapshotFactory` +
+  `BattleExecutionService` + `Contracts/Hero/LevelUpHeroResponse` + regenerated `openapi.json` + `client/src/data/generated/**`
+  + client `shared/hero_stats.gd`/`ui/hero_detail/*`/`core/net/response_parser.gd`/`core/state/state_cache.gd`/
+  `combat/combat_input_resolver.gd`/`ui/battle/battle_presenter.gd` + all the tests (behavior contract) + the docs listed
+  above + `.instructions/backend.md`/`client.md`/`config.md`/`combat.md` + `.claude/agents/dotnet-backend.md`/`godot-client.md`
+  in sync** (doc-sync matrix, §5); the tests + golden vectors are the behavior contract — update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

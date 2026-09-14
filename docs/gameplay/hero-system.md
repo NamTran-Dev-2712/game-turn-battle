@@ -115,7 +115,50 @@ Lưu **server-authoritative** (ADR-007); vị trí đi vào combat sim, ảnh h�
 Ngoài phạm vi Phase 29: battle thật (30), nhiều đội/preset (Post-MVP), bonus vị trí (config/tuning), aggro nâng cao
 (CB3, `../mvp/10`).
 
-## 9. Liên kết
+## 9. Nâng cấp Level (Phase 35 — đã đóng)
+
+Trục nâng cấp **Must** đầu tiên (F06): hero tăng **Level** bằng cách tiêu **Gold**, làm tăng chỉ số combat +
+**Power Rating**. **Server-authoritative** (ADR-007) + **data-driven** (ADR-004) + **tất định integer** (ADR-011) +
+**atomic** (Phase 31). Quyết định MVP: **gold mỗi cấp, một cấp/lệnh** (không EXP item riêng).
+
+**Đường cong = config (`economy`, KHÔNG hardcode).** `shared/config-schema/economy.schema.json` (mở rộng additive) +
+`config/economy/economy_default.json`: `cost_curves.level_up` = chi phí gold mỗi cấp (**số cấp tối đa = 1 + độ dài
+mảng**); `level_stat_growth_bp` = tăng trưởng chỉ số/cấp (basis points của chỉ số nền); `power_weights` = trọng số
+Power. Đọc qua **`IConfigProvider.Get<EconomyConfig>("economy","economy_default")`**.
+
+**Công thức (một nguồn, `GameTeam.Application/Features/Heroes/HeroStatCalculator.cs`):** `chỉ số(cấp L) = base +
+round_half_up(base × growth_bp × (L−1) / 10000)` (cấp 1 ⇒ nền; qua Phase-24 `FixedPoint`, không float);
+`Power = Σ chỉ_số_cuối × trọng_số`. **Tính-khi-đọc** (không lưu ⇒ không stale). Bản mirror client
+`client/src/shared/hero_stats.gd` cho **cùng** kết quả (hiển thị + replay).
+
+**Server (chân lý):**
+- **`OwnedHero.LevelUp()`** (`GameTeam.Domain/Heroes/`): tăng một cấp, raise `OwnedHeroLeveledUp`. Trần cấp phụ thuộc
+  config ⇒ kiểm ở Application (Domain chỉ giữ bất biến cấu trúc). **Không lưu chỉ số** — luôn tính từ config + cấp.
+- **`LevelUpHeroCommand(heroId)`** (`Features/Heroes/Commands/`, `ITransactionalRequest`): owner từ token
+  (`ICurrentUser` — chống IDOR) → `IOwnedHeroRepository.GetByProfileAndHeroForUpdateAsync` (**SELECT … FOR UPDATE**) →
+  kiểm trần cấp (`HERO_MAX_LEVEL_CONFLICT`→409) → chi phí = `cost_curves.level_up[cấp-1]` → **`CurrencyWalletService.SpendAsync`**
+  (Phase 31, khoá `hero-levelup:{profileId}:{ownedHeroId}:{targetLevel}` + ghi ledger) → `LevelUp()` → tính lại chỉ số +
+  Power → trả **`LevelUpHeroResponse{heroId,level,stats,power,goldSpent,goldBalanceAfter}`**. Tất cả **một transaction**:
+  thiếu gold (`CURRENCY_INSUFFICIENT_FUNDS`→409) / lỗi ⇒ rollback (không trừ tiền/không tăng cấp). Endpoint
+  **`POST /api/v1/heroes/{heroId}/level-up`** (protected).
+- **Combat dùng chỉ số theo cấp:** `CombatTeamMember.Level` + `TeamSnapshotFactory.Create(team, levelByHeroId)`;
+  `BattleExecutionService` nạp cấp owned (`GetByProfileIdAsync`) → `CombatInputResolver` nhân chỉ số **ally** theo cấp
+  (địch = nền, cấp 1). Golden vectors (Phase 26) dùng chỉ số tường minh ⇒ **không đổi** (scaling ở tầng resolver, không
+  đụng sim).
+
+**Client (hiển thị, không chân lý):**
+- **Hero Detail** (`client/src/ui/hero_detail/`): hiển thị chỉ số **theo cấp** + Power + chi phí + gold; nút "Nâng cấp"
+  gửi **intent** → presenter `POST /heroes/{id}/level-up` → refresh hero + ví **AUTHORITATIVE** vào `StateCache`
+  (`apply_heroes`/`apply_wallet` → `state_refreshed`). Client **không** tự tăng cấp/chỉ số/Power/trừ gold.
+- Contract `LevelUpHeroResponse` → codegen GDScript; parser `NetworkResponseParser.parse_level_up_hero_response`.
+
+**Idempotency:** khoá lần tiêu mã hoá **cấp đích** + khoá dòng hero ⇒ dưới khoá, cấp đích luôn nhất quán trạng thái dòng
+(không lên cấp "chùa"); không cần requestId/bảng record mới.
+
+**Ngoài phạm vi Phase 35:** EXP item (dùng gold), batch level-up, power-gate campaign, Sao/Ascension (39), Equipment (38),
+Skill level (Post-MVP). Chi tiết: `../roadmap/35-hero-upgrade-level.md`, `progression-and-economy.md` §1.
+
+## 10. Liên kết
 - Combat: `combat-framework.md` · Skill: `skill-framework.md`
 - Progression: `progression-and-economy.md` · Config: `configuration-and-data.md` · Assets: `../godot/resources-and-assets.md`
 - Nguồn: `../mvp/03`, `../mvp/05` · Roadmap: `../roadmap/27-hero-system.md`

@@ -57,7 +57,39 @@ func test_new_skill_via_config_only_runs() -> void:
 	assert_bool(has_self_buff).is_true()
 
 
+func test_ally_stats_scaled_by_level_from_economy() -> void:
+	# Phase 35: ally cấp 3 + economy config ⇒ chỉ số tính lại theo cấp (data-driven, khớp server); địch giữ nền.
+	var provider := _make_provider(_bundle_with_economy(200, 800))
+	var req := {
+		"seed": 12345, "stage_id": "stage_01",
+		"ally": [{"actor_id": "u_ally_01", "hero_id": "hero_ally", "slot": 0, "level": 3}],
+	}
+	var input := CombatInputResolver.new().resolve(req, provider)
+	assert_int(input.ally[0].stats.atk).is_equal(HeroStats.scale_stat(200, 3, 800))
+	assert_int(input.ally[0].stats.atk).is_greater(200)   # cấp 3 mạnh hơn nền
+	assert_int(input.enemy[0].stats.atk).is_equal(150)    # địch cấp 1 (chỉ số nền)
+
+
+func test_ally_at_level_1_uses_base_stats_with_economy_present() -> void:
+	var provider := _make_provider(_bundle_with_economy(200, 800))
+	var input := CombatInputResolver.new().resolve(_request(), provider)  # ally không có "level" ⇒ mặc định 1
+	assert_int(input.ally[0].stats.atk).is_equal(200)
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
+
+# Bundle _bundle(1, ally_atk) + economy (đường cong cấp/tăng trưởng/power) cho test scaling Phase 35.
+func _bundle_with_economy(ally_atk: int, growth_bp: int) -> Dictionary:
+	var bundle := _bundle(1, ally_atk)
+	bundle["data"]["economy"] = {
+		"economy_default": {
+			"id": "economy_default",
+			"cost_curves": {"level_up": [100, 150, 220]},
+			"level_stat_growth_bp": growth_bp,
+			"power_weights": {"hp": 1, "atk": 10, "def": 8, "spd": 6},
+		},
+	}
+	return bundle
 
 func _make_provider(bundle: Dictionary) -> Node:
 	var provider: Node = _CONFIG_PROVIDER.new()

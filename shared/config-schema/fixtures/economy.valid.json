@@ -2,5 +2,7 @@
   "schema_version": 1,
   "id": "economy_sample",
   "cost_curves": { "level_up": [0, 0, 0] },
+  "level_stat_growth_bp": 0,
+  "power_weights": { "hp": 0, "atk": 0, "def": 0, "spd": 0 },
   "energy": { "max": 0, "regen_per_hour": 0, "battle_cost": 0 }
 }

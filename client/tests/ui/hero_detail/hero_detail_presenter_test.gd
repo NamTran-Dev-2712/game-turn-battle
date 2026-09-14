@@ -28,20 +28,64 @@ class _StubRouter extends Node:
 		return true
 
 
-# StateCache giả: hero owned theo id.
+# StateCache giả: hero owned theo id + ví; apply_heroes/apply_wallet mô phỏng refresh authoritative từ server.
 class _StubState extends Node:
 	var hero: Dictionary = {}
+	var currencies: Dictionary = {}
+	var apply_heroes_calls: int = 0
+	var apply_wallet_calls: int = 0
 
 	func get_hero(_id: String) -> Dictionary:
 		return hero.duplicate(true)
 
+	func get_heroes() -> Array:
+		return [hero.duplicate(true)] if not hero.is_empty() else []
 
-# ConfigProvider giả: definition theo id.
+	func get_currency(code: String) -> int:
+		return int(currencies.get(code, 0))
+
+	func apply_heroes(heroes: Array) -> void:
+		apply_heroes_calls += 1
+		for h in heroes:
+			if h is Dictionary and str((h as Dictionary).get("id", "")) == str(hero.get("id", "")):
+				hero = (h as Dictionary).duplicate(true)
+
+	func apply_wallet(balances: Dictionary) -> void:
+		apply_wallet_calls += 1
+		currencies = balances.duplicate(true)
+
+
+# ConfigProvider giả: definition theo id (get_hero) + economy (get_entry).
 class _StubConfig extends Node:
 	var hero: Dictionary = {}
+	var economy: Dictionary = {}
 
 	func get_hero(_id: String) -> Dictionary:
 		return hero.duplicate(true)
+
+	func get_entry(_type: StringName, _id: String) -> Dictionary:
+		return economy.duplicate(true)
+
+
+# NetworkClient giả: post_json trả kết quả nâng cấp đã xếp + bắt path; get_json trả DTO theo path (refresh).
+class _StubNet extends Node:
+	var post_result: Variant = null
+	var post_calls: int = 0
+	var last_path: String = ""
+	var heroes_result: Variant = null
+	var wallet_result: Variant = null
+
+	func post_json(path: String, _body: Dictionary, _parser := Callable()) -> Variant:
+		post_calls += 1
+		last_path = path
+		return post_result
+
+	func get_json(path: String, _parser := Callable()) -> Variant:
+		if path == "/heroes":
+			return heroes_result
+		if path == "/wallet":
+			return wallet_result
+		return null
 
 
 # AssetLoader giả: placeholder + load_texture (coroutine) ghi nhận path yêu cầu/giải phóng.
@@ -147,3 +191,111 @@ func test_back_intent_navigates_back() -> void:
 	view.emit_intent(&"back")
 	assert_int(router.back_calls).is_equal(1)
 	presenter.dispose()
+
+
+# ── Phase 35 — nâng cấp (level/stat/power data-driven, server-authoritative) ───────────────────────
+
+func test_shows_level_scaled_stats_power_and_cost_from_economy() -> void:
+	var router := _StubRouter.new(); router.ctx = {"hero_id": "hero_ignis"}; _node(router)
+	var state := _StubState.new(); state.hero = {"id": "hero_ignis", "level": 3, "stars": 1}
+	state.currencies = {"gold": 500}; _node(state)
+	var config := _StubConfig.new(); config.hero = _definition(); config.economy = _economy(); _node(config)
+	var asset := _StubAssetLoader.new(); asset.placeholder_tex = _tex(Color.GRAY); _node(asset)
+	var net := _StubNet.new(); _node(net)
+	var view := _SpyView.new(); _node(view)
+
+	var presenter = _PRESENTER.new(view, state, config, router, asset, net)
+
+	# Chỉ số HIỂN THỊ theo cấp (data-driven, khớp công thức HeroStats) — cao hơn chỉ số nền.
+	var expected: Dictionary = HeroStats.scaled_stats(_definition()["base_stats"], 3, 800)
+	assert_int(int(view.last.get("atk"))).is_equal(int(expected["atk"]))
+	assert_int(int(view.last.get("atk"))).is_greater(220)  # > base
+	assert_int(int(view.last.get("power"))).is_equal(HeroStats.power(expected, _economy()["power_weights"]))
+	# Chi phí lấy từ đường cong config (level_up[level-1]) + gold hiện có; đủ tiền ⇒ nâng được.
+	assert_int(int(view.last.get("upgrade_cost"))).is_equal(220)
+	assert_int(int(view.last.get("gold"))).is_equal(500)
+	assert_bool(bool(view.last.get("can_upgrade"))).is_true()
+	presenter.dispose()
+
+
+func test_level_up_intent_posts_then_refreshes_authoritative_state() -> void:
+	var router := _StubRouter.new(); router.ctx = {"hero_id": "hero_ignis"}; _node(router)
+	var state := _StubState.new(); state.hero = {"id": "hero_ignis", "level": 1, "stars": 1}
+	state.currencies = {"gold": 100}; _node(state)
+	var config := _StubConfig.new(); config.hero = _definition(); config.economy = _economy(); _node(config)
+	var asset := _StubAssetLoader.new(); asset.placeholder_tex = _tex(Color.GRAY); _node(asset)
+	var net := _StubNet.new()
+	net.post_result = _ok(_level_up_response(2))
+	net.heroes_result = _ok([_owned("hero_ignis", 2)])
+	var wallet := WalletDto.new(); wallet.balances = [] as Array[CurrencyBalanceDto]
+	net.wallet_result = _ok(wallet)
+	_node(net)
+	var view := _SpyView.new(); _node(view)
+
+	var presenter = _PRESENTER.new(view, state, config, router, asset, net)
+	view.emit_intent(HeroDetailView.INTENT_LEVEL_UP)
+
+	# Client CHỈ gửi intent tới đúng endpoint; server-authoritative quyết cấp/chỉ số/gold.
+	assert_int(net.post_calls).is_equal(1)
+	assert_str(net.last_path).is_equal("/heroes/hero_ignis/level-up")
+	# Không tự tăng cấp — đọc lại hero + ví AUTHORITATIVE từ server vào StateCache.
+	assert_int(state.apply_heroes_calls).is_equal(1)
+	assert_int(state.apply_wallet_calls).is_equal(1)
+	assert_int(int(view.last.get("level"))).is_equal(2)  # cấp mới từ server
+	assert_str(str(view.last.get("error_text"))).is_equal("")
+	presenter.dispose()
+
+
+func test_level_up_failure_shows_error_and_mutates_nothing() -> void:
+	var router := _StubRouter.new(); router.ctx = {"hero_id": "hero_ignis"}; _node(router)
+	var state := _StubState.new(); state.hero = {"id": "hero_ignis", "level": 1, "stars": 1}
+	state.currencies = {"gold": 50}; _node(state)
+	var config := _StubConfig.new(); config.hero = _definition(); config.economy = _economy(); _node(config)
+	var asset := _StubAssetLoader.new(); asset.placeholder_tex = _tex(Color.GRAY); _node(asset)
+	var net := _StubNet.new()
+	var err := ErrorResponse.new(); err.code = "CURRENCY_INSUFFICIENT_FUNDS"; err.message = "x"
+	net.post_result = NetResult.failure(NetResult.Kind.HTTP_4XX, err, 409)
+	_node(net)
+	var view := _SpyView.new(); _node(view)
+
+	var presenter = _PRESENTER.new(view, state, config, router, asset, net)
+	view.emit_intent(HeroDetailView.INTENT_LEVEL_UP)
+
+	assert_str(str(view.last.get("error_text"))).contains("CURRENCY_INSUFFICIENT_FUNDS")
+	assert_int(state.apply_heroes_calls).is_equal(0)  # thất bại ⇒ không refresh/không đổi
+	assert_int(state.apply_wallet_calls).is_equal(0)
+	assert_int(int(view.last.get("level"))).is_equal(1)  # cấp không đổi
+	presenter.dispose()
+
+
+func _ok(value) -> NetResult:
+	return NetResult.success(value, 200)
+
+
+func _economy() -> Dictionary:
+	return {
+		"cost_curves": {"level_up": [100, 150, 220]},
+		"level_stat_growth_bp": 800,
+		"power_weights": {"hp": 1, "atk": 10, "def": 8, "spd": 6},
+	}
+
+
+func _level_up_response(level: int) -> LevelUpHeroResponse:
+	var stats := HeroBaseStatsDto.new()
+	stats.hp = 0; stats.atk = 0; stats.def = 0; stats.spd = 0
+	var dto := LevelUpHeroResponse.new()
+	dto.hero_id = "hero_ignis"
+	dto.level = level
+	dto.stats = stats
+	dto.power = 0
+	dto.gold_spent = 100
+	dto.gold_balance_after = 0
+	return dto
+
+
+func _owned(hero_id: String, level: int) -> OwnedHeroDto:
+	var dto := OwnedHeroDto.new()
+	dto.hero_id = hero_id
+	dto.level = level
+	dto.stars = 1
+	return dto

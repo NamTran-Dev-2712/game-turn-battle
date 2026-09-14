@@ -24,13 +24,28 @@ public static class TeamSnapshotFactory
     /// <summary>
     /// Ánh xạ đội hình đã lưu → danh sách <see cref="CombatTeamMember"/> bất biến (sắp theo slot). Kết quả là
     /// bản sao giá trị: thay đổi <paramref name="team"/> sau đó KHÔNG ảnh hưởng snapshot đã tạo.
+    /// <para>
+    /// <paramref name="levelByHeroId"/> (Phase 35): cấp hero owned theo <c>hero_id</c> — chỉ số vào trận tính
+    /// theo cấp này ở <see cref="CombatInputResolver"/> ⇒ nâng cấp hero ảnh hưởng combat. Thiếu (null/không có
+    /// mục) ⇒ cấp 1 (chỉ số nền) để tương thích ngược. Cấp là "chỉ số tại thời điểm" trong snapshot bất biến.
+    /// </para>
     /// </summary>
-    public static IReadOnlyList<CombatTeamMember> Create(DomainTeam team)
+    public static IReadOnlyList<CombatTeamMember> Create(
+        DomainTeam team, IReadOnlyDictionary<string, int>? levelByHeroId = null)
     {
         Guard.NotNull(team);
         return team.Slots
             .OrderBy(s => s.SlotIndex)
-            .Select(s => new CombatTeamMember($"{AllyActorPrefix}{s.SlotIndex}", s.HeroId, s.SlotIndex))
+            .Select(s => new CombatTeamMember(
+                $"{AllyActorPrefix}{s.SlotIndex}",
+                s.HeroId,
+                s.SlotIndex,
+                LevelOf(levelByHeroId, s.HeroId)))
             .ToList();
     }
+
+    private static int LevelOf(IReadOnlyDictionary<string, int>? levelByHeroId, string heroId)
+        => levelByHeroId is not null && levelByHeroId.TryGetValue(heroId, out int level) && level >= 1
+            ? level
+            : 1;
 }

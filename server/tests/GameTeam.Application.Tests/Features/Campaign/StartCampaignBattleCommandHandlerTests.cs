@@ -18,6 +18,7 @@ using GameTeam.Domain.Campaign;
 using GameTeam.Domain.Combat;
 using GameTeam.Domain.Common;
 using GameTeam.Domain.Economy;
+using GameTeam.Domain.Heroes;
 using GameTeam.Domain.Profiles;
 using NSubstitute;
 using Xunit;
@@ -160,6 +161,7 @@ public sealed class StartCampaignBattleCommandHandlerTests
         public IWalletRepository Wallets { get; } = Substitute.For<IWalletRepository>();
         public ICurrencyTransactionRepository Ledger { get; } = Substitute.For<ICurrencyTransactionRepository>();
         public ITeamRepository Teams { get; } = Substitute.For<ITeamRepository>();
+        public IOwnedHeroRepository OwnedHeroes { get; } = Substitute.For<IOwnedHeroRepository>();
         public IPlayerProfileRepository Profiles { get; } = Substitute.For<IPlayerProfileRepository>();
         public ICampaignProgressRepository Progress { get; } = Substitute.For<ICampaignProgressRepository>();
         public ICurrentUser CurrentUser { get; } = Substitute.For<ICurrentUser>();
@@ -182,6 +184,8 @@ public sealed class StartCampaignBattleCommandHandlerTests
             DomainTeam team = DomainTeam.Create(
                 h.TeamId, h.Profile.Id, new[] { new DomainTeamSlot(0, "hero_a") }, Now);
             h.Teams.GetByProfileIdAsync(h.Profile.Id, Arg.Any<CancellationToken>()).Returns(team);
+            h.OwnedHeroes.GetByProfileIdAsync(h.Profile.Id, Arg.Any<CancellationToken>())
+                .Returns(Array.Empty<OwnedHero>());
             h.BattleRecords.GetByProfileAndAttemptAsync(h.Profile.Id, AttemptId, Arg.Any<CancellationToken>())
                 .Returns((BattleRecord?)null);
             h.Progress.GetByProfileIdAsync(h.Profile.Id, Arg.Any<CancellationToken>()).Returns((CampaignProgress?)null);
@@ -230,7 +234,7 @@ public sealed class StartCampaignBattleCommandHandlerTests
             clock.UtcNow.Returns(Now);
             var wallet = new CurrencyWalletService(Wallets, Ledger, clock);
             var battle = new BattleExecutionService(
-                Teams, new CombatInputResolver(Config), new BattleSimulator(), BattleRecords, SeedSource, clock);
+                Teams, OwnedHeroes, new CombatInputResolver(Config), new BattleSimulator(), BattleRecords, SeedSource, clock);
             var rewards = new StageRewardService(Config, wallet);
             var handler = new StartCampaignBattleCommandHandler(
                 CurrentUser, Profiles, Progress, new CampaignChain(Config), Config, battle, rewards, clock);

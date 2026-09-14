@@ -7,12 +7,18 @@ extends BaseView
 
 ## Ý định: quay lại danh sách hero.
 const INTENT_BACK: StringName = &"back"
+## Ý định: nâng cấp hero một cấp (Phase 35) — presenter gửi POST /heroes/{id}/level-up (server-authoritative).
+const INTENT_LEVEL_UP: StringName = &"level_up"
 
 var _art: TextureRect = null
 var _name_label: Label = null
 var _traits_label: Label = null
 var _stats_label: Label = null
+var _power_label: Label = null
 var _skills_label: Label = null
+var _upgrade_label: Label = null
+var _upgrade_button: Button = null
+var _status_label: Label = null
 
 
 func _ready() -> void:
@@ -45,8 +51,23 @@ func _build() -> void:
 	_stats_label = Label.new()
 	box.add_child(_stats_label)
 
+	_power_label = Label.new()
+	box.add_child(_power_label)
+
 	_skills_label = Label.new()
 	box.add_child(_skills_label)
+
+	# Khu nâng cấp (Phase 35): chi phí + gold + nút "Nâng cấp" (gửi intent) + dòng trạng thái/lỗi.
+	_upgrade_label = Label.new()
+	box.add_child(_upgrade_label)
+
+	_upgrade_button = Button.new()
+	_upgrade_button.text = "Nâng cấp"
+	_upgrade_button.pressed.connect(func() -> void: emit_intent(INTENT_LEVEL_UP))
+	box.add_child(_upgrade_button)
+
+	_status_label = Label.new()
+	box.add_child(_status_label)
 
 	var back_button := Button.new()
 	back_button.text = "Quay lại"
@@ -56,7 +77,8 @@ func _build() -> void:
 
 # Render chi tiết hero do presenter đẩy vào. Khoá dữ liệu:
 #   hero_id, owned:bool, has_definition:bool, level, stars, faction, class, element, role, rarity,
-#   hp, atk, def, spd, skills:Array[String], art_texture:Texture2D.
+#   hp, atk, def, spd (chỉ số THEO CẤP), power, skills:Array[String], art_texture:Texture2D,
+#   has_economy:bool, upgrade_cost:int, gold:int, is_max_level:bool, can_upgrade:bool, status_text, error_text.
 func _render(data: Dictionary) -> void:
 	if _art != null and data.has("art_texture"):
 		_art.texture = data["art_texture"]
@@ -88,9 +110,43 @@ func _render(data: Dictionary) -> void:
 			int(data.get("spd", 0)),
 		]
 
+	if _power_label != null:
+		_power_label.text = "Power: %d" % int(data.get("power", 0))
+
 	if _skills_label != null:
 		var skills: Array = data.get("skills", [])
 		_skills_label.text = "Skills: %s" % (", ".join(skills.map(func(s): return str(s))) if not skills.is_empty() else "—")
+
+	_render_upgrade(data)
+
+
+# Khu nâng cấp (Phase 35): chi phí/gold, trạng thái max, bật/tắt nút theo can_upgrade (server vẫn là authority).
+func _render_upgrade(data: Dictionary) -> void:
+	var owned := bool(data.get("owned", false))
+	var has_economy := bool(data.get("has_economy", false))
+	var is_max := bool(data.get("is_max_level", false))
+	var cost := int(data.get("upgrade_cost", -1))
+	var gold := int(data.get("gold", 0))
+	var can_upgrade := bool(data.get("can_upgrade", false))
+
+	if _upgrade_label != null:
+		if not owned:
+			_upgrade_label.text = "(chưa sở hữu hero này)"
+		elif is_max:
+			_upgrade_label.text = "Đã đạt cấp tối đa"
+		elif has_economy and cost >= 0:
+			_upgrade_label.text = "Chi phí: %d gold · Đang có: %d gold" % [cost, gold]
+		else:
+			_upgrade_label.text = ""
+
+	if _upgrade_button != null:
+		_upgrade_button.disabled = not can_upgrade
+		_upgrade_button.visible = owned and not is_max
+
+	if _status_label != null:
+		var status := str(data.get("status_text", ""))
+		var error := str(data.get("error_text", ""))
+		_status_label.text = error if error != "" else status
 
 
 func unbind() -> void:

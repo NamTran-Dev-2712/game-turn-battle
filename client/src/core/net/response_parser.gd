@@ -84,6 +84,27 @@ static func parse_my_heroes(data: Dictionary) -> Variant:
 	return result
 
 
+## Parse `POST /api/v1/heroes/{heroId}/level-up` → LevelUpHeroResponse (phase 35). Server-authoritative:
+## cấp mới + chỉ số theo cấp + Power + biến động gold. `null` nếu thiếu key bắt buộc (`heroId`/`stats`).
+static func parse_level_up_hero_response(data: Dictionary) -> LevelUpHeroResponse:
+	if not data.has("heroId") or not (data.get("stats") is Dictionary):
+		return null
+	var stats_src: Dictionary = data["stats"]
+	var stats := HeroBaseStatsDto.new()
+	stats.hp = int(stats_src.get("hp", 0))
+	stats.atk = int(stats_src.get("atk", 0))
+	stats.def = int(stats_src.get("def", 0))
+	stats.spd = int(stats_src.get("spd", 0))
+	var model := LevelUpHeroResponse.new()
+	model.hero_id = str(data["heroId"])
+	model.level = int(data.get("level", 0))
+	model.stats = stats
+	model.power = int(data.get("power", 0))
+	model.gold_spent = int(data.get("goldSpent", 0))
+	model.gold_balance_after = int(data.get("goldBalanceAfter", 0))
+	return model
+
+
 ## Parse `GET/POST /api/v1/team` → TeamDto (phase 29). Body bọc object `{ "slots": [ {slotIndex, heroId} ] }`
 ## (không mảng trần — hợp NetworkClient chỉ nhận Dictionary). `null` nếu thiếu `slots` hoặc phần tử sai hình
 ## dạng. Mảng rỗng là hợp lệ (chưa lưu đội — lưới trống). Định nghĩa hero ghép từ ConfigProvider ở client.

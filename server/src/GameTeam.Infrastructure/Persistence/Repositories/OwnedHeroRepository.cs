@@ -26,6 +26,15 @@ public sealed class OwnedHeroRepository : IOwnedHeroRepository
             .ThenBy(h => h.HeroId)
             .ToListAsync(cancellationToken);
 
+    public async Task<OwnedHero?> GetByProfileAndHeroForUpdateAsync(
+        Guid profileId, string heroId, CancellationToken cancellationToken)
+        // Khoá dòng hero (SELECT … FOR UPDATE) để tuần tự hoá nâng cấp đồng thời cùng (profile, hero) (Phase 35).
+        // PostgreSQL chỉ khoá trong transaction đang mở (do TransactionBehavior mở). FormattableString ⇒ tham số
+        // hoá (chống SQL injection). Tracked ⇒ mutation (LevelUp) lưu ở SaveChanges.
+        => await _dbContext.OwnedHeroes
+            .FromSql($"SELECT * FROM owned_heroes WHERE profile_id = {profileId} AND hero_id = {heroId} FOR UPDATE")
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task AddAsync(OwnedHero entity, CancellationToken cancellationToken)
         => await _dbContext.OwnedHeroes.AddAsync(entity, cancellationToken);
 }

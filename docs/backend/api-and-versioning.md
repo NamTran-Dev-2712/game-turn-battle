@@ -24,7 +24,7 @@
 | Auth | `POST /api/v1/auth/guest`, `/auth/refresh` | command |
 | Profile | `GET /api/v1/profile` | query |
 | Config | `GET /api/v1/config/current`, `GET /api/v1/config/bundle?bundleVersion=N` | query (public, cache) |
-| Heroes | `GET /api/v1/heroes` (owned, protected — owner từ token), `GET /api/v1/heroes/{heroId}/definition` (config, public) | query (Phase 27) |
+| Heroes | `GET /api/v1/heroes` (owned, protected — owner từ token), `GET /api/v1/heroes/{heroId}/definition` (config, public), `POST /api/v1/heroes/{heroId}/level-up` (protected — nâng cấp, tiêu gold atomic) | query + command (level-up: Phase 35) |
 | Formation | `PUT /api/v1/teams/{id}` | command |
 | Battle | `POST /api/v1/battles` | command (re-sim) |
 | Wallet | `GET /api/v1/wallet` (số dư, protected — owner từ token) | query (Phase 31) |
@@ -189,6 +189,16 @@ endpoint** về sau — không tự vẽ convention khác.
   AFK stage **atomic**. **Mapping mở rộng:** `CAMPAIGN_STAGE_LOCKED` thêm vào `ErrorHttpMapping.KnownCodes` → 403. Contract
   (`Contracts/Campaign/*`) → regenerate `openapi.json` → codegen (`RealSpecTests` cập nhật). Chi tiết: `infrastructure.md`
   §1.8, `progression-and-economy.md` §2b.
+- **Hero level-up endpoint (Phase 35 — đã chốt):** `POST /api/v1/heroes/{heroId}/level-up` (version set, **protected**) →
+  `LevelUpHeroCommand(heroId)` (`ITransactionalRequest`; owner từ token — chống IDOR, body rỗng = INTENT). Trả
+  **`LevelUpHeroResponse{heroId,level,stats{hp,atk,def,spd},power,goldSpent,goldBalanceAfter}`** (200) / `ErrorEnvelope`
+  (401 · 404 `OWNED_HERO_NOT_FOUND`/`HERO_DEFINITION_NOT_FOUND`/`ECONOMY_CONFIG_NOT_FOUND` · **409
+  `CURRENCY_INSUFFICIENT_FUNDS`** / **`HERO_MAX_LEVEL_CONFLICT`**). Server-authoritative + atomic (ADR-004/007/011):
+  `GetByProfileAndHeroForUpdateAsync` (FOR UPDATE) → chi phí gold từ `economy.cost_curves.level_up` → `CurrencyWalletService.SpendAsync`
+  (khoá `hero-levelup:{profileId}:{ownedHeroId}:{targetLevel}` + ledger) → `LevelUp()` → chỉ số/Power theo cấp
+  (`HeroStatCalculator`) — tất cả một transaction. **Mapping không cần sửa** (`_CONFLICT`/`_NOT_FOUND` qua suffix;
+  `CURRENCY_INSUFFICIENT_FUNDS` đã có từ Phase 33). Contract (`Contracts/Hero/LevelUpHeroResponse`) → regenerate
+  `openapi.json` → codegen (`RealSpecTests` + `OpenApiContractTests` cập nhật). Chi tiết: `../gameplay/hero-system.md` §9.
 - **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
   integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
   (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.

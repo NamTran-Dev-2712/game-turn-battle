@@ -74,3 +74,9 @@ Runtime SSOT for config lives in `server/src/GameTeam.Infrastructure/Configurati
   `schema_version`). Server đọc definition qua **`IConfigProvider.Get<HeroConfig>("hero", id)`** (POCO Application, phase 27)
   — **KHÔNG hardcode chỉ số**. `hero.skills[]` phải trỏ skill tồn tại (`config/skills/*.json`) — validator phase 07 bắt
   `REF001`. Thêm hero = **thêm config**, không sửa code.
+- **Economy config (Phase 35):** `config/economy/economy_default.json` (schema `economy.schema.json`) mang đường cong nâng
+  cấp Level — `cost_curves.level_up` (gold mỗi cấp; phần tử thứ i = lên từ cấp (i+1)→(i+2) ⇒ **cấp tối đa = 1 + độ dài mảng**),
+  **`level_stat_growth_bp`** (tăng trưởng chỉ số/cấp, bp của chỉ số nền) + **`power_weights{hp,atk,def,spd}`** (trọng số Power
+  Rating) — cả hai **additive, KHÔNG bump `schema_version`**. Đọc qua **`IConfigProvider.Get<EconomyConfig>("economy","economy_default")`**.
+  Đổi giá trị ⇒ chi phí/chỉ số/Power đổi **KHÔNG sửa code** (ADR-004). Số thật là **tuning** (EC4). Chi tiết:
+  `docs/gameplay/configuration-and-data.md` (bảng economy) + `docs/gameplay/hero-system.md` §9.

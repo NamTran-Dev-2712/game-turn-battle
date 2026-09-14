@@ -150,19 +150,34 @@ func _present(team, result) -> void:
 
 # Replay client bằng seed server (display-only): dựng đội ally khớp server (actor_id "ally_{slot}" — TeamSnapshotFactory),
 # đọc stage/hero/skill từ ConfigProvider (đọc-cache), chạy sim client. Thiếu config stage ⇒ bỏ replay (vẫn hiện kết quả server).
+# Cấp hero (Phase 35) lấy từ StateCache (server-authoritative) ⇒ chỉ số replay khớp server (nâng cấp ảnh hưởng combat).
 func _replay(team, seed: int) -> Dictionary:
 	if _config_provider == null or _config_provider.get_entry(_STAGE_TYPE, _stage_id).is_empty():
 		return {}
+	var level_by_hero := _owned_levels()
 	var ally: Array = []
 	for slot in team.slots:
+		var hero_id := str(slot.hero_id)
 		ally.append({
 			"actor_id": "ally_%d" % int(slot.slot_index),
-			"hero_id": str(slot.hero_id),
+			"hero_id": hero_id,
 			"slot": int(slot.slot_index),
+			"level": int(level_by_hero.get(hero_id, 1)),
 		})
 	var request := {"seed": seed, "stage_id": _stage_id, "ally": ally}
 	var input: BattleInput = CombatInputResolver.new().resolve(request, _config_provider)
 	return BattleSimulator.new().simulate(input)
+
+
+# Bản đồ hero_id → cấp từ StateCache (đọc-cache, server-authoritative). Thiếu ⇒ cấp 1 (chỉ số nền).
+func _owned_levels() -> Dictionary:
+	var out: Dictionary = {}
+	if _state_cache == null:
+		return out
+	for hero in _state_cache.get_heroes():
+		if hero is Dictionary and hero.has("id"):
+			out[str(hero["id"])] = int(hero.get("level", 1))
+	return out
 
 
 func _on_intent(intent_name: StringName, _payload: Dictionary) -> void:

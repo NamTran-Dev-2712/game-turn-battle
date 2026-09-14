@@ -164,7 +164,32 @@ trong `GameTeam.Infrastructure/Persistence`, xem `infrastructure.md` §1.1), Red
 
 > **Ranh giới (ADR-004/007):** definition = **config** (không hardcode / không nguồn thứ hai); ownership =
 > **server/profile** (client không tự thêm hero / đổi owner / level / sao). Ngoài scope: skill (28), formation (29),
-> nâng cấp (35/39).
+> ascension (39).
+
+---
+
+### Hero level-up: nâng cấp gold atomic + chỉ số/Power data-driven (Phase 35 — đã đóng)
+
+`GameTeam.Domain/Heroes/` + `GameTeam.Application/Features/Heroes/`:
+
+- **`OwnedHero.LevelUp()`** — tăng một cấp (raise `OwnedHeroLeveledUp`); bất biến cấu trúc ở Domain, trần cấp
+  (config) kiểm ở Application. **Không lưu chỉ số** — luôn tính từ config + cấp.
+- **`HeroStatCalculator`** (static, tất định integer): `ScaleStat(base, level, growthBp) = base +
+  round_half_up(base·bp·(level−1)/10000)` (cấp 1 ⇒ nền, dùng Phase-24 `FixedPoint`) + `Power` (tổng có trọng số) +
+  `MaxLevel`/`TryGetLevelUpCost` từ `economy` config. **Dùng chung** bởi handler nâng cấp VÀ `CombatInputResolver` ⇒
+  chỉ số vào trận khớp hiển thị; mirror client `hero_stats.gd`.
+- **`EconomyConfig`** (POCO) đọc `IConfigProvider.Get<EconomyConfig>("economy","economy_default")` — `cost_curves.level_up`,
+  `level_stat_growth_bp`, `power_weights` (data-driven, ADR-004).
+- **`LevelUpHeroCommand(heroId)`** (`ITransactionalRequest`) — owner từ token (chống IDOR) → `GetByProfileAndHeroForUpdateAsync`
+  (FOR UPDATE) → kiểm trần cấp (`HERO_MAX_LEVEL_CONFLICT`) → **`CurrencyWalletService.SpendAsync`** (Phase 31, khoá
+  `hero-levelup:{profileId}:{ownedHeroId}:{targetLevel}` + ledger; thiếu ⇒ `CURRENCY_INSUFFICIENT_FUNDS`) → `LevelUp()` →
+  trả `LevelUpHeroResponse{level,stats,power,goldSpent,goldBalanceAfter}`. Một transaction (atomic); `POST /api/v1/heroes/{heroId}/level-up`.
+- **Combat theo cấp:** `CombatTeamMember.Level` + `TeamSnapshotFactory` (map cấp) + `BattleExecutionService` nạp cấp owned
+  ⇒ resolver nhân chỉ số ally (địch = nền). Golden vectors không đổi (scaling ở resolver).
+
+> **Ranh giới (ADR-004/007/011):** cấp/chi phí/chỉ số/Power **server-authoritative + config-driven**; client chỉ POST
+> intent rồi refresh state. Idempotency lần tiêu = khoá mã hoá cấp đích + khoá dòng hero (không cần requestId/bảng mới).
+> Ngoài scope: EXP item (dùng gold), batch level-up, ascension (39), equipment (38).
 
 ---
 

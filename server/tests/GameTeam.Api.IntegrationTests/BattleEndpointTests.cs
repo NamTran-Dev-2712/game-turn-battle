@@ -212,6 +212,9 @@ public sealed class BattlePostgresApiFactory : WebApplicationFactory<Program>, I
 {
     public const string StageId = "stage_demo";
 
+    /// <summary>Stage với địch "trâu" (Phase 35): sống hết vòng để mọi ally kịp đánh ⇒ đo sát thương theo cấp.</summary>
+    public const string TankyStageId = "stage_tanky";
+
     public static readonly string[] SeededHeroIds =
         ["hero_a", "hero_b", "hero_c", "hero_d", "hero_e", "hero_f"];
 
@@ -285,6 +288,37 @@ public sealed class BattlePostgresApiFactory : WebApplicationFactory<Program>, I
 
         stub.Set("reward", "reward_demo", """
             { "entries": [ { "reward_type": "currency", "ref_id": "gold", "amount": 100 } ] }
+            """);
+
+        // Phase 35: economy config (đường cong cấp/tăng trưởng/power). Cấp 1 ⇒ chỉ số nền ⇒ các test battle
+        // hiện có không đổi; chỉ khi hero được nâng cấp mới thấy chỉ số vào trận tăng.
+        stub.Set("economy", "economy_default", """
+            { "schema_version": 1, "id": "economy_default",
+              "cost_curves": { "level_up": [100, 150, 220] },
+              "level_stat_growth_bp": 800,
+              "power_weights": { "hp": 1, "atk": 10, "def": 8, "spd": 6 } }
+            """);
+
+        // Địch "trâu" (hp lớn, atk 1) — sống hết max_rounds để MỌI ally kịp đánh ⇒ đo được sát thương của
+        // ally_0 trước/sau khi nâng cấp (test combat-integration Phase 35).
+        stub.Set("hero", "hero_tank", """
+            { "schema_version": 1, "id": "hero_tank", "faction": "none", "class": "warrior",
+              "element": "fire", "role": "tank", "rarity": 3,
+              "base_stats": { "hp": 100000, "atk": 1, "def": 10, "spd": 50 }, "skills": ["skill_basic"] }
+            """);
+
+        stub.Set("stage", TankyStageId, """
+            {
+              "max_rounds": 20,
+              "basic_skill_id": "skill_basic",
+              "combat_rules": {
+                "def_constant_k": 300, "min_damage": 1, "crit_multiplier_fixed": 1500,
+                "accuracy_bp": 10000, "crit_rate_bp": 0,
+                "energy": { "initial": 0, "on_attack": 0, "on_hit": 0, "ultimate_cost": 100, "max": 100 }
+              },
+              "enemies": [ { "hero_id": "hero_tank", "slot": 0 } ],
+              "rewards": ["reward_demo"]
+            }
             """);
 
         return stub;

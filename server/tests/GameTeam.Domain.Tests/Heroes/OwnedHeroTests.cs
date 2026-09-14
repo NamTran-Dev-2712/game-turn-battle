@@ -63,6 +63,36 @@ public class OwnedHeroTests
     }
 
     [Fact]
+    public void LevelUp_increments_level_by_one_and_raises_event()
+    {
+        Guid id = Guid.NewGuid();
+        Guid profileId = Guid.NewGuid();
+        OwnedHero hero = OwnedHero.Restore(id, profileId, "hero_ignis", 4, 1, Now);
+
+        hero.LevelUp();
+
+        hero.Level.Should().Be(5);
+        hero.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<OwnedHeroLeveledUp>();
+        var leveled = (OwnedHeroLeveledUp)hero.DomainEvents.Single();
+        leveled.OwnedHeroId.Should().Be(id);
+        leveled.ProfileId.Should().Be(profileId);
+        leveled.HeroId.Should().Be("hero_ignis");
+        leveled.NewLevel.Should().Be(5);
+    }
+
+    [Fact]
+    public void LevelUp_can_be_applied_repeatedly()
+    {
+        OwnedHero hero = OwnedHero.Grant(Guid.NewGuid(), Guid.NewGuid(), "hero_a", 1, 1, Now);
+
+        hero.LevelUp();
+        hero.LevelUp();
+        hero.LevelUp();
+
+        hero.Level.Should().Be(4);
+    }
+
+    [Fact]
     public void Restore_rebuilds_state_without_raising_event()
     {
         Guid id = Guid.NewGuid();

@@ -197,6 +197,76 @@
         }
       }
     },
+    "/api/v1/heroes/{heroId}/level-up": {
+      "post": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "LevelUpHero",
+        "parameters": [
+          {
+            "name": "heroId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelUpHeroResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/team": {
       "get": {
         "tags": [
@@ -1087,6 +1157,41 @@
             "type": "string"
           },
           "quantity": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LevelUpHeroResponse": {
+        "required": [
+          "heroId",
+          "level",
+          "stats",
+          "power",
+          "goldSpent",
+          "goldBalanceAfter"
+        ],
+        "type": "object",
+        "properties": {
+          "heroId": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/HeroBaseStatsDto"
+          },
+          "power": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "goldSpent": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "goldBalanceAfter": {
             "type": "integer",
             "format": "int64"
           }

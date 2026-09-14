@@ -47,7 +47,7 @@ public sealed class OwnedHero : AggregateRoot<Guid>
     /// <summary>Id definition hero ở config (prefix <c>hero_</c>, ADR-004). Không lưu chỉ số tĩnh ở đây.</summary>
     public string HeroId { get; private set; } = string.Empty;
 
-    /// <summary>Cấp hiện tại (bản nền — nâng cấp ở phase 35).</summary>
+    /// <summary>Cấp hiện tại — nâng qua <see cref="LevelUp"/> (Phase 35, tiêu gold atomic ở Application).</summary>
     public int Level { get; private set; } = InitialLevel;
 
     /// <summary>Số sao hiện tại (bản nền — nâng sao ở phase 39).</summary>
@@ -96,6 +96,20 @@ public sealed class OwnedHero : AggregateRoot<Guid>
         OwnedHero hero = new(id, profileId, heroId, level, stars, nowUtc);
         hero.RaiseDomainEvent(new OwnedHeroGranted(id, profileId, heroId));
         return hero;
+    }
+
+    /// <summary>
+    /// Nâng cấp hero lên <b>một</b> cấp (Phase 35, server-authoritative — ADR-007). Bất biến <b>cấu trúc</b>:
+    /// cấp mới luôn dương. Trần cấp phụ thuộc config (đường cong <c>cost_curves.level_up</c>) nên được kiểm ở
+    /// Application TRƯỚC khi gọi — Domain không biết config. Chi phí (gold) do handler tiêu atomic (Phase 31).
+    /// Raise <see cref="OwnedHeroLeveledUp"/> (dispatch ở <c>SaveChanges</c>, cùng transaction).
+    /// </summary>
+    public void LevelUp()
+    {
+        int next = Level + 1;
+        Guard.Positive(next);
+        Level = next;
+        RaiseDomainEvent(new OwnedHeroLeveledUp(Id, ProfileId, HeroId, Level));
     }
 
     /// <summary>
