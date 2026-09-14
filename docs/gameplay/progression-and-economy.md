@@ -64,12 +64,42 @@ số dư mới — **không tự cộng**. Retry cùng `attemptId` ⇒ không c�
 tái dùng đúng cơ chế này; **không** dựng cơ chế giao dịch/idempotency thứ hai. Số tiền/tỉ lệ vẫn là **config**
 (ADR-004), không nằm trong code.
 
+## 2b. Campaign PvE (Phase 34 — đã hiện thực) — TRỤC TIẾN ĐỘ CHÍNH
+
+Campaign là **trục tiến độ chính** (F05) và **nguồn AFK-stage** cho phase 37 — server-authoritative + data-driven
+(ADR-004/007/011).
+
+**Data-driven (ADR-004):** chuỗi campaign = loại config **`chapter`** (`chapter.schema.json`: `order` + `stages[]`
+theo thứ tự) nhóm các **stage** (`stage.schema.json`: `enemies`, `rewards`, `combat_rules`). Chuỗi tổng = các
+chapter theo `order` (tie-break id) rồi `stages` theo thứ tự liệt kê. Thêm chapter/stage = **chỉ config**, không
+sửa business logic. Số liệu (địch/thưởng/độ khó) là tuning.
+
+**Tiến độ server-authoritative (ADR-007):** aggregate **`CampaignProgress`** (gắn 1-1 `PlayerProfile`, unique DB)
+lưu **tập stage đã clear** + **`CurrentAfkStageId`** = stage đã clear **xa nhất** theo thứ tự chuỗi. Client KHÔNG
+gửi/không tự suy tiến độ — chỉ hiển thị.
+
+**Đánh stage (reuse battle flow 30):** `POST /api/v1/campaign/battles {teamId, stageId, attemptId}` →
+`StartCampaignBattleCommand`:
+1. chủ sở hữu từ token (chống IDOR); validate stage thuộc chuỗi campaign + có config (`CAMPAIGN_STAGE_NOT_FOUND`);
+2. **anti-skip**: stage phải đã **mở khoá tuần tự** (`CampaignChain.IsUnlocked`: stage đầu, hoặc stage liền trước đã
+   clear) — nếu khoá → `CAMPAIGN_STAGE_LOCKED` (403) TRƯỚC mọi mutation;
+3. chạy trận qua cơ chế dùng chung **`BattleExecutionService`** (một sim/reward path với battle thường — KHÔNG fork):
+   snapshot đội (29) + seed server + re-sim (24) + ghi `BattleRecord`;
+4. **chỉ khi VICTORY & first-clear**: cấp thưởng config qua **`StageRewardService`**→`CurrencyWalletService`
+   (Phase 31, khoá idempotency per-profile `campaign:{profileId}:{stageId}`) + đánh dấu clear + đặt `CurrentAfkStageId`
+   — **tất cả trong MỘT transaction** (atomic). Trả `BattleResultDto`; client refresh tiến độ qua
+   `GET /api/v1/campaign/progress`.
+
+**First-clear only:** clear lại một stage đã qua ⇒ trận vẫn chạy (server-authoritative) nhưng **không cấp thưởng lần
+hai**, **không lùi tiến độ** (repeatable farm là việc của AFK — §3). Thua ⇒ không tiến độ/thưởng/mở khoá. Retry cùng
+`attemptId` ⇒ kết quả đã lưu (idempotent, không double-grant).
+
 ## 3. AFK / Idle rewards (đặc trưng thể loại)
 
 ```mermaid
 flowchart LR
     LastClaim[timestamp claim cuối - server] --> Calc[Tính theo server time + AFK rate + cap]
-    Stage[Campaign stage cao nhất] --> Calc
+    Stage[Campaign CurrentAfkStageId - Phase 34] --> Calc
     Config[AFK rate/cap config] --> Calc
     Calc --> Claim[Claim command - atomic]
 ```
@@ -79,6 +109,7 @@ flowchart LR
 | Tính **server-side khi claim** | Chống gian lận chỉnh giờ (ADR-007/008) |
 | Dựa **server time** + timestamp claim cuối | Không tin client time |
 | Rate & cap từ config | `../mvp/06` §5, `../mvp/10` EC2 |
+| **AFK stage = `CampaignProgress.CurrentAfkStageId`** (Phase 34 đã persist) | Phase 37 đọc để tính rate |
 | AFK = nguồn nền chính | `../mvp/13` A07 |
 | Client hiển thị **ước lượng** | Chỉ UI; server quyết khi claim |
 

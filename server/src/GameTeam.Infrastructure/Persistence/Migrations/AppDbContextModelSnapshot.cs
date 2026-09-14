@@ -100,6 +100,42 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                     b.ToTable("battle_records", (string)null);
                 });
 
+            modelBuilder.Entity("GameTeam.Domain.Campaign.CampaignProgress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrentAfkStageId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("current_afk_stage_id");
+
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_id");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("schema_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProfileId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_campaign_progress_profile_id");
+
+                    b.ToTable("campaign_progress", (string)null);
+                });
+
             modelBuilder.Entity("GameTeam.Domain.Economy.CurrencyTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -572,6 +608,39 @@ namespace GameTeam.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Rewards");
+                });
+
+            modelBuilder.Entity("GameTeam.Domain.Campaign.CampaignProgress", b =>
+                {
+                    b.HasOne("GameTeam.Domain.Profiles.PlayerProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("GameTeam.Domain.Campaign.ClearedStage", "ClearedStages", b1 =>
+                        {
+                            b1.Property<Guid>("campaign_progress_id")
+                                .HasColumnType("uuid")
+                                .HasColumnName("campaign_progress_id");
+
+                            b1.Property<string>("StageId")
+                                .HasColumnType("text")
+                                .HasColumnName("stage_id");
+
+                            b1.Property<DateTimeOffset>("ClearedAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("cleared_at");
+
+                            b1.HasKey("campaign_progress_id", "StageId");
+
+                            b1.ToTable("campaign_cleared_stages", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("campaign_progress_id");
+                        });
+
+                    b.Navigation("ClearedStages");
                 });
 
             modelBuilder.Entity("GameTeam.Domain.Economy.CurrencyTransaction", b =>

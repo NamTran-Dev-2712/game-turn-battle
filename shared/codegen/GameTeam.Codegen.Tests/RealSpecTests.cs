@@ -33,7 +33,9 @@ public class RealSpecTests
             // Phase 32 — inventory contract.
             "inventory_dto.gd", "item_stack_dto.gd",
             // Phase 33 — summon/gacha contract.
-            "summon_request.gd", "summon_pull_dto.gd", "summon_result_dto.gd");
+            "summon_request.gd", "summon_pull_dto.gd", "summon_result_dto.gd",
+            // Phase 34 — campaign contract.
+            "start_campaign_battle_request.gd", "campaign_stage_dto.gd", "campaign_progress_dto.gd");
     }
 
     [Fact]

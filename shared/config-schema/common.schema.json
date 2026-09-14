@@ -90,6 +90,11 @@
       "pattern": "^formation_[a-z0-9_]+$",
       "description": "Id cấu hình formation (lưới đội hình), prefix 'formation_' (vd formation_default)."
     },
+    "chapter_id": {
+      "type": "string",
+      "pattern": "^chapter_[a-z0-9_]+$",
+      "description": "Id chương campaign (nhóm stage có thứ tự), prefix 'chapter_' (vd chapter_01). Phase 34."
+    },
     "item_id": {
       "type": "string",
       "pattern": "^item_[a-z0-9_]+$",

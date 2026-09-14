@@ -220,9 +220,11 @@ public sealed class StartBattleCommandHandlerTests
             var clock = Substitute.For<IClock>();
             clock.UtcNow.Returns(Now);
             var wallet = new CurrencyWalletService(Wallets, Ledger, clock);
-            var handler = new StartBattleCommandHandler(
-                CurrentUser, Profiles, Teams, Config, new CombatInputResolver(Config), new BattleSimulator(),
-                BattleRecords, wallet, SeedSource, clock);
+            // Phase 34: handler mỏng ủy thác cho cơ chế dùng chung — dựng từ cùng mock để giữ test end-to-end.
+            var battle = new BattleExecutionService(
+                Teams, new CombatInputResolver(Config), new BattleSimulator(), BattleRecords, SeedSource, clock);
+            var rewards = new StageRewardService(Config, wallet);
+            var handler = new StartBattleCommandHandler(CurrentUser, Profiles, battle, rewards);
             return handler.Handle(command, CancellationToken.None);
         }
     }

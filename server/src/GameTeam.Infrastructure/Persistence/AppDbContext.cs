@@ -79,6 +79,9 @@ public class AppDbContext : DbContext
     /// <summary>Bản ghi triệu hồi — server-authoritative + idempotency (profile, request_id) unique (Phase 33).</summary>
     public DbSet<SummonRecord> SummonRecords => Set<SummonRecord>();
 
+    /// <summary>Tiến độ campaign — stage đã clear + current AFK stage, gắn 1-1 profile (Phase 34, ADR-007).</summary>
+    public DbSet<Domain.Campaign.CampaignProgress> CampaignProgresses => Set<Domain.Campaign.CampaignProgress>();
+
     /// <summary>Bundle config bất biến theo version (config@vN) — nền persist/rollback (Phase 21, ADR-005).</summary>
     public DbSet<ConfigBundleRecord> ConfigBundles => Set<ConfigBundleRecord>();
 

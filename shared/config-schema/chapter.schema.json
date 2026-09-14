@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://game-team/schema/chapter.schema.json",
+  "title": "Chapter config",
+  "description": "Chương campaign PvE (Phase 34, ADR-004): nhóm stage có THỨ TỰ tạo chuỗi tiến độ. Bám ../../docs/gameplay/progression-and-economy.md. Chỉ ràng buộc cấu trúc/thứ tự — địch/thưởng/độ khó nằm ở stage (không chứa balance). Chuỗi campaign = các chapter theo 'order' rồi 'stages' theo thứ tự liệt kê; mở khoá tuần tự.",
+  "type": "object",
+  "required": ["schema_version", "id", "order", "stages"],
+  "properties": {
+    "schema_version": { "$ref": "https://game-team/schema/common.schema.json#/$defs/schema_version" },
+    "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/chapter_id" },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tên hiển thị chương (tuỳ chọn). Nội dung là tuning/localization, không phải balance."
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Thứ tự chương trong campaign (nhỏ trước). Xác định vị trí chương trong chuỗi tuần tự."
+    },
+    "stages": {
+      "type": "array",
+      "description": "Danh sách stage của chương theo THỨ TỰ chơi (chapter.stages[] -> stage id). Tồn tại kiểm ở phase 07.",
+      "minItems": 1,
+      "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/stage_id" },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -27,6 +27,12 @@ flowchart TD
 
 **Cốt lõi:** người chơi **online ngắn** để ra quyết định (nâng cấp gì, summon, sắp team, đẩy stage), rồi **offline** để AFK tích lũy. Đây là bản chất idle.
 
+> **Trạng thái hiện thực:** nút **"Đẩy Campaign → Thắng → Mở stage mới + tăng AFK stage"** đã hiện thực server-authoritative
+> ở **Phase 34** (chuỗi stage config-driven qua loại config `chapter`; `CampaignProgress` lưu stage đã clear +
+> `CurrentAfkStageId`; đánh reuse battle flow 30; thắng first-clear → mở stage kế + thưởng **atomic**; mở khoá **tuần tự**
+> chống skip). "Tăng AFK stage" = cập nhật `CurrentAfkStageId` — **AFK accrual/claim** dựa trên nó là **Phase 37** (chưa
+> hiện thực ở 34). Chi tiết: [`../gameplay/progression-and-economy.md`](../gameplay/progression-and-economy.md) §2b.
+
 ---
 
 ## 2. First Login (Lần đầu vào game)

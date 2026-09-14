@@ -31,6 +31,7 @@ var _heroes: Array = []            # [ { id, ... } ] — bản ghi hero người
 var _progress: Dictionary = {}     # { key(String): value }
 var _profile: Dictionary = {}      # thông tin profile (playerId/displayName/level…)
 var _inventory: Dictionary = {}    # { items: [ {item_type,item_id,quantity} ], owned_heroes: [ {hero_id,...} ] }
+var _campaign: Dictionary = {}     # { stages: [ {stage_id,chapter_id,order,cleared,unlocked} ], current_afk_stage_id }
 var _source: String = SOURCE_EMPTY
 
 
@@ -71,6 +72,17 @@ func apply_wallet(balances: Dictionary) -> void:
 ## Đánh dấu nguồn = server, lưu đĩa (offline-view), phát `state_refreshed`.
 func apply_inventory(items: Array, owned_heroes: Array) -> void:
 	_inventory = {"items": items.duplicate(true), "owned_heroes": owned_heroes.duplicate(true)}
+	_source = SOURCE_SERVER
+	_persist_snapshot()
+	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
+
+
+## Cập nhật RIÊNG tiến độ campaign từ server response `GET /api/v1/campaign/progress` (giữ nguyên phần khác).
+## Đây KHÔNG phải mutation chân lý / không tự suy mở-khoá phía client — chỉ phản chiếu tiến độ server vừa trả
+## (server-authoritative, ADR-007). `progress` = { "stages": [ {stage_id,chapter_id,order,cleared,unlocked} ],
+## "current_afk_stage_id": String }. Đánh dấu nguồn = server, lưu đĩa (offline-view), phát `state_refreshed`.
+func apply_campaign_progress(progress: Dictionary) -> void:
+	_campaign = progress.duplicate(true)
 	_source = SOURCE_SERVER
 	_persist_snapshot()
 	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
@@ -125,6 +137,12 @@ func get_inventory() -> Dictionary:
 	return _inventory.duplicate(true)
 
 
+## Tiến độ campaign (bản sao sâu): { "stages": [ {stage_id,chapter_id,order,cleared,unlocked} ],
+## "current_afk_stage_id": String }. Client CHỈ đọc/hiển thị — mở-khoá/tiến độ do server quyết (ADR-007).
+func get_campaign_progress() -> Dictionary:
+	return _campaign.duplicate(true)
+
+
 ## Nhãn nguồn dữ liệu hiện tại: "empty" | "server" | "cache".
 func source() -> String:
 	return _source
@@ -174,6 +192,7 @@ func _persist_snapshot() -> void:
 		"heroes": _heroes,
 		"progress": _progress,
 		"inventory": _inventory,
+		"campaign": _campaign,
 	}))
 	file.close()
 
@@ -198,4 +217,5 @@ func _load_snapshot_from_disk() -> void:
 	_heroes = _array_field(snapshot, "heroes")
 	_progress = _dict_field(snapshot, "progress")
 	_inventory = _dict_field(snapshot, "inventory")
+	_campaign = _dict_field(snapshot, "campaign")
 	_source = SOURCE_CACHE

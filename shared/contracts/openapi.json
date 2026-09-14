@@ -500,6 +500,116 @@
         }
       }
     },
+    "/api/v1/campaign/battles": {
+      "post": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "StartCampaignBattle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCampaignBattleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BattleResultDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaign/progress": {
+      "get": {
+        "tags": [
+          "GameTeam.Api"
+        ],
+        "operationId": "GetCampaignProgress",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignProgressDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/config/current": {
       "get": {
         "tags": [
@@ -657,6 +767,52 @@
           },
           "log": {
             "type": "string"
+          }
+        }
+      },
+      "CampaignProgressDto": {
+        "required": [
+          "stages",
+          "currentAfkStageId"
+        ],
+        "type": "object",
+        "properties": {
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CampaignStageDto"
+            }
+          },
+          "currentAfkStageId": {
+            "type": "string"
+          }
+        }
+      },
+      "CampaignStageDto": {
+        "required": [
+          "stageId",
+          "chapterId",
+          "order",
+          "cleared",
+          "unlocked"
+        ],
+        "type": "object",
+        "properties": {
+          "stageId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cleared": {
+            "type": "boolean"
+          },
+          "unlocked": {
+            "type": "boolean"
           }
         }
       },
@@ -1090,6 +1246,26 @@
         }
       },
       "StartBattleRequest": {
+        "required": [
+          "teamId",
+          "stageId",
+          "attemptId"
+        ],
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "stageId": {
+            "type": "string"
+          },
+          "attemptId": {
+            "type": "string"
+          }
+        }
+      },
+      "StartCampaignBattleRequest": {
         "required": [
           "teamId",
           "stageId",

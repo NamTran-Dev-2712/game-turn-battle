@@ -26,6 +26,10 @@ public static class ErrorHttpMapping
         // Phase 31 economy: spending more than the balance is a state conflict (first HTTP-exercised by
         // summon, Phase 33). The code has no _CONFLICT suffix, so map it explicitly → 409.
         ["CURRENCY_INSUFFICIENT_FUNDS"] = StatusCodes.Status409Conflict,
+
+        // Phase 34 campaign: đánh stage chưa mở khoá (anti-skip) là hành động bị cấm theo trạng thái tiến độ.
+        // Mã không có hậu tố _FORBIDDEN nên map tường minh → 403.
+        ["CAMPAIGN_STAGE_LOCKED"] = StatusCodes.Status403Forbidden,
     };
 
     /// <summary>

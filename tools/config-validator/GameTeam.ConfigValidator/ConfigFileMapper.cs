@@ -21,6 +21,7 @@ public static class ConfigFileMapper
             ["quests"] = ConfigType.Quest,
             ["formation"] = ConfigType.Formation,
             ["items"] = ConfigType.Item,
+            ["chapters"] = ConfigType.Chapter,
         };
 
     /// <summary>

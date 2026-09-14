@@ -30,6 +30,8 @@
 | Wallet | `GET /api/v1/wallet` (số dư, protected — owner từ token) | query (Phase 31) |
 | Inventory | `GET /api/v1/inventory` (kho: item/fragment + hero chiếu, protected — owner từ token; lọc `itemType` + `page`/`pageSize`) | query (Phase 32) — thêm/bớt là command nội bộ, KHÔNG endpoint công khai |
 | Summon | `POST /api/v1/summon` (gacha, protected — owner từ token; `SummonRequest{bannerId,count(1\|10),requestId}`) | command (idempotent, Phase 33) — server quyết RNG/rate/pity |
+| Campaign | `POST /api/v1/campaign/battles` (đánh stage, protected; `StartCampaignBattleRequest{teamId,stageId,attemptId}`) | command (Phase 34) — anti-skip + reuse battle flow 30; VICTORY first-clear → tiến độ+thưởng+AFK atomic |
+| Campaign | `GET /api/v1/campaign/progress` (tiến độ, protected — owner từ token) | query (Phase 34) → `CampaignProgressDto{stages[],currentAfkStageId}` — server-authoritative, client chỉ hiển thị |
 | Campaign | `GET /api/v1/campaign`, `POST /api/v1/campaign/{stage}/sweep` | query/command |
 | Economy | `POST /api/v1/afk/claim`, `POST /api/v1/shop/purchase` | command (idempotent) |
 | Mail | `GET /api/v1/mail`, `POST /api/v1/mail/{id}/claim` | query/command |
@@ -178,6 +180,15 @@ endpoint** về sau — không tự vẽ convention khác.
   idempotent** (`requestId` = idempotency key, unique `(profile_id,request_id)`). Seed KHÔNG trả client (audit-only). Contract
   (`Contracts/Summon/*`) → regenerate `openapi.json` → codegen. **Mapping mở rộng:** `CURRENCY_INSUFFICIENT_FUNDS` thêm vào
   `ErrorHttpMapping.KnownCodes` → 409 (lần đầu lên HTTP ở summon). Chi tiết: `infrastructure.md` §1.7, `progression-and-economy.md` §5.
+- **Campaign endpoints (Phase 34 — đã chốt):** `POST /api/v1/campaign/battles` (version set, **protected**) →
+  `StartCampaignBattleCommand(teamId,stageId,attemptId)` (`ITransactionalRequest`); body `StartCampaignBattleRequest`, trả
+  **`BattleResultDto`** (reuse) (200) / `ErrorEnvelope` (401 · **403 `CAMPAIGN_STAGE_LOCKED`** anti-skip · 404
+  `CAMPAIGN_STAGE_NOT_FOUND`). `GET /api/v1/campaign/progress` (**protected**) → `GetCampaignProgressQuery` →
+  `CampaignProgressDto{stages[],currentAfkStageId}` (200) / 401. Server-authoritative (ADR-007/011): validate stage mở
+  khoá tuần tự (chống skip) + reuse battle flow 30 (`BattleExecutionService`) + VICTORY first-clear → tiến độ + thưởng +
+  AFK stage **atomic**. **Mapping mở rộng:** `CAMPAIGN_STAGE_LOCKED` thêm vào `ErrorHttpMapping.KnownCodes` → 403. Contract
+  (`Contracts/Campaign/*`) → regenerate `openapi.json` → codegen (`RealSpecTests` cập nhật). Chi tiết: `infrastructure.md`
+  §1.8, `progression-and-economy.md` §2b.
 - **Test hợp đồng:** `Api.IntegrationTests` (`WebApplicationFactory`) là hợp đồng HTTP — thêm endpoint ⇒ thêm
   integration test (status, contract, error envelope, versioned route). `ApiTestFactory` swap port
   (no-op UoW/cache, `FixedClock`) để test không cần Postgres/Redis thật.

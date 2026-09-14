@@ -159,6 +159,29 @@ Hai bảng nền cho triệu hồi (chi tiết luồng: `progression-and-economy
   `FOR UPDATE` (`SummonPersistenceTests`); end-to-end HTTP single/10-pull, idempotency, dupe→fragment, thiếu tiền
   (`SummonEndpointTests`, §5.1); phân phối rate + pity ngưỡng (unit `SummonRollerTests`).
 
+### 1.8 Campaign progress — tiến độ + current AFK stage (Phase 34 — đóng & verify)
+
+Gốc save mở rộng (Phase 19) cho **trục tiến độ campaign** (chi tiết luồng: `progression-and-economy.md` §2b).
+Server-authoritative + atomic + first-clear only (ADR-004/007/011). **Không dựng battle/reward mới** — reuse
+`BattleExecutionService`/`StageRewardService` (§ battle Phase 30) + `CurrencyWalletService` (§1.5).
+
+| Thành phần | File | Ghi chú |
+|---|---|---|
+| Aggregate | `Domain/Campaign/{CampaignProgress,ClearedStage,*Events}.cs` | 1-1 profile; tập `ClearedStage` + `CurrentAfkStageId`; `MarkStageCleared` first-clear idempotent; event `CampaignStageCleared`. |
+| Bảng | `Persistence/Configurations/CampaignProgressConfiguration.cs` | `ToTable("campaign_progress")`; `id`(uuid PK), `profile_id`, `current_afk_stage_id`, `schema_version`, `created_at`, `updated_at`. **Unique `profile_id`** + FK → `player_profiles` (cascade). Owned `campaign_cleared_stages` PK ghép `(campaign_progress_id, stage_id)`. |
+| Repository | `Persistence/Repositories/CampaignProgressRepository.cs` | `ICampaignProgressRepository` (`GetByProfileIdAsync`); owned collection eager-load. |
+| Chuỗi/luật | `Application/Features/Campaign/CampaignChain.cs` | Đọc loại config `chapter` → thứ tự stage + `IsUnlocked` (tuần tự) + `NextAfkStageId` (stage clear xa nhất). Nguồn thứ tự DUY NHẤT. |
+| Handler | `Application/Features/Campaign/{StartCampaignBattleCommandHandler,GetCampaignProgressQueryHandler}.cs` | Owner từ token → validate stage campaign + config → **anti-skip** (khoá→`CAMPAIGN_STAGE_LOCKED` 403 trước mutation) → `BattleExecutionService` → VICTORY & first-clear: thưởng (khoá idempotency **per-profile** `campaign:{profileId}:{stageId}`) + `MarkStageCleared` + AFK stage, MỘT transaction. |
+| Migration | `Persistence/Migrations/*_AddCampaignProgress.cs` | Tạo `campaign_progress` + `campaign_cleared_stages` + PK/FK/unique. `has-pending-model-changes` sạch. |
+| DI | `Infrastructure/DependencyInjection.cs` | `ICampaignProgressRepository` (scoped). `DbSet<CampaignProgress>` thêm vào `AppDbContext`. `BattleExecutionService`/`StageRewardService`/`CampaignChain` scoped (Application DI). |
+
+- **Endpoints** `POST /api/v1/campaign/battles` + `GET /api/v1/campaign/progress` (protected). Thưởng **first-clear
+  only**; retry cùng `attemptId` ⇒ kết quả đã lưu; khoá idempotency thưởng **phải scope theo profile** (ledger key
+  unique toàn cục). `CurrentAfkStageId` là hợp đồng cho AFK phase 37 (Phase 34 chỉ persist/phơi).
+- Test: Testcontainers pg16 — round-trip + unique `profile_id` + dispatch event (`CampaignProgressPersistenceTests`);
+  end-to-end HTTP clear→unlock+reward+AFK / locked 403 no-mutation / anti-skip / loss / retry+replay idempotent
+  (`CampaignEndpointTests`); chuỗi/mở khoá/first-clear (unit `CampaignChainTests`, `StartCampaignBattleCommandHandlerTests`).
+
 ---
 
 ## 2. Caching — Redis

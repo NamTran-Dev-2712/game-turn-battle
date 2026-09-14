@@ -23,6 +23,7 @@
 | `quests/` | Quest definition | Quest |
 | `formation/` | Lưới đội hình (rows×cols → team size) | Hero, Combat |
 | `items/` | Catalog vật phẩm (item định nghĩa) | Inventory (F10) |
+| `chapters/` | Chương campaign (nhóm stage có thứ tự → chuỗi tuần tự) | Campaign (F05) |
 | `liveops/` | Event/season/flag (schedule) — Post-MVP | LiveOps |
 
 ## 2b. Ánh xạ schema (phase 06)
@@ -41,6 +42,7 @@ Mỗi loại config có một JSON Schema (draft 2020-12) ở `../../shared/conf
 | quest | `quest.schema.json` | `quest-system.md` | `reward_refs[]` → reward; `condition_type` | condition_type: battles_won/summons_done/login |
 | formation | `formation.schema.json` | `hero-system.md` §8 | — | `rows`/`cols` integer (≥1); **team size = rows×cols**; KHÔNG bonus vị trí (tuning/Post-MVP) — thêm Phase 29 |
 | item | `item.schema.json` | `inventory-and-equipment.md` §1 | — (catalog; ref đến từ reward/inventory) | `item_id` prefix `item_`; `item_type` enum (MVP `item`); `name` tuỳ chọn — **KHÔNG balance/số lượng** (số lượng thuộc inventory người chơi). Fragment là mảnh hero (tham chiếu `hero_id`), KHÔNG phải catalog item — thêm Phase 32 |
+| chapter | `chapter.schema.json` | `progression-and-economy.md` §2b | `stages[]` → stage | `chapter_id` prefix `chapter_`; `order` integer (thứ tự chương) + `stages[]` (thứ tự chơi); `name` tuỳ chọn — **KHÔNG balance** (địch/thưởng ở stage). Chuỗi campaign = chapter theo `order` rồi `stages` — thêm Phase 34 |
 
 > **Cấp độ tham chiếu:** JSON Schema chỉ ràng buộc **định dạng/cấu trúc** của ref (prefix id, kiểu). **Kiểm tồn tại id chéo file** (hero→skill…) là việc của validator (phase 07 — §3, §6), không phải schema đơn. Fixture pass/fail ở `../../shared/config-schema/fixtures/`; quy tắc migration ở `../../shared/config-schema/_versions/`.
 
@@ -55,6 +57,7 @@ flowchart LR
     Shop[shop.items -> item/reward id] --> Reward
     Reward[reward.entries item -> item id] --> Item
     Reward2[reward.entries fragment -> hero id] --> Hero
+    Chapter[chapter.stages -> stage id] --> Stage
 ```
 
 - Validator kiểm **id tham chiếu tồn tại** (không trỏ id không có) — chống lỗi config khi live.
