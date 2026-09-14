@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "chapter_01",
+  "name": "Chương 1 — Khởi đầu",
+  "order": 1,
+  "stages": ["stage_ch01_01", "stage_ch01_02", "stage_ch01_03"]
+}

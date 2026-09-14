@@ -1246,6 +1246,67 @@ Canonical: `docs/gameplay/progression-and-economy.md` §5 + `docs/backend/infras
   `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the tests are the behavior contract —
   update them.
 
+**Campaign PvE is standardized (Phase 34 — closed & verified).** Campaign là **trục tiến độ chính** (F05) + **nguồn
+AFK-stage** cho phase 37 — **config-driven + server-authoritative + atomic** (ADR-004/007/011), xây bằng **composing**
+cơ chế sẵn có (KHÔNG fork battle/economy). Homes: **server** `GameTeam.Domain/Campaign/` +
+`GameTeam.Application/Features/Campaign/` + `GameTeam.Infrastructure/Persistence/`; **client** `client/src/ui/campaign/`.
+**Chuỗi campaign = loại config mới `chapter`** (Phase 06/07 add-a-type: `shared/config-schema/chapter.schema.json` +
+`common.schema.json#chapter_id` + `ConfigType.Chapter` + `ConfigFileMapper["chapters"]` + `ReferenceValidator.Chapter`
+`stages[]→stage` + fixtures) — `order` + `stages[]` (thứ tự chơi); chuỗi = chapter theo `order` (tie-break id) rồi stages
+theo thứ tự. **`CampaignProgress : AggregateRoot<Guid>`** (gắn 1-1 `PlayerProfile`, **unique `profile_id`**; owned
+`ClearedStage` = bảng `campaign_cleared_stages` PK `(campaign_progress_id, stage_id)`; `CurrentAfkStageId`; event
+`CampaignStageCleared`; `MarkStageCleared` **first-clear idempotent**) — mở rộng gốc save Phase 19, migration
+`AddCampaignProgress`. **Reuse battle flow 30 KHÔNG fork:** tách cơ chế dùng chung **`BattleExecutionService`** (idempotency
+`attemptId` + snapshot đội + seed server + re-sim + ghi `BattleRecord`; thưởng do caller cấp qua callback) +
+**`StageRewardService`** (cấp thưởng stage config-driven qua `CurrencyWalletService`) — `StartBattleCommandHandler`
+(Phase 30) refactor để ủy thác, hành vi KHÔNG đổi (test Phase 30 xanh). **`StartCampaignBattleCommand`**
+(`ITransactionalRequest`) → owner từ token (chống IDOR) → validate stage campaign + config (`CAMPAIGN_STAGE_NOT_FOUND`) →
+**anti-skip** (`CampaignChain.IsUnlocked`, khoá → `CAMPAIGN_STAGE_LOCKED`=403 TRƯỚC mọi mutation) → `BattleExecutionService`
+→ **chỉ VICTORY & first-clear**: thưởng (khoá idempotency **per-profile** `campaign:{profileId}:{stageId}`) + `MarkStageCleared`
++ `CurrentAfkStageId` = `CampaignChain.NextAfkStageId` (stage clear xa nhất) — **MỘT transaction (atomic)**. Trả
+**`BattleResultDto` (reuse)**; **`GetCampaignProgressQuery`** → `CampaignProgressDto{stages[], currentAfkStageId}`.
+Endpoints (version set, protected): `POST /api/v1/campaign/battles` + `GET /api/v1/campaign/progress`;
+`CAMPAIGN_STAGE_LOCKED→403` thêm vào `ErrorHttpMapping`. Contracts `GameTeam.Contracts/Campaign/*` → regenerate
+`openapi.json` → GDScript (`campaign_progress_dto.gd`/`campaign_stage_dto.gd`/`start_campaign_battle_request.gd`). Client:
+`campaign/` (view network-free + presenter) đọc `/campaign/progress` → `StateCache.apply_campaign_progress` (slice mới,
+display-only) → render mở/khoá/đã-clear; đánh **reuse màn battle** (route context `campaign_stage_id` ⇒ BattlePresenter
+POST `/campaign/battles`); `parse_campaign_progress`; hub thêm nút "Chiến dịch"; **KHÔNG thêm EventBus event** (reuse
+`state_refreshed`/`config_updated`). Verified (2026-09-13, Docker Desktop + Godot 4.7.1): build Release 0/0; `dotnet test`
+Domain 135 / Application 132 / Contracts 36 / Infrastructure 77 (Testcontainers `CampaignProgressPersistenceTests`) / Api
+104 (Testcontainers `CampaignEndpointTests`: clear→unlock+reward+AFK / locked 403 no-mutation / anti-skip / loss / retry+replay
+idempotent); codegen 41 (+3, no drift); config-validator 56 (+25 file); gdUnit4 156 (+6), 0 orphan; `has-pending-model-changes`
+sạch. Canonical: `docs/gameplay/progression-and-economy.md` §2b + `docs/mvp/02-core-game-loop.md` + `docs/backend/infrastructure.md`
+§1.8 + `docs/backend/domain-and-application.md` (Campaign) + `docs/backend/api-and-versioning.md`; decision log:
+`.memory/0032-campaign-pve-standardized.md`.
+
+- Future agents **MUST reuse** `CampaignProgress`/`ICampaignProgressRepository`/`CampaignChain`/`StartCampaignBattleCommand`/
+  `GetCampaignProgressQuery` + `BattleExecutionService`/`StageRewardService` (cơ chế battle/thưởng dùng chung) + loại config
+  `chapter` trước khi thêm bất kỳ plumbing campaign/tiến độ; **MUST NOT** fork một sim/battle flow/reward path thứ hai, tạo
+  save root tiến độ thứ hai, đọc owner từ client input (IDOR), để client quyết tiến độ/mở-khoá/thưởng, hardcode chuỗi
+  stage/độ khó (đọc `chapter`/`stage` config), hay hand-edit `client/src/data/generated`/`openapi.json`.
+- **Server-authoritative + anti-skip + atomic + first-clear là binding (ADR-007/011):** stage khoá ⇒ 403 **trước mọi
+  mutation** (không sim/thưởng/tiến độ); thắng first-clear cập nhật tiến độ + thưởng + AFK stage **cùng một transaction**;
+  clear lại/thua ⇒ không thưởng lần hai, không lùi tiến độ; retry cùng `attemptId` ⇒ kết quả đã lưu. Khoá idempotency thưởng
+  campaign **phải scope theo profile** (`campaign:{profileId}:{stageId}`) — ledger key là unique TOÀN CỤC.
+- **"Current AFK stage" là hợp đồng cho Phase 37:** `CampaignProgress.CurrentAfkStageId` = stage clear xa nhất (đọc qua
+  `/campaign/progress`). Phase 34 **KHÔNG** hiện thực AFK accrual/timer/claim (Phase 37), energy gate (Phase 36), hero
+  upgrade (Phase 35), hay tower (Post-MVP) — giữ nguyên placeholder.
+- **Thêm chapter/stage = chỉ config** (proven): thêm file `config/chapters/*`/`config/stages/*` + reward hợp lệ → chạy
+  config-validator (referential integrity) → server publish version mới → client `/campaign/progress` phản ánh, **không sửa
+  business logic**. Thêm loại config mới theo hợp đồng Phase 06/07 (schema + `ConfigType` + mapper + reference + fixtures + test).
+- When changing campaign, keep **`GameTeam.Domain/Campaign/*` + `GameTeam.Application/Features/Campaign/*` +
+  `Features/Battles/{BattleExecutionService,StageRewardService,StartBattleCommandHandler}` + `ICampaignProgressRepository`/
+  `CampaignProgressRepository`/`CampaignProgressConfiguration`/migration + `AppDbContext`/both `DependencyInjection` +
+  `Contracts/Campaign/*` + regenerated `openapi.json` + `client/src/data/generated/**` + `ErrorHttpMapping` +
+  `client/src/ui/campaign/*` + `battle_presenter.gd` (campaign context) + `response_parser.gd`/`state_cache.gd` + hub wiring +
+  `chapter.schema.json`/`common.schema.json`/`config/chapters|stages|rewards/*` + `ConfigType`/`ConfigFileMapper`/`ReferenceValidator`
+  (+ tests) + `RealSpecTests` + all the tests (behavior contract) + `docs/gameplay/progression-and-economy.md` §2b +
+  `docs/mvp/02-core-game-loop.md`/`05-player-progression.md` + `docs/backend/infrastructure.md` §1.8 +
+  `docs/backend/domain-and-application.md` + `docs/backend/api-and-versioning.md` + `docs/gameplay/configuration-and-data.md` +
+  `docs/godot/state-and-signals.md` §1.1 + `.instructions/backend.md`/`client.md`/`config.md` +
+  `.claude/agents/dotnet-backend.md`/`godot-client.md` in sync** (doc-sync matrix, §5); the tests are the behavior contract —
+  update them.
+
 **Execution rule (applies to every task).** After completing any implementation task, the agent **MUST** update the
 relevant roadmap/phase checklist and mark each completed item `[x]` (✅), **verify** it against the phase acceptance
 criteria with real run evidence, and **synchronize all affected Vibe Code/agent docs** (this file §4.6, `.instructions/*`,

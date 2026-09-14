@@ -13,6 +13,9 @@ const _INTENT_BACK: StringName = &"back"
 const _INTENT_RETRY: StringName = &"retry"
 const _TEAM_PATH: String = "/team"
 const _BATTLES_PATH: String = "/battles"
+## Endpoint campaign (Phase 34): dùng khi vào từ màn campaign (route context "campaign_stage_id"). Server
+## validate mở khoá + cập nhật tiến độ/thưởng first-clear; body + parser dùng chung với battle thường.
+const _CAMPAIGN_BATTLES_PATH: String = "/campaign/battles"
 const _WALLET_PATH: String = "/wallet"
 ## Stage demo mặc định (khớp config/stages/stage_demo_01.json) khi không có context.
 const _DEFAULT_STAGE: String = "stage_demo_01"
@@ -26,6 +29,8 @@ var _scene_router: Node = null
 var _network: Node = null
 
 var _stage_id: String = _DEFAULT_STAGE
+# True khi vào từ màn campaign ⇒ POST /campaign/battles (server-authoritative unlock + tiến độ). Mặc định battle thường.
+var _campaign: bool = false
 var _status: String = ""
 
 
@@ -42,7 +47,13 @@ func _init(
 	_network = network_client if network_client != null else NetworkClient
 	_view.intent.connect(_on_intent)
 	if _scene_router != null:
-		_stage_id = str(_scene_router.route_context().get("stage_id", _DEFAULT_STAGE))
+		var ctx: Dictionary = _scene_router.route_context()
+		# Ưu tiên context campaign (Phase 34): quyết định endpoint + stage. Không có ⇒ battle thường (stage demo).
+		if ctx.has("campaign_stage_id"):
+			_campaign = true
+			_stage_id = str(ctx["campaign_stage_id"])
+		else:
+			_stage_id = str(ctx.get("stage_id", _DEFAULT_STAGE))
 	render()
 	_start()
 
@@ -87,7 +98,8 @@ func _start() -> void:
 	_status = "Đang đánh (server re-sim)..."
 	render()
 	var body := {"teamId": str(team.id), "stageId": _stage_id, "attemptId": _new_attempt_id()}
-	var battle_res = await _network.post_json(_BATTLES_PATH, body, NetworkResponseParser.parse_battle_result)
+	var path := _CAMPAIGN_BATTLES_PATH if _campaign else _BATTLES_PATH
+	var battle_res = await _network.post_json(path, body, NetworkResponseParser.parse_battle_result)
 	if battle_res == null or not battle_res.ok or battle_res.value == null:
 		_fail("Đánh thất bại: %s" % _error_code(battle_res))
 		return

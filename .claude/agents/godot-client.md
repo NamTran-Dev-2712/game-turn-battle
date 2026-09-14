@@ -164,6 +164,20 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   **No new EventBus event** (reuse `state_refreshed` via apply_*). **Reuse `NetworkClient`/`ConfigProvider`/`StateCache`/generated DTO —
   no second parser/RNG.** Out of scope: banner rotation/limited (Post-MVP), ascension (39). Canonical:
   `docs/gameplay/progression-and-economy.md` §5; decision log `.memory/0031-summon-gacha-standardized.md`.
+- **Campaign feature (Phase 34, closed):** the campaign screen `src/ui/campaign/` (`CampaignView` **network-free** +
+  `CampaignPresenter`), entered from the hub "Chiến dịch" button (`MainHubPresenter` `CAMPAIGN_PATH`). Presenter:
+  `get_json("/campaign/progress", parse_campaign_progress)` → `StateCache.apply_campaign_progress(...)` (new display-only
+  slice; emits `state_refreshed`) → render **locked/unlocked/cleared** state (SERVER-AUTHORITATIVE) joined with enemy/reward
+  preview from `ConfigProvider.get_entry(&"stage", id)`. Playing a stage = **reuse the battle screen**
+  (`SceneRouter.goto_scene(BATTLE_PATH, {"campaign_stage_id": id})`; `BattlePresenter` reads route context ⇒ POSTs
+  `/campaign/battles` instead of `/battles`); on back the scene re-instantiates ⇒ presenter re-fetches progress. UX only lets
+  you press **unlocked** stages (button `disabled` when locked) — **security never depends on the client** (server re-validates
+  anti-skip → 403). Non-silent fallback (Rule E): load error ⇒ keep cache + error banner + Retry. **No new EventBus event**
+  (reuse `state_refreshed`/`config_updated`). The client is display-only (ADR-007/011): never infer progress/unlock. **Reuse
+  `NetworkClient`/`ConfigProvider`/`StateCache`/`SceneRouter` + the battle screen — no second HTTP/state path, no view calling
+  the net.** `parse_campaign_progress` → generated `CampaignProgressDto`/`CampaignStageDto` (DO-NOT-EDIT). Verify: gdUnit4 156
+  (`campaign_presenter_test.gd`). Out of scope: AFK accrual UI (37). Canonical: `docs/gameplay/progression-and-economy.md` §2b;
+  decision log `.memory/0032-campaign-pve-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

@@ -6,6 +6,7 @@ using GameTeam.Application;
 using GameTeam.Application.Abstractions.Configuration;
 using GameTeam.Application.Features.Auth.Commands;
 using GameTeam.Application.Features.Battles;
+using GameTeam.Application.Features.Campaign;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
 using GameTeam.Application.Features.Economy.Queries;
@@ -17,6 +18,7 @@ using GameTeam.Application.Features.Teams.Commands;
 using GameTeam.Application.Features.Teams.Queries;
 using GameTeam.Contracts.Auth;
 using GameTeam.Contracts.Battle;
+using GameTeam.Contracts.Campaign;
 using GameTeam.Contracts.Common;
 using GameTeam.Contracts.Config;
 using GameTeam.Contracts.Economy;
@@ -231,6 +233,34 @@ apiV1.MapPost("/summon", (SummonRequest request, ISender sender, HttpContext htt
     .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
     .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound)
     .Produces<ErrorEnvelope>(StatusCodes.Status409Conflict);
+
+// POST /api/v1/campaign/battles (Phase 34): đánh một stage campaign — server-authoritative (ADR-011/007). Body
+// là INTENT (StartCampaignBattleRequest{teamId, stageId, attemptId}); server validate stage đã MỞ KHOÁ (tuần
+// tự, chống skip) → chạy battle flow (30) → nếu VICTORY first-clear thì cập nhật tiến độ + "current AFK stage"
+// + cấp thưởng ATOMIC. Trả BattleResultDto (client refresh tiến độ qua GET /campaign/progress). attemptId là
+// idempotency key. Protected mặc định; stage khoá ⇒ 403 CAMPAIGN_STAGE_LOCKED; stage lạ ⇒ 404.
+apiV1.MapPost("/campaign/battles", (StartCampaignBattleRequest request, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(
+            sender.Send(new StartCampaignBattleCommand(request.TeamId, request.StageId, request.AttemptId)), httpContext))
+    .WithName("StartCampaignBattle")
+    .MapToApiVersion(1)
+    .Produces<BattleResultDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
+    .Produces<ErrorEnvelope>(StatusCodes.Status403Forbidden)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
+
+// GET /api/v1/campaign/progress (Phase 34): tiến độ campaign CHÍNH mình — chủ sở hữu suy từ token sub
+// (GetCampaignProgressQuery → ICurrentUser), KHÔNG nhận owner từ client (chống IDOR). Protected mặc định.
+// Chưa có tiến độ ⇒ trạng thái ban đầu (chỉ stage đầu mở khoá). Chỉ ĐỌC — tiến độ do server quyết
+// (server-authoritative); client chỉ hiển thị.
+apiV1.MapGet("/campaign/progress", (ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new GetCampaignProgressQuery()), httpContext))
+    .WithName("GetCampaignProgress")
+    .MapToApiVersion(1)
+    .Produces<CampaignProgressDto>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURATION SERVICE (Phase 21, ADR-005): phục vụ bundle config versioned bất biến. PUBLIC

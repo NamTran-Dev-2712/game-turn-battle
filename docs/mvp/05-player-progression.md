@@ -10,7 +10,7 @@
 |---|---|---|---|
 | Player Level (cấp tài khoản) | Tăng qua hoạt động; mở khóa tính năng & tăng trần energy | ✅ | Gate tính năng theo tiến trình, tránh ngợp người mới |
 | Feature unlock theo mốc | Mở dần Shop/Equipment/Tower... | ✅ | Onboarding tuần tự |
-| Campaign progress | Chương/stage cao nhất đạt | ✅ | Cột mốc tiến trình chính; ảnh hưởng AFK |
+| Campaign progress | Chương/stage cao nhất đạt | ✅ | Cột mốc tiến trình chính; ảnh hưởng AFK. **Hiện thực Phase 34**: `CampaignProgress` server-authoritative (stage đã clear + `CurrentAfkStageId`), mở khoá tuần tự (chống skip), thắng first-clear → thưởng atomic. Chi tiết: `../gameplay/progression-and-economy.md` §2b |
 | VIP/loyalty | Theo chi tiêu | ⬜ Post | Monetization |
 
 **WHY:** cấp tài khoản là "khung xương" điều phối nhịp mở khóa — dùng để không đổ hết hệ thống lên người mới.

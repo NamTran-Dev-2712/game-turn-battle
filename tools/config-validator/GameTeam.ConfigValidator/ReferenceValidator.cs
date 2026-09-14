@@ -29,8 +29,21 @@ public static class ReferenceValidator
             ConfigType.Shop => Shop(entity, obj, index),
             ConfigType.Quest => Quest(entity, obj, index),
             ConfigType.Reward => Reward(entity, obj, index),
-            _ => [], // skill, economy: không có tham chiếu id chéo.
+            ConfigType.Chapter => Chapter(entity, obj, index),
+            _ => [], // skill, economy, formation, item: không có tham chiếu id chéo.
         };
+    }
+
+    // chapter.stages[] → stage
+    private static IEnumerable<ValidationError> Chapter(ConfigEntity e, JsonObject obj, IdIndex index)
+    {
+        foreach ((string? id, string path) in StringItems(obj, "stages"))
+        {
+            if (id is not null && !index.Contains(ConfigType.Stage, id))
+            {
+                yield return Missing(e, path, ConfigType.Stage, id);
+            }
+        }
     }
 
     // hero.skills[] → skill

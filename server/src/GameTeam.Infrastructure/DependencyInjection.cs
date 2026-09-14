@@ -81,6 +81,9 @@ public static class DependencyInjection
         services.AddScoped<IGachaPityRepository, GachaPityRepository>();
         services.AddScoped<ISummonRecordRepository, SummonRecordRepository>();
 
+        // Repository tiến độ campaign (Phase 34): tiến độ theo profile (1-1, unique).
+        services.AddScoped<ICampaignProgressRepository, CampaignProgressRepository>();
+
         // ── Cache phân tán: Redis (ADR-003/005, Phase 12) ────────────────────────────────────────
         // Connection LẤY TỪ CONFIG (env ConnectionStrings__Redis) — không hardcode host/port/password.
         string? redisConnectionString = configuration.GetConnectionString(RedisConnectionName);

@@ -213,6 +213,30 @@ static func parse_summon_result(data: Dictionary) -> SummonResultDto:
 	return model
 
 
+## Parse `GET /api/v1/campaign/progress` → CampaignProgressDto (phase 34). Server-authoritative: trạng thái
+## mở/khoá/đã-clear của từng stage + currentAfkStageId do SERVER quyết — client CHỈ hiển thị (ADR-007). Body
+## `{ stages: [ {stageId, chapterId, order, cleared, unlocked} ], currentAfkStageId }`. `null` nếu thiếu
+## `stages` hoặc phần tử sai hình dạng (thiếu `stageId`). Mảng rỗng hợp lệ (chưa có chapter config).
+static func parse_campaign_progress(data: Dictionary) -> CampaignProgressDto:
+	if not data.has("stages") or not (data["stages"] is Array):
+		return null
+	var stages: Array[CampaignStageDto] = []
+	for item in data["stages"]:
+		if not (item is Dictionary) or not item.has("stageId"):
+			return null
+		var stage := CampaignStageDto.new()
+		stage.stage_id = str(item["stageId"])
+		stage.chapter_id = str(item.get("chapterId", ""))
+		stage.order = int(item.get("order", 0))
+		stage.cleared = bool(item.get("cleared", false))
+		stage.unlocked = bool(item.get("unlocked", false))
+		stages.append(stage)
+	var model := CampaignProgressDto.new()
+	model.stages = stages
+	model.current_afk_stage_id = str(data.get("currentAfkStageId", ""))
+	return model
+
+
 ## Mã chuỗi StateCache (gold/gem/ticket) cho một giá trị Currency enum; "" nếu không nhận diện.
 static func currency_code(currency_enum: int) -> String:
 	match currency_enum:

@@ -50,6 +50,15 @@ public static class DependencyInjection
         services.AddSingleton<BattleSimulator>(_ => new BattleSimulator());
         services.AddScoped<CombatInputResolver>();
 
+        // Battle (phase 30/34): cơ chế chạy trận + cấp thưởng stage dùng chung (idempotency + snapshot + re-sim +
+        // record; reward config-driven). Tái dùng bởi battle thường và campaign — logic Application thuần ⇒ scoped.
+        services.AddScoped<Features.Battles.BattleExecutionService>();
+        services.AddScoped<Features.Battles.StageRewardService>();
+
+        // Campaign (phase 34): chuỗi campaign data-driven (đọc chapter config, luật mở khoá tuần tự). Logic
+        // Application thuần (dùng IConfigProvider) ⇒ scoped theo request.
+        services.AddScoped<Features.Campaign.CampaignChain>();
+
         // Economy (phase 31): cơ chế giao dịch tiền tệ dùng chung (atomic + idempotency + ledger). Không phải
         // port Infra — logic Application thuần (dùng các port repo/clock) ⇒ đăng ký ở đây, scoped theo request.
         services.AddScoped<CurrencyWalletService>();
