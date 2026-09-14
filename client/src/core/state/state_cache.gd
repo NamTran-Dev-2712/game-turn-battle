@@ -66,6 +66,17 @@ func apply_wallet(balances: Dictionary) -> void:
 	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
 
 
+## Cập nhật RIÊNG danh sách hero sở hữu từ server response `GET /api/v1/heroes` (giữ nguyên profile/currency/…).
+## Đây KHÔNG phải mutation chân lý / không tự tăng cấp phía client — chỉ phản chiếu hero server vừa trả
+## (server-authoritative, ADR-007; dùng sau khi nâng cấp hero Phase 35). `heroes` = [ { id, level, stars } ].
+## Đánh dấu nguồn = server, lưu đĩa (offline-view), phát `state_refreshed`.
+func apply_heroes(heroes: Array) -> void:
+	_heroes = heroes.duplicate(true)
+	_source = SOURCE_SERVER
+	_persist_snapshot()
+	EventBus.emit(_EVENT_STATE_REFRESHED, {"source": _source})
+
+
 ## Cập nhật RIÊNG kho đồ từ server response `GET /api/v1/inventory` (giữ nguyên profile/currency/progress).
 ## Đây KHÔNG phải mutation chân lý / không cộng-trừ phía client — chỉ phản chiếu kho server vừa trả
 ## (server-authoritative, ADR-007). `items` = [ {item_type,item_id,quantity} ], `owned_heroes` = [ {hero_id,...} ].

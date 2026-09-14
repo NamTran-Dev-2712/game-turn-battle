@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "id": "economy_default",
+  "cost_curves": {
+    "level_up": [100, 150, 220, 300, 400, 520, 660, 820, 1000]
+  },
+  "level_stat_growth_bp": 800,
+  "power_weights": { "hp": 1, "atk": 10, "def": 8, "spd": 6 }
+}

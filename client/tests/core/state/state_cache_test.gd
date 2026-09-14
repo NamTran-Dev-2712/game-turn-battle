@@ -128,6 +128,20 @@ func test_apply_inventory_replaces_inventory_and_preserves_other_state() -> void
 	assert_int(_refreshed.size()).is_equal(1)
 
 
+func test_apply_heroes_replaces_heroes_and_preserves_other_state() -> void:
+	# apply_heroes = refresh hero sở hữu server (Phase 35): thay riêng heroes, giữ profile/currency, phát refresh.
+	_cache = _make_cache()
+	_cache.apply_snapshot(_snapshot())
+	_refreshed = []
+	_cache.apply_heroes([{"id": "hero_sample", "level": 11, "stars": 1}])
+	assert_int(_cache.get_heroes().size()).is_equal(1)
+	assert_int(int(_cache.get_hero("hero_sample")["level"])).is_equal(11)  # cấp mới từ server
+	assert_str(str(_cache.get_profile()["displayName"])).is_equal("Nam")   # state khác giữ nguyên
+	assert_int(_cache.get_currency("gold")).is_equal(1500)
+	assert_str(_cache.source()).is_equal("server")
+	assert_int(_refreshed.size()).is_equal(1)
+
+
 func test_get_inventory_returns_copy_not_reference() -> void:
 	_cache = _make_cache()
 	_cache.apply_inventory([{"item_type": "item", "item_id": "item_potion", "quantity": 10}], [])

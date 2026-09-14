@@ -1,4 +1,6 @@
 using GameTeam.Application.Abstractions.Configuration;
+using GameTeam.Application.Features.Economy;
+using GameTeam.Application.Features.Heroes;
 using GameTeam.Domain.Combat.Effects;
 using GameTeam.Domain.Combat.Model;
 using GameTeam.Domain.Common;
@@ -53,10 +55,15 @@ public sealed class CombatInputResolver
 
         SkillDef basicSkill = basicSkillResult.Value;
 
+        // Tăng trưởng chỉ số theo cấp (Phase 35, data-driven — ADR-004). Thiếu economy ⇒ 0 (không nhân cấp,
+        // giữ chỉ số nền); ally cấp 1 không cần economy (ScaleStat trả nền). Enemy luôn cấp 1 (không chủ sở hữu).
+        EconomyConfig? economy = _config.Get<EconomyConfig>(EconomyConfig.ConfigType, EconomyConfig.DefaultId);
+        int growthBp = economy?.LevelStatGrowthBp ?? 0;
+
         var ally = new List<UnitSnapshot>(request.Ally.Count);
         foreach (CombatTeamMember member in request.Ally)
         {
-            Result<UnitSnapshot> unit = BuildUnit(member.ActorId, member.HeroId, TeamAlly, member.Slot);
+            Result<UnitSnapshot> unit = BuildUnit(member.ActorId, member.HeroId, TeamAlly, member.Slot, member.Level, growthBp);
             if (unit.IsFailure)
             {
                 return Result.Failure<BattleInput>(unit.Error);
@@ -71,7 +78,7 @@ public sealed class CombatInputResolver
             StageEnemyConfig enemyConfig = stage.Enemies[i];
             string actorId = $"{EnemyActorPrefix}{i}";
             int slot = enemyConfig.Slot ?? i;
-            Result<UnitSnapshot> unit = BuildUnit(actorId, enemyConfig.HeroId, TeamEnemy, slot);
+            Result<UnitSnapshot> unit = BuildUnit(actorId, enemyConfig.HeroId, TeamEnemy, slot, level: 1, growthBp: growthBp);
             if (unit.IsFailure)
             {
                 return Result.Failure<BattleInput>(unit.Error);
@@ -108,7 +115,7 @@ public sealed class CombatInputResolver
         return Result.Success(input);
     }
 
-    private Result<UnitSnapshot> BuildUnit(string actorId, string heroId, string team, int slot)
+    private Result<UnitSnapshot> BuildUnit(string actorId, string heroId, string team, int slot, int level, int growthBp)
     {
         HeroCombatConfig? hero = _config.Get<HeroCombatConfig>(HeroType, heroId);
         if (hero is null)
@@ -122,13 +129,15 @@ public sealed class CombatInputResolver
             return Result.Failure<UnitSnapshot>(skills.Error);
         }
 
-        var snapshot = new UnitSnapshot(
-            actorId,
-            heroId,
-            team,
-            slot,
-            new UnitStats(hero.BaseStats.Hp, hero.BaseStats.Atk, hero.BaseStats.Def, hero.BaseStats.Spd),
-            skills.Value);
+        // Chỉ số theo cấp (Phase 35): công thức tất định integer dùng chung với luồng nâng cấp
+        // (HeroStatCalculator) ⇒ chỉ số vào trận khớp chỉ số hiển thị. Cấp 1 ⇒ chỉ số nền.
+        var stats = new UnitStats(
+            HeroStatCalculator.ScaleStat(hero.BaseStats.Hp, level, growthBp),
+            HeroStatCalculator.ScaleStat(hero.BaseStats.Atk, level, growthBp),
+            HeroStatCalculator.ScaleStat(hero.BaseStats.Def, level, growthBp),
+            HeroStatCalculator.ScaleStat(hero.BaseStats.Spd, level, growthBp));
+
+        var snapshot = new UnitSnapshot(actorId, heroId, team, slot, stats, skills.Value);
         return Result.Success(snapshot);
     }
 

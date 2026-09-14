@@ -14,6 +14,14 @@
 - Nhận yêu cầu nâng cấp → **kiểm tài nguyên + áp công thức config** → cập nhật hero instance (atomic).
 - Không chứa số cân bằng (đường cong cost ở config — `../mvp/10` EC4).
 
+### Nâng cấp Level + Power Rating (Phase 35 — đã hiện thực)
+Trục **Level (Must)** đã hiện thực (F06): `LevelUpHeroCommand` tiêu **Gold** atomic (Phase 31, `CurrencyWalletService` +
+`SELECT … FOR UPDATE` + `TransactionBehavior`) mỗi cấp; **stat computation** + **Power Rating** = một nguồn tất định
+integer (`HeroStatCalculator`, round-half-up) đọc đường cong/tăng-trưởng/trọng-số từ **`economy` config** (data-driven —
+`cost_curves.level_up`, `level_stat_growth_bp`, `power_weights`; ADR-004). Chỉ số theo cấp đi vào combat qua team snapshot
+(nâng cấp ⇒ đánh mạnh hơn). Server-authoritative; client chỉ gửi intent + hiển thị. `cost_curves.level_up` là **sink Gold**
+chính giai đoạn đầu. Chi tiết: `hero-system.md` §9, `../roadmap/35-hero-upgrade-level.md`.
+
 ## 2. Economy module
 
 ### Currencies & tài nguyên (MVP)

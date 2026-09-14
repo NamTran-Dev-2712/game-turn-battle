@@ -23,7 +23,7 @@
 
 | Lớp | Cơ chế | Nguồn tài nguyên | MVP? | WHY |
 |---|---|---|---|---|
-| Level (EXP) | Tăng cấp hero bằng EXP | AFK, campaign, EXP item | ✅ Must | Trục power cơ bản, tăng đều |
+| Level | Tăng cấp hero (tiêu Gold) | AFK, campaign → Gold | ✅ Must — **Hiện thực Phase 35** | Trục power cơ bản, tăng đều. **Hiện thực**: `LevelUpHeroCommand` tiêu Gold atomic (Phase 31) mỗi cấp; đường cong cost/tăng-trưởng ở `economy` config (data-driven); chỉ số theo cấp = base × hàm(level) integer, ảnh hưởng combat; server-authoritative. MVP dùng **Gold mỗi cấp** (không EXP item riêng — nợ tuning). Chi tiết: `../gameplay/hero-system.md` §9 |
 | Nâng sao / Ascension | Nâng bậc bằng mảnh/bản sao hero | Gacha dup, fragment, campaign | 🟡 Should | Mục tiêu trung hạn, "hút" gacha |
 | Skill level | Nâng cấp kỹ năng riêng | Mat chuyên biệt | 🔵 Could/Post | Chiều sâu, nhưng có thể hoãn |
 | Equipment | Lắp trang bị | Drop/mat | 🟡 Should | Trục power song song |
@@ -46,7 +46,7 @@ flowchart LR
 
 | Khái niệm | Mô tả |
 |---|---|
-| Power Rating | Một con số tổng hợp sức mạnh hero/đội (từ stats + level + sao + gear) |
+| Power Rating | Một con số tổng hợp sức mạnh hero (từ chỉ số cuối). **Hiện thực Phase 35**: `HeroStatCalculator.Power` = tổng có trọng số integer của chỉ số theo cấp (trọng số ở `economy.power_weights` config), **tính-khi-đọc** (không lưu → không stale). Sao/gear cộng vào sau (39/38). Chưa nối power-gate campaign (mở khoá tuần tự) |
 | Team Power | Tổng/tổ hợp power 6 hero + bonus formation/faction |
 | Gate độ khó | Stage/tower yêu cầu power ngưỡng → tạo "tường" cần vượt |
 

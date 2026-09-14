@@ -10,11 +10,27 @@
     "id": { "$ref": "https://game-team/schema/common.schema.json#/$defs/economy_id" },
     "cost_curves": {
       "type": "object",
-      "description": "Ánh xạ tên đường cong (vd level_up, ascension) -> mảng bước chi phí integer. Nội dung bước là tuning.",
+      "description": "Ánh xạ tên đường cong (vd level_up, ascension) -> mảng bước chi phí integer. Nội dung bước là tuning. Với level_up: phần tử thứ i là chi phí (gold) để lên từ cấp (i+1) sang (i+2) ⇒ số cấp tối đa = 1 + độ dài mảng (Phase 35).",
       "additionalProperties": {
         "type": "array",
         "items": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
       }
+    },
+    "level_stat_growth_bp": {
+      "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int",
+      "description": "Tăng trưởng chỉ số mỗi cấp theo basis points của chỉ số nền (Phase 35, ADR-004/011). VD 800 = +8%/cấp; chỉ số cấp L = base + round_half_up(base * bp * (L-1) / 10000) — integer, tất định, áp đều cho hp/atk/def/spd. GIÁ TRỊ THẬT là tuning, additive (không bump schema_version)."
+    },
+    "power_weights": {
+      "type": "object",
+      "description": "Trọng số integer cho Power Rating = tổng có trọng số của chỉ số cuối (Phase 35). GIÁ TRỊ THẬT là tuning; công thức là cơ chế (không hardcode ở code).",
+      "required": ["hp", "atk", "def", "spd"],
+      "properties": {
+        "hp": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "atk": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "def": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" },
+        "spd": { "$ref": "https://game-team/schema/common.schema.json#/$defs/combat_int" }
+      },
+      "additionalProperties": false
     },
     "energy": {
       "type": "object",

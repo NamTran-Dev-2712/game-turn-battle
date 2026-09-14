@@ -11,6 +11,8 @@ extends RefCounted
 const HERO_TYPE: StringName = &"hero"
 const SKILL_TYPE: StringName = &"skill"
 const STAGE_TYPE: StringName = &"stage"
+const ECONOMY_TYPE: StringName = &"economy"
+const ECONOMY_ID: String = "economy_default"
 const TEAM_ALLY: String = "ally"
 const TEAM_ENEMY: String = "enemy"
 
@@ -30,7 +32,12 @@ func resolve(request: Dictionary, config_provider: Node) -> BattleInput:
 
 	var rules := CombatRules.from_dict(stage.get("combat_rules", {}), max_rounds)
 
-	var ally := _build_ally(request.get("ally", []), config_provider)
+	# Tăng trưởng chỉ số theo cấp (Phase 35, data-driven — ADR-004). Thiếu economy ⇒ 0 (chỉ số nền);
+	# ally cấp 1 không cần economy. Địch luôn cấp 1 (không chủ sở hữu). Khớp server CombatInputResolver.cs.
+	var economy: Dictionary = config_provider.get_entry(ECONOMY_TYPE, ECONOMY_ID)
+	var growth_bp := HeroStats.growth_bp(economy)
+
+	var ally := _build_ally(request.get("ally", []), growth_bp, config_provider)
 	var enemy := _build_enemies(stage.get("enemies", []), config_provider)
 
 	var basic_skill := _build_skill(basic_skill_id, skill)
@@ -46,37 +53,43 @@ func resolve(request: Dictionary, config_provider: Node) -> BattleInput:
 	return input
 
 
-func _build_ally(members: Array, config_provider: Node) -> Array[UnitSnapshot]:
+func _build_ally(members: Array, growth_bp: int, config_provider: Node) -> Array[UnitSnapshot]:
 	var units: Array[UnitSnapshot] = []
 	for member in members:
 		var m := member as Dictionary
 		units.append(_build_unit(
-			str(m.get("actor_id", "")), str(m.get("hero_id", "")), TEAM_ALLY, int(m.get("slot", 0)), config_provider))
+			str(m.get("actor_id", "")), str(m.get("hero_id", "")), TEAM_ALLY, int(m.get("slot", 0)),
+			int(m.get("level", 1)), growth_bp, config_provider))
 	return units
 
 
 # Địch bám stage config gameplay (chỉ hero_id + slot?): định danh actor_id suy ra "enemy_{i}" (khớp server
-# CombatInputResolver.cs — tất định), slot lấy từ config hoặc chỉ số thứ tự.
+# CombatInputResolver.cs — tất định), slot lấy từ config hoặc chỉ số thứ tự. Địch luôn cấp 1 (chỉ số nền).
 func _build_enemies(enemies: Array, config_provider: Node) -> Array[UnitSnapshot]:
 	var units: Array[UnitSnapshot] = []
 	for i in enemies.size():
 		var e := enemies[i] as Dictionary
 		units.append(_build_unit(
-			"enemy_%d" % i, str(e.get("hero_id", "")), TEAM_ENEMY, int(e.get("slot", i)), config_provider))
+			"enemy_%d" % i, str(e.get("hero_id", "")), TEAM_ENEMY, int(e.get("slot", i)), 1, 0, config_provider))
 	return units
 
 
-func _build_unit(actor_id: String, hero_id: String, team: String, slot: int, config_provider: Node) -> UnitSnapshot:
+func _build_unit(
+		actor_id: String, hero_id: String, team: String, slot: int, level: int, growth_bp: int,
+		config_provider: Node) -> UnitSnapshot:
 	var hero: Dictionary = config_provider.get_entry(HERO_TYPE, hero_id)
 	assert(not hero.is_empty(), "COMBAT_HERO_CONFIG_NOT_FOUND: %s" % hero_id)
 	# Chấp nhận cả hai hình dạng chỉ số: lồng `base_stats` (schema hero phase 16) hoặc phẳng (combat).
 	var stats_src: Dictionary = hero.get("base_stats", hero)
+	# Chỉ số theo cấp (Phase 35): công thức tất định integer dùng chung với hiển thị/nâng cấp (HeroStats)
+	# ⇒ replay client khớp server. Cấp 1 ⇒ chỉ số nền.
+	var scaled: Dictionary = HeroStats.scaled_stats(stats_src, level, growth_bp)
 	var u := UnitSnapshot.new()
 	u.actor_id = actor_id
 	u.hero_id = hero_id
 	u.team = team
 	u.slot = slot
-	u.stats = UnitStats.from_dict(stats_src)
+	u.stats = UnitStats.from_dict(scaled)
 	u.skills = _build_unit_skills(hero, config_provider)
 	return u
 

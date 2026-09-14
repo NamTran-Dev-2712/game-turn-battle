@@ -69,14 +69,15 @@ Bảng **`owned_heroes`** — hero người chơi sở hữu, mở rộng gốc 
 | Thành phần | File | Ghi chú |
 |---|---|---|
 | EF config | `Persistence/Configurations/OwnedHeroConfiguration.cs` | `ToTable("owned_heroes")`; cột `snake_case`: `id`(uuid PK, `ValueGeneratedNever`), `profile_id`, `hero_id`, `level`, `stars`, `created_at`. Index `ix_owned_heroes_profile_id` + **unique `(profile_id, hero_id)`** (chống cấp trùng) + **FK → `player_profiles.id`** (cascade). `Ignore(DomainEvents)`. |
-| Repository | `Persistence/Repositories/OwnedHeroRepository.cs` | Hiện thực `IOwnedHeroRepository` (`GetById`+`Add`+**`GetByProfileIdAsync`**); không rò `IQueryable`/`DbContext`. |
+| Repository | `Persistence/Repositories/OwnedHeroRepository.cs` | Hiện thực `IOwnedHeroRepository` (`GetById`+`Add`+**`GetByProfileIdAsync`**+**`GetByProfileAndHeroForUpdateAsync`** — SELECT … FOR UPDATE, Phase 35, tuần tự hoá nâng cấp đồng thời); không rò `IQueryable`/`DbContext`. |
 | Migration | `Persistence/Migrations/*_AddOwnedHeroes.cs` | Tạo bảng + PK + FK + 2 index. `has-pending-model-changes` sạch. |
 | DI | `DependencyInjection.cs` | `IOwnedHeroRepository → OwnedHeroRepository` (scoped). `DbSet<OwnedHero>` thêm vào `AppDbContext`. |
 
 - **Definition KHÔNG lưu ở bảng này** — đọc từ config qua `IConfigProvider` (data-driven). Bảng chỉ giữ trạng thái instance
   (ownership + level/sao nền).
-- **Seed tạm (tới phase 33):** guest login cấp hero từ config **cùng transaction** account+profile (`CreateGuestAccountCommandHandler`).
-- Test: Testcontainers pg16 — round-trip theo `profile_id`, unique `(profile_id, hero_id)`, dispatch `OwnedHeroGranted` (§5.1).
+- **Seed tạm (tới phase 33):** guest login cấp hero từ config **cùng transaction** account+profile (`CreateGuestAccountCommandHandler`). (Đã gỡ ở Phase 33 — nhận hero qua summon.)
+- **Nâng cấp Level (Phase 35):** `OwnedHero.LevelUp()` tăng cột `level` sẵn có (raise `OwnedHeroLeveledUp`) — **không thêm cột ⇒ không cần migration mới** (`has-pending-model-changes` sạch). `LevelUpHeroCommand` khoá dòng hero (`GetByProfileAndHeroForUpdateAsync`) + tiêu gold qua `CurrencyWalletService` (§1.5) trong một transaction. Chỉ số/Power **không lưu** — tính từ config + cấp (`HeroStatCalculator`). Chi tiết: `../gameplay/hero-system.md` §9.
+- Test: Testcontainers pg16 — round-trip theo `profile_id`, unique `(profile_id, hero_id)`, dispatch `OwnedHeroGranted` (§5.1); nâng cấp end-to-end + combat theo cấp ở `Api.IntegrationTests/LevelUpHeroEndpointTests` (Phase 35).
 
 ### 1.4 Battle + Wallet persistence (Phase 30 — đóng & verify)
 

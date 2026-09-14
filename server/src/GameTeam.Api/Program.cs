@@ -10,6 +10,7 @@ using GameTeam.Application.Features.Campaign;
 using GameTeam.Application.Features.Diagnostics.Commands;
 using GameTeam.Application.Features.Diagnostics.Queries;
 using GameTeam.Application.Features.Economy.Queries;
+using GameTeam.Application.Features.Heroes.Commands;
 using GameTeam.Application.Features.Heroes.Queries;
 using GameTeam.Application.Features.Inventory.Queries;
 using GameTeam.Application.Features.Profile.Commands;
@@ -157,6 +158,20 @@ apiV1.MapGet("/heroes/{heroId}/definition", (string heroId, ISender sender, Http
     .AllowAnonymous()
     .Produces<HeroDefinitionDto>(StatusCodes.Status200OK)
     .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound);
+
+// POST /api/v1/heroes/{heroId}/level-up (Phase 35): nâng cấp hero MỘT cấp — server-authoritative + atomic
+// (ADR-004/007/011). Body rỗng (INTENT): server lấy cấp hiện tại + đường cong config → tiêu gold atomic
+// (Phase 31) → tăng cấp → tính lại chỉ số + Power, trả LevelUpHeroResponse. Chủ sở hữu suy từ token (chống
+// IDOR). Protected mặc định. Thiếu gold ⇒ 409; hero không sở hữu ⇒ 404; đã max cấp ⇒ 409.
+apiV1.MapPost("/heroes/{heroId}/level-up", (string heroId, ISender sender, HttpContext httpContext) =>
+        ApiResults.ToResponseAsync(sender.Send(new LevelUpHeroCommand(heroId)), httpContext))
+    .WithName("LevelUpHero")
+    .MapToApiVersion(1)
+    .Produces<LevelUpHeroResponse>(StatusCodes.Status200OK)
+    .Produces<ErrorEnvelope>(StatusCodes.Status400BadRequest)
+    .Produces<ErrorEnvelope>(StatusCodes.Status401Unauthorized)
+    .Produces<ErrorEnvelope>(StatusCodes.Status404NotFound)
+    .Produces<ErrorEnvelope>(StatusCodes.Status409Conflict);
 
 // GET /api/v1/team (Phase 29): đội hình CHÍNH mình — chủ sở hữu suy từ token sub (GetMyTeamQuery →
 // ICurrentUser), KHÔNG nhận owner từ client (chống IDOR). Protected mặc định. Chưa lưu ⇒ đội rỗng (lưới

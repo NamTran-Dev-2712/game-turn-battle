@@ -147,3 +147,13 @@ Short execution hints. Canonical design: `docs/godot/`. Agent: `.claude/agents/g
   có trong response (audit server-only). Fallback KHÔNG im lặng (Rule E): lỗi ⇒ nhãn lỗi + Thử lại, KHÔNG bịa. **KHÔNG thêm event EventBus**
   (tái dùng `state_refreshed` qua apply_*). **Reuse `NetworkClient`/`ConfigProvider`/`StateCache`/generated DTO — KHÔNG parser/RNG thứ 2.**
   Ngoài scope: banner rotation/limited (Post-MVP), ascension (39). Canonical: `docs/gameplay/progression-and-economy.md` §5 + `.memory/0031`.
+- **Hero upgrade — Level (Phase 35, closed):** màn **Hero Detail** (`client/src/ui/hero_detail/`) hiển thị chỉ số **theo cấp**
+  + **Power Rating** + **chi phí gold** + gold; nút "Nâng cấp" gửi **intent** → presenter `POST /heroes/{id}/level-up`
+  (server-authoritative) → refresh hero + ví **AUTHORITATIVE** (`StateCache.apply_heroes`/`apply_wallet` → `state_refreshed`).
+  Chỉ số hiển thị tính bằng **`client/src/shared/hero_stats.gd`** — công thức data-driven (đọc `economy` config qua
+  `ConfigProvider.get_entry("economy","economy_default")`) **khớp bit server `HeroStatCalculator`** (chỉ để hiển thị/replay,
+  KHÔNG chân lý). `combat_input_resolver.gd` nhân chỉ số ally theo cấp (địch = nền); `battle_presenter._replay` ghép cấp từ
+  `StateCache.get_heroes()`. Parser `parse_level_up_hero_response` → generated `LevelUpHeroResponse` (DO-NOT-EDIT). Thất bại
+  (thiếu gold 409/max cấp/không sở hữu) ⇒ hiện mã lỗi, **không** mutate cục bộ. **View network-free** (presenter là điểm chạm);
+  **KHÔNG** tự tăng cấp/chỉ số/Power/trừ gold; **KHÔNG thêm event EventBus** (tái dùng `state_refreshed`). Ngoài scope: EXP item,
+  batch, ascension (39). Canonical: `docs/gameplay/hero-system.md` §9 + `docs/godot/ui-architecture.md` §4.3 + `.memory/0033`.

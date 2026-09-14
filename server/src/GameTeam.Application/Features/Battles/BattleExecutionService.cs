@@ -28,6 +28,7 @@ namespace GameTeam.Application.Features.Battles;
 public sealed class BattleExecutionService
 {
     private readonly ITeamRepository _teams;
+    private readonly IOwnedHeroRepository _ownedHeroes;
     private readonly CombatInputResolver _resolver;
     private readonly BattleSimulator _simulator;
     private readonly IBattleRecordRepository _battleRecords;
@@ -36,6 +37,7 @@ public sealed class BattleExecutionService
 
     public BattleExecutionService(
         ITeamRepository teams,
+        IOwnedHeroRepository ownedHeroes,
         CombatInputResolver resolver,
         BattleSimulator simulator,
         IBattleRecordRepository battleRecords,
@@ -43,6 +45,7 @@ public sealed class BattleExecutionService
         IClock clock)
     {
         _teams = Guard.NotNull(teams);
+        _ownedHeroes = Guard.NotNull(ownedHeroes);
         _resolver = Guard.NotNull(resolver);
         _simulator = Guard.NotNull(simulator);
         _battleRecords = Guard.NotNull(battleRecords);
@@ -84,7 +87,15 @@ public sealed class BattleExecutionService
             return BattleErrors.TeamEmpty;
         }
 
-        IReadOnlyList<CombatTeamMember> ally = TeamSnapshotFactory.Create(team);
+        // Cấp hero owned (Phase 35) → chỉ số vào trận tính theo cấp (data-driven). Thiếu ⇒ cấp 1 (nền).
+        IReadOnlyList<Domain.Heroes.OwnedHero> owned = await _ownedHeroes.GetByProfileIdAsync(profileId, cancellationToken);
+        var levelByHeroId = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (Domain.Heroes.OwnedHero hero in owned)
+        {
+            levelByHeroId[hero.HeroId] = hero.Level;
+        }
+
+        IReadOnlyList<CombatTeamMember> ally = TeamSnapshotFactory.Create(team, levelByHeroId);
 
         // Server sinh seed (không để client chọn — ADR-011).
         long seed = _seedSource.Next();

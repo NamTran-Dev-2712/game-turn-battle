@@ -178,6 +178,19 @@ You implement client features for the **Godot 4.7 GDScript** project (`client/`)
   the net.** `parse_campaign_progress` → generated `CampaignProgressDto`/`CampaignStageDto` (DO-NOT-EDIT). Verify: gdUnit4 156
   (`campaign_presenter_test.gd`). Out of scope: AFK accrual UI (37). Canonical: `docs/gameplay/progression-and-economy.md` §2b;
   decision log `.memory/0032-campaign-pve-standardized.md`.
+- **Hero upgrade feature (Phase 35, closed):** the hero detail screen `src/ui/hero_detail/` (`HeroDetailView` **network-free** +
+  `HeroDetailPresenter`) shows **level-scaled** stats + **Power Rating** + **gold cost** + current gold; the "Nâng cấp" button
+  emits an **intent** → presenter `post_json("/heroes/{id}/level-up", {}, parse_level_up_hero_response)` (server-authoritative) →
+  refresh owned heroes + wallet **AUTHORITATIVE** into `StateCache` (`apply_heroes`/`apply_wallet` → `state_refreshed` → auto
+  re-render). Displayed stats are computed by **`src/shared/hero_stats.gd`** — a data-driven formula (reads `economy` config via
+  `ConfigProvider.get_entry(&"economy","economy_default")`) that **matches the server `HeroStatCalculator` bit-for-bit** (display/
+  replay only, never authority); `combat_input_resolver.gd` scales ally stats by level (enemies = base) and `battle_presenter._replay`
+  joins levels from `StateCache.get_heroes()`. Failure (insufficient gold 409 / max level / not owned) ⇒ show error code, **no local
+  mutation**. **View calls no network** (presenter is the only touchpoint); the client never levels up / computes stats/Power / spends
+  gold; **no new EventBus event** (reuse `state_refreshed`). `parse_level_up_hero_response` → generated `LevelUpHeroResponse` (DO-NOT-EDIT).
+  Verify: gdUnit4 167 (`hero_detail_presenter_test.gd` +3, `hero_stats_test.gd`, `state_cache_test` `apply_heroes`, `combat_input_resolver`
+  level-scaling). Out of scope: EXP item, ascension (39). Canonical: `docs/gameplay/hero-system.md` §9 + `docs/godot/ui-architecture.md`
+  §4.3; decision log `.memory/0033-hero-upgrade-level-standardized.md`.
 
 ## Definition of Done
 Per `docs/ai/review-and-dod.md`: gdUnit4 tests for new logic (golden-vector test if the sim changed), no Forbidden Patterns, docs updated per `.claude/workflows/documentation-sync.md`.

@@ -46,6 +46,7 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("/api/v1/config/bundle")]  //           as current-version + versioned-bundle endpoints
     [InlineData("/api/v1/heroes")]                       // Phase 27: owned heroes (server-authoritative)
     [InlineData("/api/v1/heroes/{heroId}/definition")]  //           + hero definition from config
+    [InlineData("/api/v1/heroes/{heroId}/level-up")]     // Phase 35: level up (spend gold → scaled stats)
     [InlineData("/api/v1/team")]                         // Phase 29: team/formation (get + save)
     [InlineData("/api/v1/battles")]                      // Phase 30: start battle (re-sim → BattleResult)
     [InlineData("/api/v1/wallet")]                       // Phase 31: read currency balances (server-authoritative)
@@ -70,6 +71,7 @@ public class OpenApiContractTests : IClassFixture<ApiTestFactory>
     [InlineData("MyHeroesResponse")]   // Phase 27
     [InlineData("HeroDefinitionDto")]  // Phase 27
     [InlineData("HeroBaseStatsDto")]   // Phase 27
+    [InlineData("LevelUpHeroResponse")] // Phase 35
     [InlineData("TeamDto")]            // Phase 29
     [InlineData("TeamSlotDto")]        // Phase 29
     [InlineData("SaveTeamRequest")]    // Phase 29
